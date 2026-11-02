@@ -1148,7 +1148,7 @@
       impossible: {
         tag: 'Impossible', sub: 'No help. 4 minutes. 5 strikes.', limit: 240, hintsOn: false, strikes: 5,
         desc: 'Nine stages. No hints, no task list, no mercy. A clock runs and the IDS locks you out after 5 strikes (wrong guesses, blocked requests, failed logins). Almost nobody finishes.',
-        mission: ['ROOM: Ghost in the Shell', 'Hardened box at ' + IP + ' (alias "target"). It logs everything.', 'No map this time. Enumerate, pivot, escalate. Root flag only.'],
+        mission: ['ROOM: Ghost in the Shell', 'Hardened box at ' + IP + ' (alias "target"). It logs everything.', 'No map this time. Enumerate, pivot, escalate. Root flag only. Your box runs Arch, btw.'],
         tasks: [],
         hints: [],
         acts: [
@@ -1174,13 +1174,14 @@
       }
     };
     var lvKey = 'easy', st = null, timer = 0, idle = true;
+    function host() { return lvKey === 'impossible' ? 'arch' : 'kali'; }
     function fmt(s) { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
     function bestOf(k) { try { return localStorage.getItem('gbest_' + k); } catch (e) { return null; } }
     function showBest() { var b = bestOf(lvKey); bEl.textContent = b ? fmt(+b) : '-'; }
     function el(tag, cls, txt) { var d = document.createElement(tag); if (cls) d.className = cls; if (txt != null) d.textContent = txt; return d; }
     var TITLES_G = { easy: 'Break In', normal: 'Backup Blues', impossible: 'Ghost in the Shell' }, overEl = $('#g-over');
     function showDesc() {
-      var L = LV[lvKey]; $('#g-title').textContent = TITLES_G[lvKey]; $('#g-badge').textContent = L.sub; $('#g-blurb').textContent = L.desc; box.setAttribute('data-lv', lvKey);
+      var L = LV[lvKey]; $('#g-title').textContent = TITLES_G[lvKey]; $('#g-badge').textContent = L.sub; $('#g-blurb').textContent = L.desc; box.setAttribute('data-lv', lvKey); $('.gm-term .term-bar span').textContent = 'attacker@' + host() + ': room.thm';
     }
     function sendCmd(c, run) { inp.value = c; if (run) { form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true })); } else inp.focus(); }
     function renderTask() {
@@ -1241,7 +1242,7 @@
     }
     function run(line) {
       var raw = line.trim().replace(/\s+/g, ' '); if (!raw || !st || st.done) return;
-      pr(out, 'attacker@kali:~$ ' + (st.ask ? '********' : raw), 'c');
+      pr(out, 'attacker@' + host() + ':~$ ' + (st.ask ? '********' : raw), 'c');
       var L = LV[lvKey];
       if (st.ask) {
         if (st.ask.re.test(raw)) { var k = st.ask; st.ask = null; st.fail = 0; st.tok[k.gives] = 1; pr(out, k.out, 'ok'); renderTask(); }
