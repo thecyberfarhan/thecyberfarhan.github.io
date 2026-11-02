@@ -68,6 +68,27 @@
       var a = pr[glk[i][0]], b = pr[glk[i][1]], al = (0.05 + ((a.z + b.z) / 2 + 1) * 0.1) * la * Math.min(a.f, b.f); if (al < 0.01) continue;
       gctx.strokeStyle = 'rgba(' + P.link + ',' + al.toFixed(3) + ')'; gctx.beginPath(); gctx.moveTo(a.x, a.y); gctx.lineTo(b.x, b.y); gctx.stroke();
     }
+    var ra = ease3(G.grow);
+    if (ra > 0.02) {
+      var rings = [[1.28, 1.15, 0.5, 0.0004, 5], [1.55, 0.55, -0.9, -0.0003, 3.2]];
+      for (var ri = 0; ri < rings.length; ri++) {
+        var rg = rings[ri], seg = 72, last = null, ang0 = t * rg[3] * 1000;
+        for (var sg = 0; sg <= seg; sg++) {
+          var th2 = sg / seg * 6.283, ox = Math.cos(th2) * rg[0], oz = Math.sin(th2) * rg[0], oy = 0;
+          var y1 = oy * Math.cos(rg[1]) - oz * Math.sin(rg[1]), z1 = oy * Math.sin(rg[1]) + oz * Math.cos(rg[1]), x1 = ox;
+          var x2 = x1 * Math.cos(rg[2]) - y1 * Math.sin(rg[2]), y2 = x1 * Math.sin(rg[2]) + y1 * Math.cos(rg[2]);
+          var x3 = x2 * cyaw + z1 * syaw, z3 = -x2 * syaw + z1 * cyaw, y3 = y2 * cp - z3 * sp; z3 = y2 * sp + z3 * cp;
+          var s3 = 1 / (1.9 - z3 * 0.5), px = cx + x3 * R * s3 * 1.9, py = cy + y3 * R * s3 * 1.9;
+          if (last) { gctx.strokeStyle = 'rgba(' + (ri ? P.hot : P.link) + ',' + (0.1 * ra * (0.4 + (z3 + 1) / 2)).toFixed(3) + ')'; gctx.beginPath(); gctx.moveTo(last[0], last[1]); gctx.lineTo(px, py); gctx.stroke(); }
+          last = [px, py];
+        }
+        var sat = (t * rg[4] * 0.2) % 6.283, sx = Math.cos(sat) * rg[0], sz = Math.sin(sat) * rg[0], sy1 = sz * Math.sin(rg[1]), sz1 = sz * Math.cos(rg[1]), sx2 = sx * Math.cos(rg[2]) - (-sy1 * 0 + (0 * Math.cos(rg[1]) - sz * Math.sin(rg[1]))) * Math.sin(rg[2]);
+        var yy1 = 0 * Math.cos(rg[1]) - sz * Math.sin(rg[1]), yy2 = sx * Math.sin(rg[2]) + yy1 * Math.cos(rg[2]), xx2 = sx * Math.cos(rg[2]) - yy1 * Math.sin(rg[2]);
+        var xx3 = xx2 * cyaw + sz1 * syaw, zz3 = -xx2 * syaw + sz1 * cyaw, yy3 = yy2 * cp - zz3 * sp; zz3 = yy2 * sp + zz3 * cp;
+        var ss = 1 / (1.9 - zz3 * 0.5);
+        gctx.fillStyle = 'rgba(' + (ri ? P.hot : P.node) + ',' + (0.8 * ra).toFixed(2) + ')'; gctx.beginPath(); gctx.arc(cx + xx3 * R * ss * 1.9, cy + yy3 * R * ss * 1.9, 3.2, 0, 6.283); gctx.fill();
+      }
+    }
     for (i = 0; i < pr.length; i++) {
       var q2 = pr[i], dep = (q2.z + 1) / 2;
       if (gp[i].hot) { var pulse = 0.6 + Math.sin(t * 2 + i) * 0.4; gctx.fillStyle = 'rgba(' + P.hot + ',' + (0.35 + dep * 0.55).toFixed(2) + ')'; gctx.beginPath(); gctx.arc(q2.x, q2.y, (2.4 + pulse * 1.2) * q2.s * 1.4, 0, 6.283); gctx.fill(); }
@@ -204,14 +225,9 @@
     if (prog) prog.style.strokeDashoffset = 119.4 * (1 - frac);
     root.style.setProperty('--scroll', y);
     nav.classList.toggle('scrolled', y > 30);
-    if (motion) {
-      nav.style.transform = (y > lastY && y > 500 && !pill.classList.contains('open')) ? 'translateY(-90px)' : '';
-      var k = Math.min(y / innerHeight, 1.4);
-      if (copy) copy.style.transform = 'translate3d(0,' + (y * 0.18) + 'px,0)';
-      if (medalWrap) medalWrap.style.transform = 'translate3d(0,' + (y * 0.3) + 'px,0) scale(' + Math.max(1 - k * 0.18, 0.7) + ')';
-      if (gl) gl.style.opacity = Math.max(0.85 - k * 0.8, 0); G.show = y < innerHeight * 1.5; if (G.show) startGlobe(); else G.running = false;
-      if (medal && !fineMouse) medal.style.setProperty('--my', Math.min(y / 14, 24) + 'deg');
-    }
+    nav.style.transform = (y > lastY && y > 500 && !pill.classList.contains('open')) ? 'translateY(-90px)' : '';
+    if (medal && !fineMouse) medal.style.setProperty('--my', Math.min(y / 14, 24) + 'deg');
+    G.show = y < innerHeight * 1.5; if (G.show) startGlobe(); else G.running = false;
     lastY = y;
     var cur = null;
     secs.forEach(function (o) { if (o.s && o.s.getBoundingClientRect().top < innerHeight * 0.45) cur = o; });
@@ -221,6 +237,15 @@
   }
   window.addEventListener('scroll', function () { if (!ticking) { ticking = true; requestAnimationFrame(onScroll); } }, { passive: true });
   onScroll();
+  var ssy = 0;
+  (function plx() {
+    ssy += (sy - ssy) * 0.1;
+    var k = Math.min(ssy / innerHeight, 1.4);
+    if (copy) copy.style.transform = 'translate3d(0,' + (ssy * 0.18).toFixed(2) + 'px,0)';
+    if (medalWrap) medalWrap.style.transform = 'translate3d(0,' + (ssy * 0.3).toFixed(2) + 'px,0) scale(' + Math.max(1 - k * 0.18, 0.7).toFixed(4) + ')';
+    if (gl) gl.style.opacity = Math.max(0.85 - k * 0.8, 0).toFixed(3);
+    requestAnimationFrame(plx);
+  })();
 
   /* ---------- section transitions: scan sweep ---------- */
   var scan = $('#scan'), sctx = scan && scan.getContext('2d'), busy = false;
@@ -279,6 +304,23 @@
       go(id, name.charAt(0).toUpperCase() + name.slice(1));
     });
   });
+
+  /* ---------- smooth wheel scrolling (mouse notches glide, trackpads stay native) ---------- */
+  var sT = 0, sC = 0, sOn = false;
+  function sClamp(v) { return Math.max(0, Math.min(v, document.documentElement.scrollHeight - innerHeight)); }
+  window.addEventListener('wheel', function (e) {
+    if (e.ctrlKey || busy || !motion) return;
+    var d = e.deltaMode === 1 ? e.deltaY * 34 : e.deltaMode === 2 ? e.deltaY * innerHeight : e.deltaY;
+    if (!sOn && Math.abs(d) < 40) return;
+    e.preventDefault();
+    if (!sOn) { sC = window.scrollY; sT = sC; }
+    sT = sClamp(sT + d); sOn = true;
+  }, { passive: false });
+  (function sLoop() {
+    if (sOn) { sC += (sT - sC) * 0.09; if (Math.abs(sT - sC) < 0.4) { sC = sT; sOn = false; } window.scrollTo(0, sC); }
+    requestAnimationFrame(sLoop);
+  })();
+  window.addEventListener('keydown', function () { sOn = false; });
 
   /* ---------- pointer: reticle cursor with target lock, trail and click burst ---------- */
   var dot = $('.cursor-dot'), ring = $('.cursor-ring'), tag = $('.cursor-tag'), lock = $('.cur-lock'), fx = $('#curfx'), fctx = fx && fx.getContext('2d');
@@ -418,11 +460,22 @@
       bctx.beginPath(); bctx.arc(a.x, a.y, a.hot ? 2.4 : 1.4 * a.z + 0.4, 0, 6.283); bctx.fill();
     }
   }
+  var SNIP = ['0x41414141', 'root@kali:~#', 'nmap -sV -p-', 'SELECT * FROM users', 'CVE-2021-44228', 'HTTP/1.1 200 OK', 'sudo -l', 'id=1 OR 1=1', 'whoami', 'uid=0(root)', '/etc/shadow', '$ ssh user@lab', 'GET /admin 302', 'base64 -d', 'chmod +s /bin/bash', 'nc -lvnp 4444', 'XSS <script>', '0xdeadbeef', 'flag{...}', 'hashcat -m 0'], flo = [];
+  function mkFlo() { flo = []; var n = innerWidth < 820 ? 8 : 16; for (var i = 0; i < n; i++) flo.push({ t: SNIP[i % SNIP.length], x: Math.random(), y: Math.random() * 1.4, v: 0.08 + Math.random() * 0.16, z: 0.3 + Math.random() * 0.7 }); }
+  function drawFlo(P) {
+    if (!flo.length) mkFlo();
+    bctx.font = '11px "JetBrains Mono","Fira Code",ui-monospace,monospace'; bctx.textBaseline = 'middle';
+    for (var i = 0; i < flo.length; i++) {
+      var f = flo[i]; f.y -= f.v * 0.0006 * 16; if (f.y < -0.1) { f.y = 1.1; f.x = Math.random(); }
+      var yy = f.y * BH - (sy * 0.05 * f.z) % BH, a = Math.min(1, Math.min(f.y + 0.1, 1.1 - f.y) * 6) * 0.2 * f.z;
+      bctx.fillStyle = 'rgba(' + P.node + ',' + a.toFixed(3) + ')'; bctx.fillText(f.t, f.x * (BW - 160) + 20 + bmx * 20 * f.z, yy);
+    }
+  }
   function drawBg() {
     if (!bctx || !BW) return;
     bctx.clearRect(0, 0, BW, BH);
     var P = pal(), fade;
-    if (!nodes.length) mkNodes(); drawNet(P);
+    if (!nodes.length) mkNodes(); drawNet(P); drawFlo(P);
     for (var i = 0; i < shapes.length; i++) {
       var sh = shapes[i], cy = sh.doc - sy * sh.depth, cx = sh.x * BW + bmx * 30 * sh.depth;
       if (cy < -140 || cy > BH + 140) continue;
@@ -450,4 +503,108 @@
   document.addEventListener('visibilitychange', function () { if (document.hidden) bgRun = false; else startBg(); });
   sizeBg(); mkNodes(); drawBg(); startBg();
   window.addEventListener('load', function () { mkShapes(); });
+
+  /* ---------- idle nudges: whatever you are looking at gets sarcastic ---------- */
+  var TOOLQ = {
+    'Nmap': 'I have scanned all 65,535 of your attention ports. Every one is closed.',
+    'Nessus': 'Critical finding: visitor idle for 12 seconds. CVSS 9.8. Recommended fix: scroll.',
+    'Nikto': 'Found: one unattended visitor. Severity: embarrassing.',
+    'RustScan': 'I scan every port in seconds. You have not scrolled in twelve.',
+    'Masscan': 'Fastest scanner on the internet, slowest visitor on this page.',
+    'Subfinder': 'Found 0 subdomains of your motivation.',
+    'Shodan': 'I can see you. You are exposed, and you are not moving.',
+    'Maltego': 'Link analysis says you and the scroll wheel are not connected.',
+    'Burp Suite': 'Request intercepted: one visitor. Forward it, drop it, or just scroll.',
+    'OWASP ZAP': 'Spidering this entire page took two seconds. You are still on it.',
+    'ffuf': 'I fuzzed four thousand words and not one of them was "scroll".',
+    'feroxbuster': 'Recursion depth reached. Subject: you, staring.',
+    'SQLMap': 'Injected \' OR 1=1 -- into your attention. Still no response.',
+    'Caido': 'Proxying your boredom, free of charge.',
+    'XSStrike': 'Reflected: your stare. Not exploitable.',
+    'WPScan': 'No vulnerabilities found, apart from your scroll wheel.',
+    'Metasploit': 'I have thousands of exploits. None of them work on a bored visitor.',
+    'Cobalt Strike': 'Beacon check-in missed. Hello? Anyone there?',
+    'Mythic': 'Agent lost contact. Last known state: staring at me.',
+    'BloodHound': 'Shortest path to your next click: scroll down. One hop.',
+    'Impacket': 'Relaying your attention to nowhere. It works about as well as you do.',
+    'NetExec': 'Pwn3d! Just kidding, you are only idle.',
+    'Mimikatz': 'Dumped your credentials. Found nothing, you are not even logged into this page.',
+    'Evil-WinRM': 'Shell obtained. Unlike you, I actually move.',
+    'Hydra': 'Brute-forcing your attention at sixteen tries per second. Attempt 200: nothing.',
+    'John the Ripper': 'Cracked in 0.2 seconds. Your password was "idle".',
+    'Hashcat': 'GPU at 100 percent. You at 0 percent.',
+    'Wireshark': 'Packet capture shows zero packets from you in twelve seconds.',
+    'tcpdump': 'Listening... still listening... still listening...',
+    'Aircrack-ng': 'Handshake captured. Your tab is the only thing connected here.',
+    'Bettercap': 'Man in the middle: it is just you and this tab.',
+    'Ligolo-ng': 'Tunnel is up. You are not coming through it.',
+    'LinkedIn': 'I am a button. Pressing me is free and surprisingly painless.',
+    'GitHub': 'git push your courage.',
+    'TryHackMe': 'These numbers keep climbing while you stare. Think about that.',
+    'Writeups': 'Thirty-seven writeups and you chose staring. Bold.',
+    'Rooms gauge': 'A hundred rooms and counting. You are at zero scrolls and counting.',
+    'Rank gauge': 'Top 3 percent. You are top 100 percent of idle visitors.',
+    'Writeups gauge': 'Thirty-seven writeups. None of them are about watching a page.',
+    'TryHackMe card': 'This card updates live. So does your idle time.',
+    'Contact terminal': 'I typed all of that for you. The least you can do is read it.',
+    'Kali': 'Is this a pentest or a screensaver?',
+    'Linux': 'I am not mad. I am a zombie process waiting on you.',
+    'Windows': 'Waiting for you to do something. Windows Update does it too.',
+    'Python': 'import patience  # ModuleNotFoundError',
+    'Bash': 'exit 1: visitor idle.',
+    'PowerShell': 'Get-Visitor | Where-Object { $_.Active } returned nothing.',
+    'JavaScript': 'undefined is not a function. Neither are you, apparently.',
+    'SQL': 'SELECT * FROM visitors WHERE active = 1; 0 rows returned.',
+    'Docker': 'container "visitor" exited with code 0.',
+    'VS Code': 'You have unsaved changes. Specifically, your attention.',
+    'VMware': 'Your tab is also idling inside a virtual machine, probably.'
+  };
+  var SECQ = {
+    hero: [['$ whoami', 'A person waiting for you to scroll. Take your time.'], ['CPENT', 'Certified in penetration testing. Currently pen-testing your patience.'], ['Terminal', 'That lab session keeps running whether you read it or not.']],
+    about: [['About', 'Three cards. Each one is readable, and none of them bite.'], ['About', 'Fun fact: reading is not a vulnerability. You may proceed.']],
+    proof: [['Writeups', 'I wrote 37 of these so you could stare at one. Make it count.'], ['Mr Robot CTF', 'I cut a wordlist from 858,160 entries to 11,451. You can cut this staring.'], ['Cap', 'Even the IDOR in this box was less forgotten than this tab.'], ['Archetype', 'Credentials in plaintext history are a finding. Your idle tab is a pattern.'], ['Watcher', 'Six hops from www-data to root. You are one scroll from the next section.']],
+    sky: [['Contributions', 'I am 72 contributions tall. Staring at me will not make it 73.'], ['Skyline', 'The tallest bar is 10 commits. Your attention span is shorter than that.']],
+    live: [['TryHackMe', 'These numbers update live. You, on the other hand, do not.'], ['TryHackMe', 'Rank, rooms, writeups. All moving. Unlike you.']],
+    contact: [['LinkedIn', 'It is a button. Pressing it is free and surprisingly painless.'], ['GitHub', 'git push your courage.'], ['Contact', 'I do not bite, and I do not spam. Probably. Say hi.']],
+    tools: [['Tools', 'Eleven seconds is a long time to stare at a toolbox.']]
+  };
+  var MORE = ['Seriously, are you still there?', 'I can do this all day. Can you?', 'Okay, I am going to assume you went for coffee.', 'Last one, I promise. Scroll, click, anything.'];
+  var nEl = document.createElement('div'); nEl.className = 'nudge'; nEl.setAttribute('role', 'status'); nEl.innerHTML = '<span class="tile"></span><div><b></b><p></p></div><button type="button" aria-label="Dismiss">&times;</button>'; document.body.appendChild(nEl);
+  var nTile = $('.tile', nEl), nName = $('b', nEl), nMsg = $('p', nEl), lastAct = performance.now(), lastN = 0, nCount = 0, spoke = null, hideT = null, lastPick = '';
+  function act() { lastAct = performance.now(); nCount = 0; hideNudge(); }
+  ['wheel', 'keydown', 'pointerdown', 'touchstart'].forEach(function (ev) { window.addEventListener(ev, act, { passive: true }); });
+  var lastSY = 0; window.addEventListener('scroll', function () { if (Math.abs(window.scrollY - lastSY) > 24) { lastSY = window.scrollY; act(); } }, { passive: true });
+  nEl.querySelector('button').addEventListener('click', function () { hideNudge(); lastN = performance.now() + 10000; });
+  function hideNudge() { nEl.classList.remove('on'); if (spoke) { spoke.classList.remove('speak'); spoke = null; } clearTimeout(hideT); }
+  function inView(el) { var r = el.getBoundingClientRect(); return r.top > 60 && r.bottom < innerHeight - 40 && r.left >= 0 && r.right <= innerWidth; }
+  function sectionNow() {
+    var sky = $('.sky'); if (sky) { var r = sky.getBoundingClientRect(); if (r.top < innerHeight * 0.6 && r.bottom > innerHeight * 0.4) return 'sky'; }
+    var cur = 'hero', ids = ['hero', 'about', 'tools', 'proof', 'live', 'contact'];
+    ids.forEach(function (id) { var s = document.getElementById(id); if (s && s.getBoundingClientRect().top < innerHeight * 0.5) cur = id; });
+    return cur;
+  }
+  function nameOf(el) { var b = el.querySelector('b'), h = el.querySelector('h3'), l = el.querySelector('.tl'); return (b && b.textContent) || (h && h.textContent) || (l && l.textContent) || el.getAttribute('data-nudge') || ''; }
+  function pickSpeaker(sec) {
+    var sel = sec === 'tools' ? '.chip-tile, .tool-col li' : sec === 'proof' ? '.wcard, .stat' : sec === 'about' ? '.card' : sec === 'sky' ? '.sky' : sec === 'live' ? '.gauge, .live-card' : sec === 'contact' ? '.ccard, .cterm' : sec === 'hero' ? '.medal-stage, .termcard' : '';
+    if (!sel) return null; var list = $$(sel).filter(inView); return list.length ? list[Math.floor(Math.random() * list.length)] : null;
+  }
+  function showNudge() {
+    var sec = sectionNow(), el = pickSpeaker(sec), name = el ? nameOf(el) : '', msg = '', ic = null;
+    if (nCount >= 4) { name = 'Website'; msg = MORE[Math.min(nCount - 4, MORE.length - 1)]; el = null; }
+    else if (TOOLQ[name]) msg = TOOLQ[name];
+    else if (el && sec === 'proof' && name) { var one = SECQ.proof.filter(function (p) { return p[0] === name; })[0]; msg = one ? one[1] : 'Read me or keep staring. Both are valid, only one is useful.'; }
+    else { var pool = SECQ[sec] || SECQ.tools, hit = pool[Math.floor(Math.random() * pool.length)]; if (hit) { name = hit[0]; msg = hit[1]; } }
+    if (!msg || msg === lastPick) { var p2 = SECQ[sec] || SECQ.tools; var h2 = p2[Math.floor(Math.random() * p2.length)]; name = h2[0]; msg = h2[1]; }
+    lastPick = msg;
+    var src = el && el.querySelector('svg.ic'); nTile.innerHTML = src ? src.outerHTML : '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
+    nName.textContent = name; nMsg.textContent = msg;
+    if (spoke) spoke.classList.remove('speak'); spoke = el; if (el) { el.classList.remove('speak'); void el.offsetWidth; el.classList.add('speak'); }
+    nEl.classList.add('on'); lastN = performance.now(); nCount++;
+    clearTimeout(hideT); hideT = setTimeout(function () { nEl.classList.remove('on'); }, 7500);
+  }
+  setInterval(function () {
+    if (document.hidden || !root.classList.contains('done') || !motion) return;
+    var now = performance.now(), idle = now - lastAct;
+    if (idle > 12000 && now - lastN > 15000 && nCount < 8) showNudge();
+  }, 1000);
 })();
