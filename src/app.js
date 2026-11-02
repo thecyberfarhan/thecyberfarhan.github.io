@@ -149,7 +149,7 @@
           if (!e.isIntersecting) return;
           e.target.classList.add('is-in'); io.unobserve(e.target); countUp(e.target);
         });
-      }, { threshold: 0.14, rootMargin: '0px 0px -6% 0px' });
+      }, { threshold: 0.08, rootMargin: '0px 0px -3% 0px' });
       els.forEach(function (el) { io.observe(el); });
     } else { els.forEach(function (el) { el.classList.add('is-in'); countUp(el); }); }
     roleCycle(); termDemo(); hudTick();
@@ -160,7 +160,7 @@
     var list = $$('[data-count]', scope); if (scope.hasAttribute && scope.hasAttribute('data-count')) list.push(scope);
     list.forEach(function (b) {
       if (b.dataset.done) return; b.dataset.done = 1;
-      var end = +b.dataset.count, pre = b.dataset.prefix || '', suf = b.dataset.suffix || '', t0 = null, dur = 1400;
+      var end = +b.dataset.count, pre = b.dataset.prefix || '', suf = b.dataset.suffix || '', t0 = null, dur = 1000;
       function step(t) { if (!t0) t0 = t; var p = Math.min((t - t0) / dur, 1), e = 1 - Math.pow(1 - p, 3); b.textContent = pre + Math.round(end * e) + suf; if (p < 1) requestAnimationFrame(step); }
       requestAnimationFrame(step);
     });
