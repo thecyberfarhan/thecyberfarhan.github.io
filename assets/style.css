@@ -2,6 +2,7 @@
   color-scheme:dark;
   --bg:#0d1117;--surface:#161b22;--tile:#1c232d;--border:#30363d;--text:#e6edf3;--soft:#c9d1d9;--muted:#8b949e;
   --accent:#B4232C;--steel:#7FA8CC;--bronze:#C79A66;--red:#C2686C;--lav:#9C97B8;
+  --ic-kali:#7FA1B8;--ic-linux:#D0D4D9;--ic-windows:#6FA3D8;--ic-python:#6FA3D8;--ic-bash:#8DB874;--ic-powershell:#7FA8CC;--ic-js:#E6C34D;--ic-sql:#C79A66;--ic-docker:#5AA0DB;--ic-github:#D0D4D9;--ic-vscode:#6FA3D8;--ic-vmware:#D0D4D9;
   --nav-bg:rgba(22,27,34,.72);--nav-bg2:rgba(13,17,23,.86);--menu-bg:rgba(13,17,23,.95);--pill-bg:rgba(22,27,34,.8);--pill-red:#E5A0A4;--shadow:rgba(0,0,0,.45);--glare:rgba(255,255,255,.07);--btn-shine:rgba(255,255,255,.14);
   --sans:Inter,"Segoe UI","Helvetica Neue",Arial,system-ui,sans-serif;
   --mono:"JetBrains Mono","Fira Code",ui-monospace,Consolas,"DejaVu Sans Mono",monospace;
@@ -12,6 +13,7 @@ html[data-theme=light]{
   color-scheme:light;
   --bg:#e9edf2;--surface:#f4f6f9;--tile:#dfe4ea;--border:#c6cdd6;--text:#1c232b;--soft:#3a434d;--muted:#5d6772;
   --steel:#456f96;--bronze:#8f6a3a;--red:#a9484d;--lav:#6d6a8c;
+  --ic-kali:#3b6a86;--ic-linux:#232a31;--ic-windows:#1f62ad;--ic-python:#2a639c;--ic-bash:#3b7a28;--ic-powershell:#2a639c;--ic-js:#9a7c00;--ic-sql:#8a5a1c;--ic-docker:#1b72bd;--ic-github:#1f2328;--ic-vscode:#1c68b0;--ic-vmware:#454d57;
   --nav-bg:rgba(244,246,249,.7);--nav-bg2:rgba(244,246,249,.9);--menu-bg:rgba(244,246,249,.96);--pill-bg:rgba(244,246,249,.85);--pill-red:#8a1d24;--shadow:rgba(28,35,43,.16);--glare:rgba(255,255,255,.35);--btn-shine:rgba(255,255,255,.4);
 }
 html{scroll-padding-top:96px;-webkit-text-size-adjust:100%}
@@ -345,3 +347,54 @@ main{position:relative;z-index:1}
 @keyframes speak{50%{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 55%,transparent)}}
 @media (max-width:980px){.live-grid,.contact-grid{grid-template-columns:1fr}.gauges{grid-template-columns:repeat(3,1fr)}}
 @media (max-width:620px){.gauges{grid-template-columns:1fr}.ccards{grid-template-columns:1fr}.nudge{left:12px;right:12px;bottom:12px;max-width:none}}
+
+/* ---------- light / dark asset swaps ---------- */
+.sky .sky-l{display:none}
+html[data-theme=light] .sky .sky-d{display:none}
+html[data-theme=light] .sky .sky-l{display:block}
+html[data-theme=light] .tile{background:color-mix(in srgb,var(--surface) 70%,var(--tile))}
+html[data-theme=light] .lvl{background:color-mix(in srgb,currentColor 8%,transparent)}
+html[data-theme=light] .tilt:hover{border-color:color-mix(in srgb,var(--text) 35%,var(--border))}
+
+/* ---------- day / night switch ---------- */
+::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
+::view-transition-old(root){z-index:1}::view-transition-new(root){z-index:2}
+html.no-tr *,html.no-tr *::before,html.no-tr *::after{transition:none!important}
+html.theming *,html.theming *::before,html.theming *::after{transition:background-color .7s ease,color .7s ease,border-color .7s ease,fill .7s ease,stroke .7s ease,box-shadow .7s ease!important}
+
+/* ---------- TryHackMe card with live counters ---------- */
+.live-card{display:block;padding:26px 26px 22px;min-height:0}
+.lc-head{display:flex;align-items:center;gap:18px;margin-bottom:22px}
+.lc-av{position:relative;width:76px;height:76px;border-radius:50%;padding:4px;border:2.5px solid var(--accent);flex:none}
+.lc-av img{width:100%;height:100%;border-radius:50%;object-fit:cover}
+.lc-av::after{content:"";position:absolute;inset:-9px;border-radius:50%;border:1.5px solid var(--accent);opacity:0;animation:pulse2 3.2s ease-out infinite}
+@keyframes pulse2{0%{transform:scale(.88);opacity:.6}100%{transform:scale(1.18);opacity:0}}
+.lc-id h3{font-size:1.45rem}
+.lc-id a{font:12px var(--mono);color:var(--muted);transition:color .3s}.lc-id a:hover{color:var(--text)}
+.lc-logo{margin-left:auto;font-size:1.9rem;color:var(--muted)}
+.lc-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.lc-stat{position:relative;display:flex;flex-direction:column;gap:2px;padding:16px 16px 14px;border:1px solid var(--border);border-radius:10px;background:var(--tile)}
+.lc-stat .tile{color:var(--c);margin-bottom:10px;background:var(--surface)}
+.lc-stat b{font-size:clamp(1.7rem,3vw,2.2rem);line-height:1.05;color:var(--text);font-variant-numeric:tabular-nums}
+.lbl{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.bar{display:block;height:4px;margin:12px 0 8px;border-radius:3px;background:var(--border);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:3px;background:var(--c);transform:scaleX(0);transform-origin:left;transition:transform 2.2s var(--slow) .4s}
+.live-card.is-in .bar i{transform:scaleX(var(--p))}
+.thm-badge{margin-top:16px;display:grid;place-items:center}
+.thm-badge:empty{display:none}
+@media (max-width:760px){.lc-stats{grid-template-columns:1fr}.lc-head{flex-wrap:wrap}}
+
+/* ---------- looping contact terminal ---------- */
+.cterm-body{height:230px;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;padding:20px 22px;font:13px/1.9 var(--mono);color:var(--muted)}
+.cterm-body div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cterm-body .cmd{color:var(--text)}.cterm-body .ok{color:var(--steel)}
+
+/* ---------- nudge: longer stay, sound button, attention pulse ---------- */
+.nudge.on{animation:nudgeIn .8s var(--ease)}
+@keyframes nudgeIn{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 60%,transparent)}60%{box-shadow:0 0 0 14px transparent}100%{box-shadow:0 18px 50px -12px var(--shadow)}}
+.nudge .snd{top:auto;right:10px;bottom:8px;font-size:.95rem;display:grid;place-items:center;width:22px;height:22px;border-radius:6px;transition:background .25s,color .25s}
+.nudge .snd:hover{background:var(--tile);color:var(--text)}
+.nudge .snd svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.nudge{padding-right:34px}
+.plat,.lvl{white-space:nowrap}
+.plat{letter-spacing:.08em}
