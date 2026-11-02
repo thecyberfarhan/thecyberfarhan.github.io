@@ -23,7 +23,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Farhan">
 <link rel="preload" href="assets/cpent-medal.webp" as="image" type="image/webp">
-<link rel="stylesheet" href="assets/style.css?v=26">
+<link rel="stylesheet" href="assets/style.css?v=29">
 <style>html.loading{overflow:hidden}html{background:#0d1117}html[data-theme=light]{background:#e9edf2}#loader{position:fixed;inset:0;background-color:#0d1117;z-index:10000}html[data-theme=light] #loader{background-color:#e9edf2}#loader{display:grid;place-items:center}html.done #loader{display:none}</style>
 <script>setTimeout(function(){var r=document.documentElement;r.classList.remove("loading");r.classList.add("loaded","done")},9000)</script>
 </head>
@@ -198,20 +198,24 @@
 
 <section class="sec" id="play">
   <h2 class="title split" data-reveal>Play</h2>
-  <p class="sub" data-reveal>A tiny TryHackMe-style room. Pick a difficulty, break into the machine and capture the flag. No experience needed on Easy.</p>
+  <p class="sub" data-reveal>A tiny TryHackMe-style room. Break into the machine and capture the flag. Easy needs no experience: it explains every step.</p>
   <div class="game" id="game" data-reveal="flip">
-    <div class="term-bar"><i></i><i></i><i></i><span>room.thm</span></div>
-    <div class="g-brief" aria-label="Machine details"><span><i>Target</i><b>10.10.11.42</b></span><span><i>Alias</i><b>target</b></span><span><i>Your IP</i><b>10.10.14.7</b></span><span><i>Goal</i><b>get a shell, find the flag</b></span></div>
-    <div class="g-top">
+    <aside class="gm-side">
       <div class="g-lv" role="tablist" aria-label="Difficulty"><button type="button" data-lv="easy" class="on">Easy</button><button type="button" data-lv="normal">Normal</button><button type="button" data-lv="impossible">Impossible</button></div>
-      <div class="g-stats"><span>Time <b id="g-time">0:00</b></span><span>Hints <b id="g-hints">0</b></span><span id="g-alerts-w" hidden>Strikes <b id="g-alerts">0/5</b></span><span>Best <b id="g-best">-</b></span></div>
+      <div class="gm-head"><h3 id="g-title">Break In</h3><span class="gm-badge" id="g-badge"></span></div>
+      <p class="gm-blurb" id="g-blurb"></p>
+      <dl class="gm-meta"><div><dt>Target</dt><dd>10.10.11.42</dd></div><div><dt>Alias</dt><dd>target</dd></div><div><dt>You</dt><dd>10.10.14.7</dd></div></dl>
+      <div class="gm-stats"><div><i>Time</i><b id="g-time">0:00</b></div><div><i>Hints</i><b id="g-hints">0</b></div><div id="g-alerts-w" hidden><i>Strikes</i><b id="g-alerts">0/5</b></div><div><i>Best</i><b id="g-best">-</b></div></div>
+      <div class="g-prog" hidden><i id="g-bar"></i></div>
+      <div class="g-task" id="g-task" hidden></div>
+      <div class="gm-actions"><button type="button" class="btn primary" id="g-start"><span>Start the room</span></button><button type="button" class="btn" id="g-hint"><span>Hint</span></button></div>
+    </aside>
+    <div class="gm-term">
+      <div class="term-bar"><i></i><i></i><i></i><span>attacker@kali: room.thm</span></div>
+      <div class="g-out" id="g-out" aria-live="polite"></div>
+      <form class="g-in" id="g-form" autocomplete="off"><span class="g-ps">$</span><input id="g-input" type="text" inputmode="text" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Command" placeholder="type a command, or press Run on the task card"></form>
+      <div class="gm-over" id="g-over"><div><b>Ready when you are</b><p>Pick a difficulty on the left, then press <em>Start the room</em>. The clock only runs while you play.</p><button type="button" class="btn primary" id="g-start2"><span>Start the room</span></button></div></div>
     </div>
-    <div class="g-desc" id="g-desc"></div>
-    <div class="g-prog" hidden><i id="g-bar"></i></div>
-    <div class="g-task" id="g-task" hidden></div>
-    <div class="g-out" id="g-out" aria-live="polite"></div>
-    <form class="g-in" id="g-form" autocomplete="off"><span class="g-ps">attacker@kali:~$</span><input id="g-input" type="text" inputmode="text" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Command" placeholder="type a command, or press Run on the task card"></form>
-    <div class="g-btns"><button type="button" class="btn primary" id="g-start"><span>Start the room</span></button><button type="button" class="btn" id="g-hint"><span>Hint</span></button></div>
   </div>
 </section>
 

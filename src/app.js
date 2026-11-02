@@ -985,7 +985,7 @@
   var tm = $('#tm'), tmOut = $('#tm-out'), tmIn = $('#tm-input'), tmBtn = $('#tm-btn');
   var tmHist = [], tmHi = 0, tmBooted = false;
   function pr(box, text, cls) {
-    var d = document.createElement('div'); if (cls) d.className = cls; d.textContent = text; box.appendChild(d); box.scrollTop = box.scrollHeight; return d;
+    var d = document.createElement('div'); if (cls) d.className = cls; d.textContent = text; box.appendChild(d); box.scrollTop = box.scrollHeight; requestAnimationFrame(function () { box.scrollTop = box.scrollHeight; }); return d;
   }
   function prLink(box, label, href, dl) {
     var d = document.createElement('div'), a = document.createElement('a'); a.href = href; a.textContent = label; if (dl) a.setAttribute('download', 'Farhan_Hussain_Resume.pdf'); else { a.target = '_blank'; a.rel = 'noopener'; }
@@ -1098,7 +1098,7 @@
   /* ---------- the game: a tiny TryHackMe-style room, three levels ---------- */
   (function () {
     var box = $('#game'); if (!box) return;
-    var out = $('#g-out'), form = $('#g-form'), inp = $('#g-input'), startB = $('#g-start'), hintB = $('#g-hint'), descEl = $('#g-desc'), taskEl = $('#g-task'), barEl = $('#g-bar');
+    var out = $('#g-out'), form = $('#g-form'), inp = $('#g-input'), startB = $('#g-start'), hintB = $('#g-hint'), taskEl = $('#g-task'), barEl = $('#g-bar');
     var tEl = $('#g-time'), hEl = $('#g-hints'), bEl = $('#g-best'), aEl = $('#g-alerts'), aWrap = $('#g-alerts-w'), lvBtns = $$('.g-lv button', box);
     var T = '(?:target|10\\.10\\.11\\.42)', B64 = 'c3ZjX2FkbWluOlN1cDNyUzNjcmV0IQ==', ROT = 'frperg_xrl_9', HASH_D = '4ca7c5c27c2314eecc71f67501abb724', HASH_R = '4ece57a61323b52ccffdbef021956754';
     var IP = '10.10.11.42';
@@ -1178,13 +1178,14 @@
     function bestOf(k) { try { return localStorage.getItem('gbest_' + k); } catch (e) { return null; } }
     function showBest() { var b = bestOf(lvKey); bEl.textContent = b ? fmt(+b) : '-'; }
     function el(tag, cls, txt) { var d = document.createElement(tag); if (cls) d.className = cls; if (txt != null) d.textContent = txt; return d; }
+    var TITLES_G = { easy: 'Break In', normal: 'Backup Blues', impossible: 'Ghost in the Shell' }, overEl = $('#g-over');
     function showDesc() {
-      var L = LV[lvKey]; descEl.textContent = '';
-      var h = el('div', 'gd-h'); h.appendChild(el('b', 'gd-t', L.tag)); h.appendChild(el('span', 'gd-s', L.sub)); descEl.appendChild(h); descEl.appendChild(el('p', '', L.desc));
+      var L = LV[lvKey]; $('#g-title').textContent = TITLES_G[lvKey]; $('#g-badge').textContent = L.sub; $('#g-blurb').textContent = L.desc; box.setAttribute('data-lv', lvKey);
     }
     function sendCmd(c, run) { inp.value = c; if (run) { form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true })); } else inp.focus(); }
     function renderTask() {
       var L = LV[lvKey]; taskEl.textContent = ''; var tok = st ? st.tok : {};
+      if (st && st.won) { taskEl.hidden = false; taskEl.className = 'g-task won'; taskEl.appendChild(el('div', 'gt-k', 'Room complete')); taskEl.appendChild(el('h4', '', fmt(st.time) + ' with ' + st.hints + ' hint' + (st.hints === 1 ? '' : 's') + (L.strikes ? ', ' + st.strikes + ' strike' + (st.strikes === 1 ? '' : 's') : ''))); var nx = { easy: 'normal', normal: 'impossible' }[lvKey]; if (nx) { var nb = el('button', 'gt-run next'); nb.type = 'button'; nb.appendChild(el('span', '', 'Next: ' + LV[nx].tag)); nb.addEventListener('click', function () { var b = lvBtns.filter(function (x) { return x.dataset.lv === nx; })[0]; b.click(); start(); }); taskEl.appendChild(nb); } else taskEl.appendChild(el('p', '', 'You cleared every level.')); return; }
       if (!st || !L.tasks.length) { taskEl.hidden = true; barEl.style.width = '0'; barEl.parentNode.hidden = !L.tasks.length; if (st && lvKey === 'impossible') { taskEl.hidden = false; taskEl.className = 'g-task hard'; taskEl.appendChild(el('div', 'gt-k', 'No guidance')); taskEl.appendChild(el('p', '', 'Root the box. Watch the clock and the strikes.')); } return; }
       taskEl.hidden = false; var done = L.tasks.filter(function (t) { return tok[t.tok]; }).length;
       barEl.parentNode.hidden = false; barEl.style.width = Math.round(done / L.tasks.length * 100) + '%';
@@ -1204,15 +1205,15 @@
       }
     }
     function setIdle(msg) {
-      idle = true; clearInterval(timer); st = null; inp.disabled = true; hintB.disabled = true; var L = LV[lvKey];
+      idle = true; overEl.hidden = false; clearInterval(timer); st = null; inp.disabled = true; hintB.disabled = true; var L = LV[lvKey];
       startB.querySelector('span').textContent = 'Start the room'; startB.classList.add('primary'); tEl.textContent = L.limit ? fmt(L.limit) : '0:00'; hEl.textContent = '0';
       aWrap.hidden = !L.strikes; aEl.textContent = '0/' + L.strikes; showBest(); showDesc(); renderTask(); taskEl.hidden = true; barEl.parentNode.hidden = true;
       lvBtns.forEach(function (b) { b.disabled = false; });
-      if (msg !== false) { out.textContent = ''; pr(out, 'Pick a difficulty above, then press "Start the room".', 'm'); pr(out, 'Target: ' + IP + '   You: 10.10.14.7', 'm'); }
+      if (msg !== false) { out.textContent = ''; }
     }
     function start() {
       clearInterval(timer);
-      var L = LV[lvKey]; st = { tok: {}, hints: 0, t0: Date.now(), ask: null, done: false, strikes: 0 }; idle = false;
+      overEl.hidden = true; var L = LV[lvKey]; st = { tok: {}, hints: 0, t0: Date.now(), ask: null, done: false, strikes: 0 }; idle = false;
       out.textContent = ''; pr(out, L.mission[0], 'y'); pr(out, L.mission[1]); pr(out, L.mission[2], 'm'); pr(out, '', ''); pr(out, 'Type help any time.', 'm');
       inp.disabled = false; hintB.disabled = !L.hintsOn; startB.querySelector('span').textContent = 'Restart'; startB.classList.remove('primary'); hEl.textContent = '0';
       aWrap.hidden = !L.strikes; aEl.textContent = '0/' + L.strikes;
@@ -1230,7 +1231,7 @@
       if (st.strikes >= L.strikes) lock('IDS TRIGGERED. 5 strikes. Connection dropped. Press "Try again".');
     }
     function win() {
-      st.done = true; clearInterval(timer); var e = Math.round((Date.now() - st.t0) / 1000); st.tok.done = 1; renderTask(); barEl.style.width = '100%';
+      st.done = true; clearInterval(timer); var e = Math.round((Date.now() - st.t0) / 1000); st.tok.done = 1; st.won = 1; st.time = e; renderTask(); barEl.parentNode.hidden = false; barEl.style.width = '100%';
       pr(out, 'ROOM COMPLETE. Flag accepted in ' + fmt(e) + ' with ' + st.hints + ' hint' + (st.hints === 1 ? '' : 's') + (LV[lvKey].strikes ? ' and ' + st.strikes + ' strike' + (st.strikes === 1 ? '' : 's') : '') + '.', 'ok');
       var prev = bestOf(lvKey); if (!prev || e < +prev) { try { localStorage.setItem('gbest_' + lvKey, String(e)); } catch (x) {} pr(out, 'New best time.', 'y'); }
       if (lvKey === 'impossible') { pr(out, 'Respect. Title unlocked: Red Team Legend. Now go hire the guy who built this.', 'y'); try { localStorage.setItem('legend', '1'); } catch (x) {} }
@@ -1270,7 +1271,7 @@
       else pr(out, name + ': command not found. Type help.', 'r');
     }
     form.addEventListener('submit', function (e) { e.preventDefault(); var v = inp.value; inp.value = ''; run(v); });
-    startB.addEventListener('click', start);
+    startB.addEventListener('click', start); $('#g-start2').addEventListener('click', start);
     hintB.addEventListener('click', function () {
       if (!st || st.done) return; var L = LV[lvKey]; if (!L.hintsOn) return;
       st.hints++; hEl.textContent = String(st.hints);
