@@ -306,11 +306,33 @@
     pill.classList.remove('open');
     if (busy) return;
     busy = true; navHold = performance.now() + 2600; nav.style.transform = '';
-    runScan(label || id, function () {
-      navHold = performance.now() + 2200; window.scrollTo(0, y); nav.style.transform = '';
+    glide(y, function () {
       var t = target.querySelector && target.querySelector('.title');
       if (t) { t.classList.remove('pulse'); void t.offsetWidth; t.classList.add('pulse'); }
-    }, function () { busy = false; navHold = performance.now() + 1200; nav.style.transform = ''; try { history.replaceState(null, '', id === 'top' ? location.pathname : '#' + id); } catch (e) {} });
+      busy = false; navHold = performance.now() + 1200; nav.style.transform = '';
+      try { history.replaceState(null, '', id === 'top' ? location.pathname : '#' + id); } catch (e) {}
+    });
+  }
+  /* quick, quiet transition: an eased glide with a thin scanner line crossing the screen */
+  function glide(y, done) {
+    var y0 = window.scrollY, d = y - y0, dur = Math.min(850, Math.max(420, 300 + Math.abs(d) * 0.15)), t0 = performance.now(), W = innerWidth, H = innerHeight, down = d >= 0;
+    var finished = false;
+    function finish() { if (finished) return; finished = true; clearTimeout(guard); sctx.clearRect(0, 0, W, H); scan.classList.remove('on'); window.scrollTo(0, y); done(); }
+    var guard = setTimeout(finish, dur + 700);
+    if (document.hidden) { finish(); return; }
+    scan.width = W; scan.height = H; scan.classList.add('on');
+    function ease(x) { return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; }
+    (function frame(now) {
+      if (finished) return;
+      var p = Math.min((now - t0) / dur, 1), e = ease(p);
+      window.scrollTo(0, y0 + d * e);
+      sctx.clearRect(0, 0, W, H);
+      var ly = (down ? e : 1 - e) * H, a = Math.sin(Math.PI * p), dir = down ? -1 : 1;
+      var g = sctx.createLinearGradient(0, ly, 0, ly + dir * 90); g.addColorStop(0, 'rgba(180,35,44,' + (0.22 * a).toFixed(3) + ')'); g.addColorStop(1, 'rgba(180,35,44,0)');
+      sctx.fillStyle = g; sctx.fillRect(0, Math.min(ly, ly + dir * 90), W, 90);
+      sctx.fillStyle = 'rgba(180,35,44,' + (0.85 * a).toFixed(3) + ')'; sctx.fillRect(0, ly - 1, W, 2);
+      if (p < 1) requestAnimationFrame(frame); else finish();
+    })(t0);
   }
   $$('[data-go]').forEach(function (a) {
     a.addEventListener('click', function (e) {
