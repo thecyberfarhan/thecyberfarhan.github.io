@@ -1,0 +1,30 @@
+# Farhan Hussain
+
+> CPENT-certified web and API penetration tester from Bahawalnagar, Punjab, Pakistan. TryHackMe top 3% with 100+ rooms completed and 37 public writeups. Open to Junior Penetration Tester, Web and API Security Tester, Offensive Security Intern and Bug Bounty roles. Full-time, available immediately, remote preferred, open to relocation. Languages: English (advanced), Urdu (fluent).
+
+## Start here
+- [Portfolio](https://thecyberfarhan.github.io/): single-page site with tools, proof of work, journey and contact.
+- [Resume (PDF, one page)](https://thecyberfarhan.github.io/assets/Farhan_Hussain_Resume.pdf): skills, certification, projects, education.
+- [Sample penetration test report (PDF)](https://thecyberfarhan.github.io/assets/Sample_Pentest_Report.pdf): fictional lab target, shows how findings, evidence and remediation are written.
+
+## Proof of work
+- [CTF writeups on GitHub](https://github.com/thecyberfarhan/CTF-Writeups): 37 structured writeups from TryHackMe, Hack The Box and PortSwigger, each with a key takeaway.
+- [TryHackMe profile](https://tryhackme.com/p/farhan.hussain): top 3% globally, 100+ rooms.
+- [GitHub profile](https://github.com/thecyberfarhan)
+- [LinkedIn](https://www.linkedin.com/in/cyber-farhan-hussain/)
+
+## Facts
+- Certification: CPENT (Certified Penetration Testing Professional), EC-Council, 2026.
+- Web and API security: Burp Suite, OWASP ZAP, SQLMap, ffuf, OWASP Top 10, authentication and access control, API security.
+- Recon: Nmap, RustScan, Masscan, Nessus, Wireshark, NetExec.
+- Exploitation and Active Directory: Metasploit, Hydra, Hashcat, BloodHound, Impacket, Kerberoasting, AS-REP roasting, DCSync, Cobalt Strike, Mythic.
+- Pivoting and tooling: Chisel, Ligolo-ng, Proxychains, Python, Bash, PowerShell, JavaScript, Docker.
+- Education: Intermediate (HSSC), ICS, Al-Hayat College, 2023 to 2025, 87%.
+- Method: recon, exploit, escalate, report.
+
+## Contact
+- Email: farhan736hussain@gmail.com
+- Contact section: https://thecyberfarhan.github.io/#contact
+
+## Optional
+- [Sitemap](https://thecyberfarhan.github.io/sitemap.xml)
