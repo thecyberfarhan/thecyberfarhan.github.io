@@ -1006,7 +1006,7 @@
   var FILES = ['about/', 'journey/', 'tools/', 'proof/', 'live/', 'play/', 'arch/', 'contact/', 'resume.pdf'];
   var CMDS = {
     help: function (o) {
-      ['Commands:', '  ls              list sections', '  goto <section>  jump there (about, journey, tools, proof, live, play, contact)', '  whoami          who am I', '  skills          what I work with', '  certs           certifications', '  writeups        featured writeups', '  projects        things I built', '  education       school', '  contact         where to reach me', '  resume          download my resume', '  play            open the mini TryHackMe-style room', '  theme           toggle day / night', '  clear, exit     tidy up', 'Not everything is listed. Poke around.'].forEach(function (l) { pr(o, l, l.charAt(0) === ' ' ? '' : 'c'); });
+      ['Commands:', '  ls, cd, pwd, cat, tree   browse like a real shell (try: cd tools, cat core.txt)', '  ls              list sections', '  goto <section>  jump there (about, journey, tools, proof, live, play, contact)', '  whoami          who am I', '  skills          what I work with', '  certs           certifications', '  writeups        featured writeups', '  projects        things I built', '  education       school', '  contact         where to reach me', '  resume          download my resume', '  play            open the mini TryHackMe-style room', '  theme           toggle day / night', '  clear, exit     tidy up', 'Not everything is listed. Poke around.'].forEach(function (l) { pr(o, l, l.charAt(0) === ' ' ? '' : 'c'); });
     },
     ls: function (o, a) {
       if (/a/.test(a || '')) { pr(o, FILES.concat(['.secret']).join('   '), 'a'); } else pr(o, FILES.join('   '), 'a');
@@ -1070,25 +1070,109 @@
     '42': function (o) { pr(o, 'The answer to life, the universe and a CTF flag.', 'y'); }
   };
   var CNAMES = Object.keys(CMDS);
+  /* ---------- a tiny read-only shell: virtual filesystem, cd, ls, cat and friends ---------- */
+  var HOME = {
+    about: { 'whoami.txt': ['Farhan Hussain. Web and API penetration tester, CPENT certified.', 'Based in Bahawalnagar, Pakistan. Open to junior pentest roles.'], 'README.md': ['# About', 'What I do: web and API penetration testing, reported clearly.', 'How I work: labs, public writeups, a repeatable method.', 'What I build: Python tooling that removes repetitive work.'] },
+    journey: { 'timeline.txt': ['2023-2025  Intermediate (HSSC), ICS, Al-Hayat College, 87%', 'Labs       TryHackMe (100+ rooms), Hack The Box, HTB Academy, PicoCTF, PortSwigger, Hacker101', 'Writeups   37 published on GitHub', 'Tooling    Python venv manager (~1,800 LOC), automation scripts', '2026       CPENT certified (EC-Council), TryHackMe top 3%', 'Now        Open to work: Junior Penetration Tester / Web and API Security Tester'] },
+    tools: { 'core.txt': ['Kali, Linux, Windows, Python, Bash, PowerShell, JavaScript, SQL, Docker, GitHub, VS Code, VMware'], 'recon.txt': ['Nmap, Nessus, Nikto, RustScan, Masscan, Subfinder, Shodan, Maltego'], 'web.txt': ['Burp Suite, OWASP ZAP, ffuf, feroxbuster, SQLMap, Caido, XSStrike, WPScan'], 'exploitation.txt': ['Metasploit, Cobalt Strike, Mythic, BloodHound, Impacket, NetExec, Mimikatz, Evil-WinRM'], 'passwords-network.txt': ['Hydra, John the Ripper, Hashcat, Wireshark, tcpdump, Aircrack-ng, Bettercap, Ligolo-ng'], 'techniques.txt': ['OWASP Top 10, SQL injection, XSS, password spraying, Kerberoasting, AS-REP roasting, Pass-the-Hash, DCSync, Golden and Silver tickets, AMSI bypass, privilege escalation (Linux and Windows), pivoting, reverse shells, lateral movement, AD enumeration'] },
+    proof: { 'stats.txt': ['TryHackMe ranking   top 3%', 'Rooms completed     100+', 'Published writeups  37'], 'writeups.txt': ['Mr Robot CTF, Mustacchio, Archetype, Cap, Overpass, Silver Platter, Watcher, tomghost', 'github.com/thecyberfarhan/CTF-Writeups'] },
+    live: { 'tryhackme.txt': ['farhan.hussain', 'tryhackme.com/p/farhan.hussain', 'rank: top 3%   rooms: 100+   writeups: 37'] },
+    play: { 'README.txt': ['A tiny TryHackMe-style room. Three difficulties: easy, normal, impossible.', 'Run ./start to jump to the game.'], start: { exec: 'play' } },
+    arch: { 'neofetch.txt': ['OS: Arch Linux x86_64', 'Shell: zsh', 'Role: Penetration Tester', 'Motto: btw'], 'motto.txt': ['I use Arch, btw.'] },
+    contact: { 'links.txt': ['LinkedIn   linkedin.com/in/cyber-farhan-hussain', 'GitHub     github.com/thecyberfarhan', 'TryHackMe  tryhackme.com/p/farhan.hussain', 'Email      farhan736hussain@gmail.com'] },
+    'resume.pdf': { bin: true },
+    '.secret': ['You found it. Beat the Impossible level in the Play section and see what happens.']
+  };
+  var cwd = [];
+  function isDir(n) { return n && typeof n === 'object' && !Array.isArray(n) && !n.bin && !n.exec; }
+  function lookup(parts) { var n = HOME; for (var i = 0; i < parts.length; i++) { if (!isDir(n) || !Object.prototype.hasOwnProperty.call(n, parts[i])) return undefined; n = n[parts[i]]; } return n; }
+  function resolvePath(p) {
+    p = (p || '').trim(); var base;
+    if (p === '' || p === '~') return [];
+    if (p.indexOf('~/') === 0) { base = []; p = p.slice(2); } else if (p.charAt(0) === '/') { if (p === '/') return null; var q = p.replace(/^\/home\/visitor\/?/, ''); if (q === p) return null; base = []; p = q; } else base = cwd.slice();
+    var out = base; p.split('/').forEach(function (s) { if (!s || s === '.') return; if (s === '..') { if (out.length) out.pop(); } else out.push(s); }); return out;
+  }
+  function promptStr() { return 'visitor@farhan:~' + (cwd.length ? '/' + cwd.join('/') : '') + '$ '; }
+  function setPrompt() { var ps = $('#tm-ps'); if (ps) ps.textContent = promptStr().trim(); }
+  function listDir(n, all) { return Object.keys(n).filter(function (k) { return all || k.charAt(0) !== '.'; }).sort(); }
+  function showLong(o, n, names) { names.forEach(function (k) { var d = isDir(n[k]); pr(o, (d ? 'drwxr-xr-x' : '-rw-r--r--') + ' visitor visitor ' + (d ? '4096' : ' 512') + ' Nov  3 ' + k + (d ? '/' : ''), d ? 'a' : ''); }); }
+  var FSCMD = {
+    pwd: function (o) { pr(o, '/home/visitor' + (cwd.length ? '/' + cwd.join('/') : '')); },
+    cd: function (o, a) {
+      var t = a[0]; if (t === '-') t = '~'; var p = resolvePath(t); if (p === null) { pr(o, 'cd: permission denied: ' + t, 'r'); return; }
+      var n = lookup(p); if (n === undefined) { pr(o, 'cd: no such file or directory: ' + t, 'r'); return; } if (!isDir(n)) { pr(o, 'cd: not a directory: ' + t, 'r'); return; }
+      cwd = p; setPrompt(); if (p.length && SECS.indexOf(p[0]) >= 0) go(p[0]); else if (!p.length) go('top');
+    },
+    ls: function (o, a) {
+      var flags = a.filter(function (x) { return x.charAt(0) === '-'; }).join(''), args = a.filter(function (x) { return x.charAt(0) !== '-'; }), all = /a/.test(flags), long = /l/.test(flags);
+      if (!args.length) args = ['.'];
+      args.forEach(function (t, i) {
+        var p = resolvePath(t); if (p === null) { pr(o, 'ls: cannot open directory ' + t + ': Permission denied', 'r'); return; }
+        var n = lookup(p); if (n === undefined) { pr(o, 'ls: cannot access ' + t + ': No such file or directory', 'r'); return; }
+        if (args.length > 1) pr(o, t + ':', 'm');
+        if (!isDir(n)) { pr(o, t); return; }
+        var names = listDir(n, all); if (all) names = ['.', '..'].concat(names);
+        if (long) { showLong(o, n, names.filter(function (k) { return k !== '.' && k !== '..'; })); }
+        else pr(o, names.map(function (k) { return isDir(n[k]) ? k + '/' : k; }).join('   '), 'a');
+      });
+    },
+    cat: function (o, a) {
+      if (!a.length) { pr(o, 'cat: missing file operand', 'r'); return; }
+      a.forEach(function (t) {
+        var p = resolvePath(t); var n = p === null ? undefined : lookup(p);
+        if (n === undefined) { if (/(^|\/)flag\.txt$/.test(t)) pr(o, 'cat: ' + t + ': Permission denied. Earn it in the Play section.', 'r'); else if (/passwd/.test(t)) CMDS.cat(o, '/etc/passwd'); else pr(o, 'cat: ' + t + ': No such file or directory', 'r'); return; }
+        if (isDir(n)) { pr(o, 'cat: ' + t + ': Is a directory', 'r'); return; }
+        if (n.bin) { pr(o, 'cat: ' + t + ': binary file. Use the "resume" command to download it.', 'y'); return; }
+        if (n.exec) { pr(o, 'cat: ' + t + ': is an executable. Run it with ./' + t, 'y'); return; }
+        n.forEach(function (l) { pr(o, l); });
+      });
+    },
+    tree: function (o) {
+      var base = lookup(cwd); pr(o, cwd.length ? cwd[cwd.length - 1] : '~', 'a');
+      (function walk(n, pre) { var ks = listDir(n, false); ks.forEach(function (k, i) { var last = i === ks.length - 1, d = isDir(n[k]); pr(o, pre + (last ? '└── ' : '├── ') + k + (d ? '/' : ''), d ? 'a' : ''); if (d) walk(n[k], pre + (last ? '    ' : '│   ')); }); })(base, '');
+    },
+    echo: function (o, a) { pr(o, a.join(' ').replace(/\$USER/g, 'visitor').replace(/\$HOME/g, '/home/visitor').replace(/\$PWD/g, '/home/visitor' + (cwd.length ? '/' + cwd.join('/') : '')).replace(/\$SHELL/g, '/bin/zsh').replace(/^["']|["']$/g, '')); },
+    grep: function (o, a) {
+      var args = a.filter(function (x) { return x.charAt(0) !== '-'; }), pat = (args[0] || '').replace(/^["']|["']$/g, ''), f = args[1]; if (!pat || !f) { pr(o, 'usage: grep PATTERN FILE', 'r'); return; }
+      var p = resolvePath(f), n = p === null ? undefined : lookup(p); if (!Array.isArray(n)) { pr(o, 'grep: ' + f + ': No such file', 'r'); return; }
+      var hit = n.filter(function (l) { return l.toLowerCase().indexOf(pat.toLowerCase()) >= 0; }); if (!hit.length) pr(o, '(no match)', 'm'); hit.forEach(function (l) { pr(o, l); });
+    },
+    which: function (o, a) { var c = (a[0] || '').toLowerCase(); if (!c) return; if (FSCMD[c] || CMDS[c]) pr(o, '/usr/bin/' + c); else pr(o, c + ' not found', 'r'); },
+    man: function (o, a) { pr(o, a[0] ? 'No manual entry for ' + a[0] + '. Try help.' : 'What manual page do you want? Try help.', 'm'); },
+    env: function (o) { ['USER=visitor', 'HOME=/home/visitor', 'SHELL=/bin/zsh', 'EDITOR=vim', 'LANG=en_US.UTF-8', 'HIRE_ME=true'].forEach(function (l) { pr(o, l); }); },
+    touch: function (o, a) { pr(o, 'touch: cannot touch ' + (a[0] || '') + ': Read-only file system', 'r'); },
+    mkdir: function (o, a) { pr(o, 'mkdir: cannot create directory ' + (a[0] || '') + ': Read-only file system', 'r'); },
+    cp: function (o) { pr(o, 'cp: Read-only file system', 'r'); }, mv: function (o) { pr(o, 'mv: Read-only file system', 'r'); },
+    chmod: function (o) { pr(o, 'chmod: changing permissions: Operation not permitted', 'r'); }, chown: function (o) { pr(o, 'chown: changing ownership: Operation not permitted', 'r'); },
+    curl: function (o) { pr(o, 'curl: I am not your target. Try the Play section.', 'y'); }, wget: function (o) { pr(o, 'wget: nothing to download here. Try: resume', 'y'); },
+    ssh: function (o) { pr(o, 'ssh: Permission denied (publickey). This box only talks to recruiters.', 'r'); },
+    open: function (o, a) { CMDS.goto(o, a.join(' ')); }
+  };
+  ['head', 'tail', 'less', 'more', 'bat'].forEach(function (c) { FSCMD[c] = FSCMD.cat; });
+  FSCMD.dir = FSCMD.ls; FSCMD.ll = function (o, a) { FSCMD.ls(o, ['-l'].concat(a)); }; FSCMD.la = function (o, a) { FSCMD.ls(o, ['-a'].concat(a)); };
+  FSCMD.rm = function (o, a) { if (/^-\w*r/.test(a[0] || '') && a.indexOf('/') >= 0) CMDS.rm(o); else pr(o, 'rm: cannot remove ' + (a.filter(function (x) { return x.charAt(0) !== '-'; })[0] || '') + ': Read-only file system', 'r'); };
   function runTerm(line) {
     var raw = line.trim(); if (!raw) return;
-    pr(tmOut, 'visitor@farhan:~$ ' + raw, 'c'); tmHist.push(raw); tmHi = tmHist.length;
-    var parts = raw.split(/\s+/), name = parts[0].toLowerCase(), arg = parts.slice(1).join(' ');
-    if (/^rm\b/.test(raw) && /-rf?\s*\/|-fr\s*\//.test(raw)) name = 'rm';
-    if (name === 'ls' && /-\w*a/.test(arg)) arg = 'a';
-    if (name === 'uname') arg = '';
-    var fn = CMDS[name];
-    if (fn && typeof fn === 'function' && Object.prototype.hasOwnProperty.call(CMDS, name)) fn(tmOut, arg);
-    else pr(tmOut, name + ': command not found. Type help.', 'r');
+    pr(tmOut, promptStr() + raw, 'c'); tmHist.push(raw); tmHi = tmHist.length;
+    var toks = raw.match(/"[^"]*"|'[^']*'|\S+/g) || [], name = toks[0], args = toks.slice(1), low = name.toLowerCase();
+    if (name.indexOf('./') === 0) { var f = name.slice(2), n = lookup(cwd.concat(f)); if (n && n.exec) { CMDS[n.exec](tmOut, ''); } else pr(tmOut, name + ': Permission denied or not found', 'r'); tmOut.scrollTop = tmOut.scrollHeight; return; }
+    if (FSCMD.hasOwnProperty(low)) FSCMD[low](tmOut, args);
+    else if (CMDS.hasOwnProperty(low) && typeof CMDS[low] === 'function') { var arg = args.join(' '); if (low === 'uname') arg = ''; CMDS[low](tmOut, arg); }
+    else pr(tmOut, 'zsh: command not found: ' + name + '. Type help.', 'r');
     tmOut.scrollTop = tmOut.scrollHeight;
   }
   $('#tm-form').addEventListener('submit', function (e) { e.preventDefault(); var v = tmIn.value; tmIn.value = ''; runTerm(v); });
   tmIn.addEventListener('keydown', function (e) {
     if (e.key === 'ArrowUp') { e.preventDefault(); if (tmHi > 0) { tmHi--; tmIn.value = tmHist[tmHi] || ''; } }
     else if (e.key === 'ArrowDown') { e.preventDefault(); if (tmHi < tmHist.length) { tmHi++; tmIn.value = tmHist[tmHi] || ''; } }
+    else if (e.key === 'l' && e.ctrlKey) { e.preventDefault(); tmOut.textContent = ''; }
     else if (e.key === 'Tab') {
-      e.preventDefault(); var v = tmIn.value.toLowerCase(); if (!v) return;
-      var m = CNAMES.filter(function (c) { return c.indexOf(v) === 0; }); if (m.length === 1) tmIn.value = m[0] + ' ';
+      e.preventDefault(); var v = tmIn.value; if (!v.trim()) return; var sp = v.lastIndexOf(' ');
+      if (sp < 0) { var m = Object.keys(FSCMD).concat(CNAMES).filter(function (c, i, ar) { return c.indexOf(v.toLowerCase()) === 0 && ar.indexOf(c) === i; }); if (m.length === 1) tmIn.value = m[0] + ' '; else if (m.length > 1) pr(tmOut, m.join('   '), 'm'); return; }
+      var head = v.slice(0, sp + 1), tok = v.slice(sp + 1), sl = tok.lastIndexOf('/'), dirPart = tok.slice(0, sl + 1), pre = tok.slice(sl + 1);
+      var dp = resolvePath(dirPart || '.'); var dn = dp === null ? undefined : lookup(dp); if (!isDir(dn)) return;
+      var c = listDir(dn, pre.charAt(0) === '.').filter(function (k) { return k.indexOf(pre) === 0; });
+      if (c.length === 1) tmIn.value = head + dirPart + c[0] + (isDir(dn[c[0]]) ? '/' : ' '); else if (c.length > 1) pr(tmOut, c.join('   '), 'm');
     }
   });
   tmBtn.addEventListener('click', function () { tm.hidden ? openTerm() : closeTerm(); });
