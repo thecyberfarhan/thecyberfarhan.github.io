@@ -23,7 +23,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Farhan">
 <link rel="preload" href="assets/cpent-medal.webp" as="image" type="image/webp">
-<link rel="stylesheet" href="assets/style.css?v=23">
+<link rel="stylesheet" href="assets/style.css?v=24">
 <style>html.loading{overflow:hidden}html{background:#0d1117}html[data-theme=light]{background:#e9edf2}#loader{position:fixed;inset:0;background-color:#0d1117;z-index:10000}html[data-theme=light] #loader{background-color:#e9edf2}#loader{display:grid;place-items:center}html.done #loader{display:none}</style>
 <script>setTimeout(function(){var r=document.documentElement;r.classList.remove("loading");r.classList.add("loaded","done")},9000)</script>
 </head>
@@ -139,13 +139,13 @@
 <section class="sec" id="journey">
   <h2 class="title split" data-reveal>Journey</h2>
   <p class="sub" data-reveal>Where I started, what I built along the way, and what I am looking for next.</p>
-  <ol class="tl">
-    <li class="tl-i" data-reveal style="--c:var(--lav)"><span class="tl-dot"></span><div class="tl-b"><span class="tl-t">2023 to 2025</span><h3>Intermediate (HSSC), ICS</h3><p>Al-Hayat College, 87%. Started learning security on the side, one lab at a time.</p></div></li>
-    <li class="tl-i" data-reveal style="--c:var(--steel)"><span class="tl-dot"></span><div class="tl-b"><span class="tl-t">Labs and platforms</span><h3>Hands-on practice</h3><p>TryHackMe (100+ rooms), Hack The Box, HTB Academy, PicoCTF, PortSwigger and Hacker101.</p></div></li>
-    <li class="tl-i" data-reveal style="--c:var(--bronze)"><span class="tl-dot"></span><div class="tl-b"><span class="tl-t">Writing it down</span><h3>37 public writeups</h3><p>Every lab gets a technical report with a key takeaway, published on GitHub.</p></div></li>
-    <li class="tl-i" data-reveal style="--c:var(--lav)"><span class="tl-dot"></span><div class="tl-b"><span class="tl-t">Tooling</span><h3>Python and Bash projects</h3><p>A ~1,800 line virtual-environment manager and personal automation scripts built with Rich and InquirerPy.</p></div></li>
-    <li class="tl-i" data-reveal style="--c:var(--red)"><span class="tl-dot"></span><div class="tl-b"><span class="tl-t">2026</span><h3>CPENT certified</h3><p>EC-Council Certified Penetration Testing Professional, plus TryHackMe top 3%.</p></div></li>
-    <li class="tl-i now" data-reveal style="--c:var(--accent)"><span class="tl-dot"></span><div class="tl-b"><span class="tl-t">Now</span><h3>Open to work</h3><p>Junior Penetration Tester, Web and API Security Tester, Offensive Security Intern or Bug Bounty Hunter.</p></div></li>
+  <ol class="jt">
+    <li class="jt-i" data-reveal style="--c:var(--lav)"><span class="jt-dot"></span><div class="jt-b"><span class="jt-t">2023 to 2025</span><h3>Intermediate (HSSC), ICS</h3><p>Al-Hayat College, 87%. Started learning security on the side, one lab at a time.</p></div></li>
+    <li class="jt-i" data-reveal style="--c:var(--steel)"><span class="jt-dot"></span><div class="jt-b"><span class="jt-t">Labs and platforms</span><h3>Hands-on practice</h3><p>TryHackMe (100+ rooms), Hack The Box, HTB Academy, PicoCTF, PortSwigger and Hacker101.</p></div></li>
+    <li class="jt-i" data-reveal style="--c:var(--bronze)"><span class="jt-dot"></span><div class="jt-b"><span class="jt-t">Writing it down</span><h3>37 public writeups</h3><p>Every lab gets a technical report with a key takeaway, published on GitHub.</p></div></li>
+    <li class="jt-i" data-reveal style="--c:var(--lav)"><span class="jt-dot"></span><div class="jt-b"><span class="jt-t">Tooling</span><h3>Python and Bash projects</h3><p>A ~1,800 line virtual-environment manager and personal automation scripts built with Rich and InquirerPy.</p></div></li>
+    <li class="jt-i" data-reveal style="--c:var(--red)"><span class="jt-dot"></span><div class="jt-b"><span class="jt-t">2026</span><h3>CPENT certified</h3><p>EC-Council Certified Penetration Testing Professional, plus TryHackMe top 3%.</p></div></li>
+    <li class="jt-i now" data-reveal style="--c:var(--accent)"><span class="jt-dot"></span><div class="jt-b"><span class="jt-t">Now</span><h3>Open to work</h3><p>Junior Penetration Tester, Web and API Security Tester, Offensive Security Intern or Bug Bounty Hunter.</p></div></li>
   </ol>
   <div class="open-card" data-reveal="flip">
     <div class="oc-h"><span class="tile"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/><rect width="20" height="14" x="2" y="6" rx="2"/></svg></span><h3>Work preferences</h3></div>
@@ -201,13 +201,14 @@
   <p class="sub" data-reveal>A tiny hack-the-box. Pick a difficulty, then type commands to get a shell and capture the flag.</p>
   <div class="game" id="game" data-reveal="flip">
     <div class="term-bar"><i></i><i></i><i></i><span>target.htb</span></div>
+    <div class="g-brief" aria-label="Mission briefing"><span><i>Target</i><b>10.10.11.42</b></span><span><i>Alias</i><b>target</b></span><span><i>Your IP</i><b>10.10.14.7</b></span><span><i>Goal</i><b>get a shell, read the flag</b></span></div>
     <div class="g-top">
       <div class="g-lv" role="tablist" aria-label="Difficulty"><button type="button" data-lv="easy" class="on">Easy</button><button type="button" data-lv="normal">Normal</button><button type="button" data-lv="impossible">Impossible</button></div>
       <div class="g-stats"><span>Time <b id="g-time">0:00</b></span><span>Hints <b id="g-hints">0</b></span><span>Best <b id="g-best">-</b></span></div>
     </div>
     <div class="g-out" id="g-out" aria-live="polite"></div>
     <form class="g-in" id="g-form" autocomplete="off"><span class="g-ps">attacker@kali:~$</span><input id="g-input" type="text" inputmode="text" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Command" placeholder="type help"></form>
-    <div class="g-chips" id="g-chips"></div>
+    <div class="g-sug" id="g-sug" hidden><em>Try</em><div class="g-chips" id="g-chips"></div></div>
     <div class="g-btns"><button type="button" class="btn" id="g-start"><span>Start</span></button><button type="button" class="btn" id="g-hint"><span>Hint</span></button></div>
   </div>
 </section>

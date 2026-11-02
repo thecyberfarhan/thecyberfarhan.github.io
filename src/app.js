@@ -370,6 +370,7 @@
   function sClamp(v) { return Math.max(0, Math.min(v, document.documentElement.scrollHeight - innerHeight)); }
   window.addEventListener('wheel', function (e) {
     if (e.ctrlKey || busy || !motion) return;
+    var inner = e.target.closest && e.target.closest('.g-out, .tm-out'); if (inner && inner.scrollHeight > inner.clientHeight + 1) return;
     var d = e.deltaMode === 1 ? e.deltaY * 34 : e.deltaMode === 2 ? e.deltaY * innerHeight : e.deltaY;
     if (!sOn && Math.abs(d) < 40) return;
     e.preventDefault();
@@ -1097,7 +1098,7 @@
   /* ---------- the game: three levels, scripted target ---------- */
   (function () {
     var box = $('#game'); if (!box) return;
-    var out = $('#g-out'), form = $('#g-form'), inp = $('#g-input'), chips = $('#g-chips'), startB = $('#g-start'), hintB = $('#g-hint');
+    var sugBox = $('#g-sug'), out = $('#g-out'), form = $('#g-form'), inp = $('#g-input'), chips = $('#g-chips'), startB = $('#g-start'), hintB = $('#g-hint');
     var tEl = $('#g-time'), hEl = $('#g-hints'), bEl = $('#g-best'), lvBtns = $$('.g-lv button', box);
     var T = '(?:target|10\\.10\\.11\\.42)', B64 = 'c3ZjX2FkbWluOlN1cDNyUzNjcmV0IQ==', ROT = 'frperg_xrl_9';
     var LV = {
@@ -1154,18 +1155,18 @@
     function bestOf(k) { try { return localStorage.getItem('gbest_' + k); } catch (e) { return null; } }
     function showBest() { var b = bestOf(lvKey); bEl.textContent = b ? fmt(+b) : '-'; }
     function setIdle(msg) {
-      idle = true; clearInterval(timer); st = null; form.querySelector('input').disabled = true; chips.textContent = ''; hintB.disabled = true;
+      idle = true; clearInterval(timer); st = null; form.querySelector('input').disabled = true; chips.textContent = ''; sugBox.hidden = true; hintB.disabled = true;
       startB.querySelector('span').textContent = 'Start'; tEl.textContent = LV[lvKey].limit ? fmt(LV[lvKey].limit) : '0:00'; hEl.textContent = '0'; showBest();
       lvBtns.forEach(function (b) { b.disabled = false; });
       if (msg !== false) { out.textContent = ''; pr(out, msg || 'Pick a difficulty and press Start.', 'm'); }
     }
     function sugNext() {
-      chips.textContent = ''; if (!st || !LV[lvKey].chipsOn) return;
+      chips.textContent = ''; sugBox.hidden = true; if (!st || !LV[lvKey].chipsOn) return;
       var a = LV[lvKey].acts.filter(function (x) { return x.sug && !st.tok[x.gives] && (x.needs || []).every(function (n) { return st.tok[n]; }); })[0];
       if (!a || st.tok.flag) return;
       var b = document.createElement('button'); b.type = 'button'; b.textContent = a.sug;
       b.addEventListener('click', function () { inp.value = a.sug; inp.focus(); });
-      chips.appendChild(b);
+      chips.appendChild(b); sugBox.hidden = false;
     }
     function start() {
       clearInterval(timer);
@@ -1203,7 +1204,8 @@
       var low = raw, name = low.split(/\s+/)[0].toLowerCase();
       var m = raw.match(/^(?:submit\s+)?(FLAG\{[^}]*\})$/i);
       if (m) { if (m[1] === FLAGS[lvKey]) win(); else pr(out, 'Wrong flag. Keep digging.', 'r'); return; }
-      if (name === 'help') { pr(out, 'nmap, curl, nc, ssh, cat, ls, base64, tr, hashcat, hint, clear, submit FLAG{...}', 'a'); pr(out, 'Tip: the host is "target". Flags look like FLAG{...}.', 'm'); return; }
+      if (name === 'target' || name === '10.10.11.42') { pr(out, 'target is the box you are attacking: 10.10.11.42. Use it as an argument, e.g. nmap target', 'y'); return; }
+      if (name === 'help') { pr(out, 'Target: 10.10.11.42 (alias: target). Your IP: 10.10.14.7.', 'y'); pr(out, 'nmap, curl, nc, ssh, cat, ls, base64, tr, hashcat, hint, clear, submit FLAG{...}', 'a'); pr(out, 'Tip: the host is "target". Flags look like FLAG{...}.', 'm'); return; }
       if (name === 'clear') { out.textContent = ''; return; }
       if (name === 'hint') { hintB.click(); return; }
       var hit = null;
@@ -1220,7 +1222,7 @@
     startB.addEventListener('click', start);
     hintB.addEventListener('click', function () {
       if (!st || st.done) return; var L = LV[lvKey]; if (!L.hintsOn) return;
-      var n = Object.keys(st.tok).length, h = L.hints[Math.min(n, L.hints.length - 1)]; st.hints++; hEl.textContent = String(st.hints); pr(out, 'HINT: ' + h, 'y');
+      var n = Object.keys(st.tok).length, h = L.hints[Math.min(n, L.hints.length - 1)]; st.hints++; hEl.textContent = String(st.hints); pr(out, 'HINT ' + st.hints + ': ' + h + '  [target 10.10.11.42, alias "target"]', 'y');
     });
     lvBtns.forEach(function (b) {
       b.addEventListener('click', function () {
