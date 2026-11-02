@@ -750,3 +750,5 @@ html.quick #loader{transition:opacity .3s 0s!important}html.quick .ld-ui{transit
 @media (max-width:820px),(pointer:coarse){.tm-btn,.tm{display:none!important}}
 
 #about .more{display:flex;flex-wrap:wrap;gap:12px}
+
+.rsay.foe{border-color:color-mix(in srgb,var(--accent) 70%,var(--border));background:color-mix(in srgb,var(--accent) 12%,var(--surface))}
