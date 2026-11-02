@@ -240,7 +240,7 @@
   window.addEventListener('resize', function () { moveInd(active); });
   $('#burger').addEventListener('click', function () { var o = pill.classList.toggle('open'); this.setAttribute('aria-expanded', o); });
 
-  var TITLES = { about: 'About', tools: 'Tools', proof: 'Proof of work', live: 'Live stats', contact: 'Contact' }, appTitle = $('#apptitle'), curTitle = 'Farhan';
+  var TITLES = { about: 'About', journey: 'Journey', tools: 'Tools', proof: 'Proof of work', live: 'Live stats', contact: 'Contact' }, appTitle = $('#apptitle'), curTitle = 'Farhan';
   function setTitle(id) {
     var t = TITLES[id] || 'Farhan'; if (!appTitle || t === curTitle) return; curTitle = t;
     var b = document.createElement('b'); b.textContent = t; appTitle.innerHTML = ''; appTitle.appendChild(b);
@@ -862,7 +862,7 @@
   function inView(el) { var r = el.getBoundingClientRect(); return r.top > 90 && r.bottom < innerHeight - 40 && r.left >= 0 && r.right <= innerWidth; }
   function sectionNow() {
     var sky = $('.sky'); if (sky) { var r = sky.getBoundingClientRect(); if (r.top < innerHeight * 0.6 && r.bottom > innerHeight * 0.4) return 'sky'; }
-    var cur = 'hero', ids = ['hero', 'about', 'tools', 'proof', 'live', 'contact'];
+    var cur = 'hero', ids = ['hero', 'about', 'journey', 'tools', 'proof', 'live', 'play', 'contact'];
     ids.forEach(function (id) { var s = document.getElementById(id); if (s && s.getBoundingClientRect().top < innerHeight * 0.5) cur = id; });
     return cur;
   }
@@ -979,4 +979,255 @@
       startRoam(); tLoop = true; lastF = performance.now(); requestAnimationFrame(roamLoop);
     }, 2000);
   }
+
+  /* ---------- command palette (Enter) + mini hack-the-box ---------- */
+  var tm = $('#tm'), tmOut = $('#tm-out'), tmIn = $('#tm-input'), tmBtn = $('#tm-btn');
+  var tmHist = [], tmHi = 0, tmBooted = false;
+  function pr(box, text, cls) {
+    var d = document.createElement('div'); if (cls) d.className = cls; d.textContent = text; box.appendChild(d); box.scrollTop = box.scrollHeight; return d;
+  }
+  function prLink(box, label, href, dl) {
+    var d = document.createElement('div'), a = document.createElement('a'); a.href = href; a.textContent = label; if (dl) a.setAttribute('download', 'Farhan_Hussain_Resume.pdf'); else { a.target = '_blank'; a.rel = 'noopener'; }
+    d.appendChild(a); box.appendChild(d); box.scrollTop = box.scrollHeight;
+  }
+  function openTerm() {
+    if (!tm.hidden) return;
+    tm.hidden = false; void tm.offsetWidth; tm.classList.add('on');
+    if (!tmBooted) { tmBooted = true; pr(tmOut, 'Farhan OS 1.0. Type help or ls to see what you can do.', 'm'); }
+    setTimeout(function () { try { tmIn.focus({ preventScroll: true }); } catch (e) { tmIn.focus(); } }, 60);
+  }
+  function closeTerm() {
+    if (tm.hidden) return;
+    tm.classList.remove('on'); setTimeout(function () { tm.hidden = true; }, 220);
+    try { tmIn.blur(); } catch (e) {}
+  }
+  var SECS = ['about', 'journey', 'tools', 'proof', 'live', 'play', 'contact'];
+  var FILES = ['about/', 'journey/', 'tools/', 'proof/', 'live/', 'play/', 'contact/', 'resume.pdf'];
+  var CMDS = {
+    help: function (o) {
+      ['Commands:', '  ls              list sections', '  goto <section>  jump there (about, journey, tools, proof, live, play, contact)', '  whoami          who am I', '  skills          what I work with', '  certs           certifications', '  writeups        featured writeups', '  projects        things I built', '  education       school', '  contact         where to reach me', '  resume          download my resume', '  play            open the mini hack-the-box', '  theme           toggle day / night', '  clear, exit     tidy up', 'Not everything is listed. Poke around.'].forEach(function (l) { pr(o, l, l.charAt(0) === ' ' ? '' : 'c'); });
+    },
+    ls: function (o, a) {
+      if (/a/.test(a || '')) { pr(o, FILES.concat(['.secret']).join('   '), 'a'); } else pr(o, FILES.join('   '), 'a');
+    },
+    whoami: function (o) { pr(o, 'Farhan Hussain. Web and API penetration tester, CPENT certified.'); pr(o, 'Based in Bahawalnagar, Pakistan. Open to junior pentest roles.', 'm'); },
+    about: function (o) { CMDS.whoami(o); },
+    skills: function (o) { pr(o, 'Web and API: Burp Suite, OWASP ZAP, SQLMap, ffuf, OWASP Top 10'); pr(o, 'Recon: Nmap, RustScan, Masscan, Nessus, Wireshark, NetExec'); pr(o, 'Exploitation: Metasploit, Hydra, Hashcat, Mimikatz, Evil-WinRM'); pr(o, 'Active Directory: BloodHound, Impacket, Kerberoasting, DCSync'); pr(o, 'Code: Python, Bash, PowerShell, JavaScript, SQL, Docker'); },
+    tools: function (o) { CMDS.skills(o); go('tools'); },
+    certs: function (o) { pr(o, 'CPENT, EC-Council, 2026. Practical, hands-on penetration testing.', 'ok'); pr(o, 'TryHackMe top 3%, 100+ rooms.', 'm'); },
+    certifications: function (o) { CMDS.certs(o); },
+    writeups: function (o) { pr(o, '37 published on GitHub. Featured:'); ['Mr Robot CTF', 'Mustacchio', 'Archetype', 'Cap', 'Overpass', 'Silver Platter', 'Watcher', 'tomghost'].forEach(function (w) { pr(o, '  - ' + w, 'a'); }); prLink(o, 'github.com/thecyberfarhan/CTF-Writeups', 'https://github.com/thecyberfarhan/CTF-Writeups'); },
+    projects: function (o) { pr(o, 'Python Virtual-Environment Manager, ~1,800 LOC (Rich, InquirerPy)'); pr(o, 'Personal Automation Scripts (Python / Bash)'); pr(o, 'This site, hand-built with no frameworks'); },
+    education: function (o) { pr(o, 'Intermediate (HSSC), ICS, Al-Hayat College, 2023 to 2025, 87%.'); },
+    journey: function (o) { pr(o, 'Opening the journey section...', 'm'); go('journey'); },
+    contact: function (o) { prLink(o, 'LinkedIn  in/cyber-farhan-hussain', 'https://www.linkedin.com/in/cyber-farhan-hussain/'); prLink(o, 'GitHub    @thecyberfarhan', 'https://github.com/thecyberfarhan'); prLink(o, 'TryHackMe farhan.hussain', 'https://tryhackme.com/p/farhan.hussain'); prLink(o, 'Email     farhan736hussain@gmail.com', 'mailto:farhan736hussain@gmail.com'); },
+    resume: function (o) { pr(o, 'Downloading Farhan_Hussain_Resume.pdf ...', 'ok'); var a = document.createElement('a'); a.href = 'assets/Farhan_Hussain_Resume.pdf'; a.setAttribute('download', 'Farhan_Hussain_Resume.pdf'); document.body.appendChild(a); a.click(); a.remove(); },
+    cv: function (o) { CMDS.resume(o); },
+    play: function (o) { pr(o, 'Loading target.htb ...', 'm'); closeTerm(); go('play'); },
+    ctf: function (o) { CMDS.play(o); },
+    theme: function (o) { tBtn.click(); pr(o, 'Theme switched.', 'm'); },
+    goto: function (o, a) { var id = (a || '').trim().toLowerCase(); if (id === 'home' || id === 'top') { closeTerm(); go('top'); return; } if (SECS.indexOf(id) < 0) { pr(o, 'goto: unknown section "' + id + '". Try: ' + SECS.join(', '), 'r'); return; } closeTerm(); go(id); },
+    clear: function () { tmOut.textContent = ''; },
+    exit: function () { closeTerm(); },
+    quit: function () { closeTerm(); },
+    history: function (o) { tmHist.forEach(function (h, i) { pr(o, ' ' + (i + 1) + '  ' + h, 'm'); }); },
+    date: function (o) { pr(o, new Date().toString()); },
+    pwd: function (o) { pr(o, '/home/visitor'); },
+    id: function (o) { pr(o, 'uid=1000(visitor) gid=1000(visitor) groups=1000(visitor),1337(recruiters)'); },
+    uname: function (o) { pr(o, 'Linux farhan 6.x-kali #1 SMP x86_64 GNU/Linux'); },
+    neofetch: function (o) { pr(o, 'visitor@farhan', 'c'); pr(o, 'OS:    Farhan OS 1.0'); pr(o, 'Shell: zsh (probably)'); pr(o, 'Role:  Penetration Tester'); pr(o, 'Cert:  CPENT'); pr(o, 'Rank:  TryHackMe top 3%'); },
+    sudo: function (o) { pr(o, 'visitor is not in the sudoers file. This incident will be reported.', 'r'); },
+    su: function (o) { pr(o, 'su: Authentication failure. Nice try.', 'r'); },
+    cat: function (o, a) {
+      a = (a || '').trim();
+      if (a === '.secret') { pr(o, 'You found it. Beat the Impossible level in the Play section and see what happens.', 'y'); }
+      else if (a === 'flag.txt' || a === '/root/flag.txt') { pr(o, 'cat: ' + a + ': Permission denied. Earn it in the Play section.', 'r'); }
+      else if (/passwd/.test(a)) { pr(o, 'root:x:0:0:root:/root:/bin/bash\nvisitor:x:1000:1000::/home/visitor:/bin/zsh\nfarhan:x:1001:1001:please hire me:/home/farhan:/bin/zsh'); }
+      else if (a) pr(o, 'cat: ' + a + ': No such file or directory', 'r'); else pr(o, 'cat: missing file operand', 'r');
+    },
+    rm: function (o) { pr(o, 'rm: it is dangerous to operate recursively on /. Also, I keep backups.', 'r'); },
+    vim: function (o) { pr(o, 'You are now trapped in vim. Type :q! to escape (it will not work).', 'y'); },
+    ':q': function (o) { pr(o, 'E37: No write since last change. Nice try.', 'y'); },
+    ':q!': function (o) { pr(o, 'Fine. You are free.', 'ok'); closeTerm(); },
+    ping: function (o) { pr(o, 'PING farhan.local: 64 bytes, time=0.042 ms, still hiring-friendly'); },
+    nmap: function (o) { pr(o, 'Scanning the portfolio... 22/ssh closed, 80/http open, 443/https open, 31337/elite open (just kidding).', 'a'); },
+    hack: function (o) { pr(o, 'Access granted. Just kidding. Try the Play section instead.', 'ok'); },
+    matrix: function (o) { for (var i = 0; i < 6; i++) { var s = ''; for (var j = 0; j < 46; j++) s += Math.random() < 0.5 ? Math.floor(Math.random() * 2) : String.fromCharCode(65382 + Math.floor(Math.random() * 50)); pr(o, s, 'ok'); } },
+    coffee: function (o) { pr(o, '   ( (\n    ) )\n  ........\n  |      |]\n  \\      /\n   `----\'\nCoffee ready. Fuel for the next writeup.', 'y'); },
+    hello: function (o) { pr(o, 'Hello, recruiter. Type resume to grab my CV.', 'c'); },
+    hi: function (o) { CMDS.hello(o); },
+    '42': function (o) { pr(o, 'The answer to life, the universe and a CTF flag.', 'y'); }
+  };
+  var CNAMES = Object.keys(CMDS);
+  function runTerm(line) {
+    var raw = line.trim(); if (!raw) return;
+    pr(tmOut, 'visitor@farhan:~$ ' + raw, 'c'); tmHist.push(raw); tmHi = tmHist.length;
+    var parts = raw.split(/\s+/), name = parts[0].toLowerCase(), arg = parts.slice(1).join(' ');
+    if (/^rm\b/.test(raw) && /-rf?\s*\/|-fr\s*\//.test(raw)) name = 'rm';
+    if (name === 'ls' && /-\w*a/.test(arg)) arg = 'a';
+    if (name === 'uname') arg = '';
+    var fn = CMDS[name];
+    if (fn && typeof fn === 'function' && Object.prototype.hasOwnProperty.call(CMDS, name)) fn(tmOut, arg);
+    else pr(tmOut, name + ': command not found. Type help.', 'r');
+    tmOut.scrollTop = tmOut.scrollHeight;
+  }
+  $('#tm-form').addEventListener('submit', function (e) { e.preventDefault(); var v = tmIn.value; tmIn.value = ''; runTerm(v); });
+  tmIn.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowUp') { e.preventDefault(); if (tmHi > 0) { tmHi--; tmIn.value = tmHist[tmHi] || ''; } }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); if (tmHi < tmHist.length) { tmHi++; tmIn.value = tmHist[tmHi] || ''; } }
+    else if (e.key === 'Tab') {
+      e.preventDefault(); var v = tmIn.value.toLowerCase(); if (!v) return;
+      var m = CNAMES.filter(function (c) { return c.indexOf(v) === 0; }); if (m.length === 1) tmIn.value = m[0] + ' ';
+    }
+  });
+  tmBtn.addEventListener('click', function () { tm.hidden ? openTerm() : closeTerm(); });
+  $('#tm-x').addEventListener('click', closeTerm);
+  tm.addEventListener('pointerdown', function (e) { if (e.target === tm) closeTerm(); });
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { closeTerm(); return; }
+    var ae = document.activeElement, tag = ae && ae.tagName;
+    var typing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (ae && ae.isContentEditable);
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); tm.hidden ? openTerm() : closeTerm(); return; }
+    if (e.key === 'Enter' && !typing && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && (tag === 'BODY' || !ae) && tm.hidden) {
+      var ld = $('#loader'); if (ld && getComputedStyle(ld).display !== 'none') return;
+      e.preventDefault(); openTerm();
+    }
+  });
+
+  /* ---------- the game: three levels, scripted target ---------- */
+  (function () {
+    var box = $('#game'); if (!box) return;
+    var out = $('#g-out'), form = $('#g-form'), inp = $('#g-input'), chips = $('#g-chips'), startB = $('#g-start'), hintB = $('#g-hint');
+    var tEl = $('#g-time'), hEl = $('#g-hints'), bEl = $('#g-best'), lvBtns = $$('.g-lv button', box);
+    var T = '(?:target|10\\.10\\.11\\.42)', B64 = 'c3ZjX2FkbWluOlN1cDNyUzNjcmV0IQ==', ROT = 'frperg_xrl_9';
+    var LV = {
+      easy: {
+        limit: 0, hintsOn: true, chipsOn: true,
+        intro: 'EASY: one box, one path. Target 10.10.11.42 (alias: target). Suggested commands appear below.',
+        hints: ['Start with a port scan.', 'The web server is open. Fetch the home page and read the source.', 'Developers leave comments. See what the page mentions.', 'The notes hold a login. Use it on the admin page with curl -u user:pass.'],
+        acts: [
+          { re: new RegExp('^nmap\\b.*' + T), gives: 'scan', sug: 'nmap target', out: 'Starting Nmap 7.94\nNmap scan report for target (10.10.11.42)\nPORT   STATE SERVICE\n22/tcp open  ssh\n80/tcp open  http\nNmap done: 1 IP address (1 host up)' },
+          { re: new RegExp('^curl\\b.*' + T + '/admin.*(admin:letmein|admin letmein)'), needs: ['notes'], gives: 'flag', out: 'Welcome back, admin.\nFLAG{easy_peasy_recon}' },
+          { re: new RegExp('^curl\\b.*' + T + '/admin'), needs: ['notes'], out: '401 Unauthorized. Send credentials: curl -u user:pass target/admin' },
+          { re: new RegExp('^curl\\b.*' + T + '/notes\\.txt'), needs: ['home'], gives: 'notes', sug: 'curl target/notes.txt', out: 'admin panel: /admin\nlogin: admin / letmein' },
+          { re: new RegExp('^curl\\b(?:\\s+-\\w+)*\\s+(?:http://)?' + T + '/?$'), needs: ['scan'], gives: 'home', sug: 'curl target', out: '<html><title>Acme Corp</title>\n<h1>Coming soon</h1>\n<!-- TODO: remove /notes.txt before launch -->\n</html>' },
+          { sugOnly: true, needs: ['notes'], sug: 'curl -u admin:letmein target/admin', gives: 'flag' }
+        ]
+      },
+      normal: {
+        limit: 0, hintsOn: true, chipsOn: false,
+        intro: 'NORMAL: web box. Target 10.10.11.42 (alias: target). No suggestions; hints cost you.',
+        hints: ['Scan it. Not every web port is 80.', 'Check robots.txt on the second web port.', 'Walk into the folder it mentions.', 'Fetch that file. It looks encoded.', 'Decode it with base64 -d.', 'You have credentials and an SSH port.', 'Look around the home folder.'],
+        acts: [
+          { re: new RegExp('^nmap\\b.*' + T), gives: 'scan', out: 'Starting Nmap 7.94\nPORT     STATE SERVICE\n22/tcp   open  ssh\n80/tcp   open  http\n8080/tcp open  http-alt\nNmap done: 1 IP address (1 host up)' },
+          { re: new RegExp('^curl\\b.*' + T + ':8080/robots\\.txt'), needs: ['scan'], gives: 'robots', out: 'User-agent: *\nDisallow: /backup/' },
+          { re: new RegExp('^curl\\b.*' + T + ':8080/backup/db\\.bak\\.b64'), needs: ['listing'], gives: 'b64', out: B64 },
+          { re: new RegExp('^curl\\b.*' + T + ':8080/backup/?$'), needs: ['robots'], gives: 'listing', out: 'Index of /backup\n  db.bak.b64    2.1K' },
+          { re: new RegExp('base64\\s+(-d|--decode)'), has: B64, needs: ['b64'], gives: 'creds', out: 'svc_admin:Sup3rS3cret!' },
+          { re: new RegExp('^ssh\\b.*svc_admin@' + T), needs: ['creds'], out: "svc_admin@target's password:", ask: { re: /^Sup3rS3cret!$/, gives: 'shell', out: 'Welcome to Ubuntu 22.04 LTS\nYou have a shell as svc_admin. Try ls and cat.' } },
+          { re: /^cat\s+flag\.txt$/, needs: ['shell'], gives: 'flag', out: 'FLAG{b64_is_not_encryption}' },
+          { re: /^ls\b/, needs: ['shell'], out: 'flag.txt  notes.md' }
+        ]
+      },
+      impossible: {
+        limit: 180, hintsOn: false, chipsOn: false,
+        intro: 'IMPOSSIBLE: hardened box. 3 minutes. No hints. Target 10.10.11.42 (alias: target). The IDS is watching.',
+        hints: [],
+        acts: [
+          { re: new RegExp('^nmap\\b(?=.*-p-)(?=.*' + T + ')'), gives: 'allports', out: 'Starting Nmap 7.94 (all 65535 ports)\nPORT      STATE SERVICE\n22/tcp    open  ssh\n80/tcp    open  http\n31337/tcp open  Elite\nNmap done: 1 IP address (1 host up)' },
+          { re: new RegExp('^nmap\\b.*' + T), out: 'Starting Nmap 7.94\nPORT   STATE SERVICE\n22/tcp open  ssh\n80/tcp open  http\nNothing else on the top 1000 ports. Maybe look wider.' },
+          { re: new RegExp('^nc\\b.*' + T + '\\s+31337'), needs: ['allports'], gives: 'banner', out: 'AUTH SERVICE v0.9\nChallenge token (rot13): ' + ROT + '\nDecode it and send it in an X-Key header to the web server.' },
+          { re: new RegExp('(rot13|tr\\b.*N-ZA-Mn-za-m).*' + ROT + '|' + ROT + '.*(rot13|tr\\b.*N-ZA-Mn-za-m)'), needs: ['banner'], gives: 'key', out: 'secret_key_9' },
+          { re: new RegExp('^curl\\b(?=.*-H\\s*["\']?X-Key:\\s*secret_key_9)(?=.*' + T + "/export\\?id=.*(?:'|%27).*(?:\\bor\\b|%20or%20|\\+or\\+))", 'i'), needs: ['key'], gives: 'hash', out: 'id | user  | hash\n 1 | root  | 5f4dcc3b5aa765d61d8327deb882cf99\n 2 | guest | 084e0343a0486ff05530df6c705c8bb4' },
+          { re: new RegExp('^curl\\b(?=.*-H\\s*["\']?X-Key:\\s*secret_key_9)(?=.*' + T + '/export\\?id=)'), needs: ['key'], out: 'id | user  | hash\n 1 | guest | (no access)\nSomething about this input handling feels loose.' },
+          { re: new RegExp('^curl\\b(?=.*-H\\s*["\']?X-Key:\\s*secret_key_9)(?=.*' + T + ')'), needs: ['key'], gives: 'dash', out: 'Internal dashboard\n  /export?id=<n>   report export' },
+          { re: new RegExp('^curl\\b.*' + T), out: '403 Forbidden' },
+          { re: /^(hashcat|john|crack)\b.*5f4dcc3b5aa765d61d8327deb882cf99/, needs: ['hash'], gives: 'pw', out: '5f4dcc3b5aa765d61d8327deb882cf99:password\nStatus: Cracked' },
+          { re: new RegExp('^ssh\\b.*root@' + T), needs: ['pw'], out: "root@target's password:", ask: { re: /^password$/, gives: 'shell', out: 'root@target:~# you are root. Try cat /root/flag.txt' } },
+          { re: /^cat\s+\/root\/flag\.txt$/, needs: ['shell'], gives: 'flag', out: 'FLAG{no_hints_no_mercy}' }
+        ]
+      }
+    };
+    var FLAGS = { easy: 'FLAG{easy_peasy_recon}', normal: 'FLAG{b64_is_not_encryption}', impossible: 'FLAG{no_hints_no_mercy}' };
+    var lvKey = 'easy', st = null, timer = 0, idle = true;
+    function fmt(s) { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
+    function bestOf(k) { try { return localStorage.getItem('gbest_' + k); } catch (e) { return null; } }
+    function showBest() { var b = bestOf(lvKey); bEl.textContent = b ? fmt(+b) : '-'; }
+    function setIdle(msg) {
+      idle = true; clearInterval(timer); st = null; form.querySelector('input').disabled = true; chips.textContent = ''; hintB.disabled = true;
+      startB.querySelector('span').textContent = 'Start'; tEl.textContent = LV[lvKey].limit ? fmt(LV[lvKey].limit) : '0:00'; hEl.textContent = '0'; showBest();
+      lvBtns.forEach(function (b) { b.disabled = false; });
+      if (msg !== false) { out.textContent = ''; pr(out, msg || 'Pick a difficulty and press Start.', 'm'); }
+    }
+    function sugNext() {
+      chips.textContent = ''; if (!st || !LV[lvKey].chipsOn) return;
+      var a = LV[lvKey].acts.filter(function (x) { return x.sug && !st.tok[x.gives] && (x.needs || []).every(function (n) { return st.tok[n]; }); })[0];
+      if (!a || st.tok.flag) return;
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = a.sug;
+      b.addEventListener('click', function () { inp.value = a.sug; inp.focus(); });
+      chips.appendChild(b);
+    }
+    function start() {
+      clearInterval(timer);
+      var L = LV[lvKey]; st = { tok: {}, hints: 0, t0: Date.now(), ask: null, done: false }; idle = false;
+      out.textContent = ''; pr(out, L.intro, 'y'); pr(out, 'Type help for commands. Find the flag, then: submit FLAG{...}', 'm');
+      inp.disabled = false; hintB.disabled = !L.hintsOn; startB.querySelector('span').textContent = 'Restart'; hEl.textContent = '0';
+      lvBtns.forEach(function (b) { b.disabled = b.dataset.lv !== lvKey ? false : false; });
+      timer = setInterval(tick, 250); tick(); sugNext(); setTimeout(function () { try { inp.focus({ preventScroll: true }); } catch (e) { inp.focus(); } }, 50);
+    }
+    function tick() {
+      if (!st || st.done) return; var el = (Date.now() - st.t0) / 1000, L = LV[lvKey];
+      if (L.limit) {
+        var left = L.limit - el; tEl.textContent = fmt(left);
+        if (left <= 0) { st.done = true; clearInterval(timer); pr(out, 'IDS TRIGGERED. Connection dropped. Press Restart to try again.', 'r'); inp.disabled = true; hintB.disabled = true; chips.textContent = ''; }
+      } else tEl.textContent = fmt(el);
+    }
+    function win() {
+      st.done = true; clearInterval(timer); var el = Math.round((Date.now() - st.t0) / 1000);
+      pr(out, 'FLAG ACCEPTED. Box owned in ' + fmt(el) + ' with ' + st.hints + ' hint' + (st.hints === 1 ? '' : 's') + '.', 'ok');
+      var prev = bestOf(lvKey); if (!prev || el < +prev) { try { localStorage.setItem('gbest_' + lvKey, String(el)); } catch (e) {} pr(out, 'New best time.', 'y'); }
+      if (lvKey === 'impossible') { pr(out, 'Respect. Title unlocked: Red Team Legend. Now go hire the guy who built this.', 'y'); try { localStorage.setItem('legend', '1'); } catch (e) {} }
+      else pr(out, 'Try the next difficulty.', 'm');
+      inp.disabled = true; hintB.disabled = true; chips.textContent = ''; showBest(); box.classList.add('won'); setTimeout(function () { box.classList.remove('won'); }, 1600);
+      startB.querySelector('span').textContent = 'Play again';
+    }
+    function run(line) {
+      var raw = line.trim(); if (!raw || !st || st.done) return;
+      pr(out, 'attacker@kali:~$ ' + (st.ask ? '********' : raw), 'c');
+      var L = LV[lvKey];
+      if (st.ask) {
+        if (st.ask.re.test(raw)) { var k = st.ask; st.ask = null; st.tok[k.gives] = 1; pr(out, k.out, 'ok'); }
+        else { st.fail = (st.fail || 0) + 1; pr(out, 'Permission denied, please try again.', 'r'); if (st.fail >= 3) { st.ask = null; st.fail = 0; pr(out, 'Connection closed after 3 failed attempts.', 'm'); } }
+        sugNext(); return;
+      }
+      var low = raw, name = low.split(/\s+/)[0].toLowerCase();
+      var m = raw.match(/^(?:submit\s+)?(FLAG\{[^}]*\})$/i);
+      if (m) { if (m[1] === FLAGS[lvKey]) win(); else pr(out, 'Wrong flag. Keep digging.', 'r'); return; }
+      if (name === 'help') { pr(out, 'nmap, curl, nc, ssh, cat, ls, base64, tr, hashcat, hint, clear, submit FLAG{...}', 'a'); pr(out, 'Tip: the host is "target". Flags look like FLAG{...}.', 'm'); return; }
+      if (name === 'clear') { out.textContent = ''; return; }
+      if (name === 'hint') { hintB.click(); return; }
+      var hit = null;
+      L.acts.some(function (a) { if (a.sugOnly || !a.re.test(raw)) return false; if (a.has && raw.indexOf(a.has) < 0) return false; if ((a.needs || []).every(function (n) { return st.tok[n]; })) { hit = a; return true; } return false; });
+      if (hit) {
+        pr(out, hit.out, 'a'); if (hit.gives && !hit.ask) st.tok[hit.gives] = 1; if (hit.ask) st.ask = hit.ask;
+        if (st.tok.flag && !hit.ask && /FLAG\{/.test(hit.out)) pr(out, 'Flag found. Now: submit it.', 'y');
+        sugNext(); return;
+      }
+      var generic = { nmap: 'Host seems down. Did you use the right target? (try: target)', curl: 'curl: (22) The requested URL returned error: 404', nc: 'nc: connection refused', ssh: 'ssh: Permission denied (publickey).', cat: 'cat: no such file here', ls: 'tools  wordlists  loot', base64: 'base64: nothing useful to decode here', tr: 'nothing useful here', hashcat: 'No hashes loaded.', john: 'No password hashes loaded.', echo: raw.replace(/^echo\s*/, ''), pwd: '/home/attacker', whoami: 'attacker', id: 'uid=1000(attacker)' };
+      if (generic.hasOwnProperty(name)) pr(out, generic[name], 'm'); else pr(out, name + ': command not found. Type help.', 'r');
+    }
+    form.addEventListener('submit', function (e) { e.preventDefault(); var v = inp.value; inp.value = ''; run(v); });
+    startB.addEventListener('click', start);
+    hintB.addEventListener('click', function () {
+      if (!st || st.done) return; var L = LV[lvKey]; if (!L.hintsOn) return;
+      var n = Object.keys(st.tok).length, h = L.hints[Math.min(n, L.hints.length - 1)]; st.hints++; hEl.textContent = String(st.hints); pr(out, 'HINT: ' + h, 'y');
+    });
+    lvBtns.forEach(function (b) {
+      b.addEventListener('click', function () {
+        if (b.dataset.lv === lvKey && !idle) return; lvKey = b.dataset.lv;
+        lvBtns.forEach(function (x) { x.classList.toggle('on', x === b); }); setIdle();
+      });
+    });
+    setIdle();
+  })();
 })();
