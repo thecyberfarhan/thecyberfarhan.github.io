@@ -23,10 +23,11 @@
       root.classList.add('theming'); applyTheme(next); setTimeout(function () { root.classList.remove('theming'); }, 800); return;
     }
     var r = tBtn.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2, end = Math.hypot(Math.max(x, innerWidth - x), Math.max(y, innerHeight - y));
-    root.classList.add('no-tr');
-    var vt = document.startViewTransition(function () { applyTheme(next); });
+    root.classList.add('no-tr'); root.style.setProperty('--vx', x + 'px'); root.style.setProperty('--vy', y + 'px');
+    var applied = false, vt = document.startViewTransition(function () { applied = true; applyTheme(next); });
+    setTimeout(function () { if (!applied) { try { vt.skipTransition(); } catch (e) {} applyTheme(next); root.classList.remove('no-tr'); } }, 1500);
     vt.ready.then(function () {
-      root.animate({ clipPath: ['circle(0px at ' + x + 'px ' + y + 'px)', 'circle(' + end + 'px at ' + x + 'px ' + y + 'px)'] }, { duration: 950, easing: 'cubic-bezier(.65,0,.2,1)', pseudoElement: '::view-transition-new(root)' });
+      root.animate({ clipPath: ['circle(0px at ' + x + 'px ' + y + 'px)', 'circle(' + end + 'px at ' + x + 'px ' + y + 'px)'] }, { duration: 950, easing: 'cubic-bezier(.65,0,.2,1)', fill: 'forwards', pseudoElement: '::view-transition-new(root)' });
     }).catch(function () {});
     vt.finished.then(function () { root.classList.remove('no-tr'); }, function () { root.classList.remove('no-tr'); });
   });

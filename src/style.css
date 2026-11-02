@@ -382,7 +382,7 @@ html[data-theme=light] .tilt:hover{border-color:color-mix(in srgb,var(--text) 35
 
 /* ---------- day / night switch ---------- */
 ::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
-::view-transition-old(root){z-index:1}::view-transition-new(root){z-index:2}
+::view-transition-old(root){z-index:1}::view-transition-new(root){z-index:2;clip-path:circle(0px at var(--vx,50%) var(--vy,50%))}
 html.no-tr *,html.no-tr *::before,html.no-tr *::after{transition:none!important}
 html.theming *,html.theming *::before,html.theming *::after{transition:background-color .7s ease,color .7s ease,border-color .7s ease,fill .7s ease,stroke .7s ease,box-shadow .7s ease!important}
 
