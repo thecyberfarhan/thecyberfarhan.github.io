@@ -889,6 +889,7 @@
     return dir === 'in' ? f : f.slice().reverse().filter(function (z, i, a) { return a.length === 3 ? i !== 1 : true; });
   }
   function hideNudge() {
+    freeNudge = false;
     if (hiding || !nEl.classList.contains('on')) { anchor = null; clearTimeout(hideT); return; }
     var el = anchor; anchor = null; clearTimeout(hideT);
     if (spoke) { spoke.classList.remove('speak'); spoke = null; }
@@ -909,17 +910,50 @@
     var sel = sec === 'tools' ? '.chip-tile, .tool-col li' : sec === 'proof' ? '.wcard, .stat' : sec === 'about' ? '.card' : sec === 'sky' ? '.sky' : sec === 'live' ? '.lc-stat, .live-card' : sec === 'contact' ? '.ccard, .cterm' : sec === 'hero' ? '.medal-stage, .termcard' : '';
     if (!sel) return null; var list = $$(sel).filter(inView); return list.length ? list[Math.floor(Math.random() * list.length)] : null;
   }
-  function place() {
-    if (!anchor) return;
-    var r = anchor.getBoundingClientRect();
-    if (r.bottom < 50 || r.top > innerHeight - 30) { hideNudge(); return; }
-    var w = nEl.offsetWidth, h = nEl.offsetHeight, cx = r.left + r.width / 2, x = Math.max(12, Math.min(cx - w / 2, innerWidth - w - 12)), below = r.top - h - 16 < 76, y = below ? r.bottom + 16 : r.top - h - 16;
-    y = Math.max(76, Math.min(y, innerHeight - h - (innerWidth <= 820 ? 88 : 12)));
-    nEl.classList.toggle('below', below);
-    nEl.style.transform = 'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0)';
-    nEl.style.setProperty('--tx', Math.max(24, Math.min(cx - x, w - 24)).toFixed(1) + 'px');
+  /* a notification never sits on top of other content: it picks the free spot with the least overlap */
+  var BLK = '.card,.wcard,.chip-tile,.tool-col,.stat,.lc-stat,.ccard,.termcard,.cterm,.live-card,.btn,.title,.sub,.pills,.lead,.hero-copy h1,.role,.medal-stage,.sky,.eyebrow,.arch-q,.jt-b,.open-card,.steps li,.nf,.pm,.game,.tech li,.thm-badge,.hud,.prompt';
+  var pmKey = null, pmAt = 0, freeNudge = false, lastOv = 0;
+  function blockers(skip) {
+    var out = [];
+    $$(BLK).forEach(function (b) {
+      if (skip && (b === skip || b.contains(skip) || skip.contains(b))) return;
+      var r = b.getBoundingClientRect(); if (r.width < 8 || r.height < 8 || r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) return; out.push(r);
+    });
+    return out;
   }
-  (function nloop() { if (anchor) place(); requestAnimationFrame(nloop); })();
+  function overlap(x, y, w, h, list) {
+    var sum = 0; for (var i = 0; i < list.length; i++) { var r = list[i], a = Math.min(x + w, r.right) - Math.max(x, r.left), b = Math.min(y + h, r.bottom) - Math.max(y, r.top); if (a > 0 && b > 0) sum += a * b; } return sum;
+  }
+  function clampN(v, lo, hi) { return Math.max(lo, Math.min(v, hi)); }
+  function candidates(r, w, h) {
+    var maxY = innerHeight - h - (innerWidth <= 820 ? 88 : 12), list = [];
+    if (r) {
+      var cx = r.left + r.width / 2, ax = clampN(cx - w / 2, 12, innerWidth - w - 12), ry = clampN(r.top + r.height / 2 - h / 2, 76, maxY);
+      if (r.top - h - 16 >= 76) list.push({ k: 'above', x: ax, y: r.top - h - 16, pen: 0, tail: true, cx: cx });
+      if (r.bottom + 16 <= maxY) list.push({ k: 'below', x: ax, y: r.bottom + 16, pen: 0, tail: true, below: true, cx: cx });
+      if (r.right + 14 + w <= innerWidth - 12) list.push({ k: 'right', x: r.right + 14, y: ry, pen: 2500 });
+      if (r.left - 14 - w >= 12) list.push({ k: 'left', x: r.left - 14 - w, y: ry, pen: 2500 });
+    }
+    list.push({ k: 'bl', x: 16, y: maxY, pen: 5000 }, { k: 'br', x: innerWidth - w - 16, y: maxY, pen: 5000 }, { k: 'tl', x: 16, y: 84, pen: 5000 }, { k: 'tr', x: innerWidth - w - 16, y: 84, pen: 5000 });
+    return list;
+  }
+  function place() {
+    if (!anchor && !freeNudge) return;
+    var r = anchor ? anchor.getBoundingClientRect() : null;
+    if (r && (r.bottom < 50 || r.top > innerHeight - 30)) { hideNudge(); return; }
+    var w = nEl.offsetWidth, h = nEl.offsetHeight, now = performance.now(), cs = candidates(r, w, h), c;
+    if (!pmKey || now - pmAt > 350) {
+      var bl = blockers(anchor), best = null;
+      cs.forEach(function (q) { q.sc = overlap(q.x, q.y, w, h, bl) + q.pen; if (!best || q.sc < best.sc) best = q; });
+      pmKey = best.k; pmAt = now; lastOv = best.sc - best.pen;
+      if (nEl.classList.contains('on') && lastOv > 3000) { hideNudge(); return; }
+    }
+    c = cs.filter(function (q) { return q.k === pmKey; })[0] || cs[cs.length - 1];
+    nEl.classList.toggle('below', !!c.below); nEl.classList.toggle('free', !c.tail);
+    nEl.style.transform = 'translate3d(' + c.x.toFixed(1) + 'px,' + c.y.toFixed(1) + 'px,0)';
+    if (c.tail) nEl.style.setProperty('--tx', Math.max(24, Math.min(c.cx - c.x, w - 24)).toFixed(1) + 'px');
+  }
+  (function nloop() { if (anchor || freeNudge) place(); requestAnimationFrame(nloop); })();
   function other(list, last) { var pool = list.filter(function (x) { return x !== last; }); return pool[Math.floor(Math.random() * pool.length)]; }
   function pickKind() {
     var r = Math.random(), k = r < 0.4 ? 'sarcasm' : r < 0.6 ? 'tip' : r < 0.82 ? 'fact' : 'ask';
@@ -927,6 +961,7 @@
     return k;
   }
   function showNudge() {
+    var prevPick = lastPick, prevKind = lastKind;
     var sec = sectionNow(), el = pickSpeaker(sec), name = '', msg = '', lead = '', acts = [], kind = nCount >= 3 ? 'final' : pickKind();
     if (kind === 'sarcasm') {
       name = el ? nameOf(el) : '';
@@ -950,9 +985,10 @@
     nName.textContent = name; nMsg.textContent = msg; nLead.textContent = lead; nLead.style.display = lead ? '' : 'none';
     nBtns.innerHTML = ''; acts.forEach(function (a2) { var bt = document.createElement('button'); bt.type = 'button'; bt.textContent = a2.label; if (a2.url) bt.setAttribute('data-url', a2.url); else if (a2.id) bt.setAttribute('data-id', a2.id); else bt.setAttribute('data-close', '1'); nBtns.appendChild(bt); });
     if (spoke) spoke.classList.remove('speak'); spoke = el; if (el) { el.classList.remove('speak'); void el.offsetWidth; el.classList.add('speak'); }
-    anchor = el; nEl.className = 'nudge t-' + theme + ' a-' + anim + (el ? '' : ' free'); void nEl.offsetWidth;
-    if (!el) nEl.style.transform = 'translate3d(' + Math.round(innerWidth / 2 - 160) + 'px,' + (innerHeight - 260) + 'px,0)';
-    place(); nEl.classList.add('on'); hiding = false;
+    anchor = el; freeNudge = !el; pmKey = null; nEl.className = 'nudge t-' + theme + ' a-' + anim + (el ? '' : ' free'); void nEl.offsetWidth;
+    place();
+    if (lastOv > 1800) { if (spoke) { spoke.classList.remove('speak'); spoke = null; } anchor = null; freeNudge = false; lastPick = prevPick; lastKind = prevKind; return; }
+    nEl.classList.add('on'); hiding = false;
     if (el && nEl.animate) { var kind = anim === 'drop' ? 'drop' : anim; nEl.animate(frames(el, kind, 'in'), { duration: kind === 'glitch' ? 460 : 620, easing: kind === 'glitch' ? 'steps(7,end)' : 'cubic-bezier(.2,.9,.25,1)' }); }
     lastN = performance.now(); nCount++;
     clearTimeout(hideT); if (!hovering) hideT = setTimeout(hideNudge, 14000);
@@ -961,8 +997,8 @@
   nBtns.addEventListener('click', function (e) { var bt = e.target.closest && e.target.closest('button'); if (bt && bt.hasAttribute('data-close')) hideNudge(); });
   setInterval(function () {
     if (document.hidden || !root.classList.contains('done') || !motion) return;
-    var now = performance.now(), idle = now - lastAct, gap = Math.min(150000 + nCount * 60000, 420000);
-    if (idle > 50000 && now - lastN > gap) showNudge();
+    var now = performance.now(), idle = now - lastAct, gap = +QS.get('nudgegap') || Math.min(150000 + nCount * 60000, 420000);
+    if (idle > (+QS.get('nudgeidle') || 50000) && now - lastN > gap) showNudge();
   }, 1000);
 
   /* ---------- phone-only: share, touch roamers, haptic taps ---------- */
