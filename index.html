@@ -5,15 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Farhan | Penetration Tester</title>
 <meta name="description" content="Farhan, CPENT-certified penetration tester focused on web and API security. Tools, writeups and contact links.">
-<meta name="theme-color" content="#0d1117">
+<meta name="theme-color" content="#0d1117" id="tcolor">
+<script>try{var __t=localStorage.getItem("theme")||(matchMedia("(prefers-color-scheme: light)").matches?"light":"dark");document.documentElement.setAttribute("data-theme",__t)}catch(e){document.documentElement.setAttribute("data-theme","dark")}</script>
 <meta property="og:title" content="Farhan | Penetration Tester">
 <meta property="og:description" content="CPENT-certified penetration tester. 37 writeups, TryHackMe top 3%.">
 <meta property="og:type" content="website">
 <link rel="canonical" href="https://thecyberfarhan.github.io/">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
 <link rel="preload" href="assets/cpent-medal.webp" as="image" type="image/webp">
-<link rel="stylesheet" href="assets/style.css?v=3">
-<style>html.loading{overflow:hidden}#loader{position:fixed;inset:0;background:#0d1117;z-index:10000}.ld-mark{width:132px;height:132px}.ld-core{position:relative;z-index:2}#loader{display:grid;place-items:center}html.done #loader{display:none}</style>
+<link rel="stylesheet" href="assets/style.css?v=4">
+<style>html.loading{overflow:hidden}html{background:#0d1117}html[data-theme=light]{background:#f6f8fa}#loader{position:fixed;inset:0;background:#0d1117;z-index:10000}html[data-theme=light] #loader{background:#f6f8fa}.ld-mark{width:132px;height:132px}.ld-core{position:relative;z-index:2}#loader{display:grid;place-items:center}html.done #loader{display:none}</style>
 <script>setTimeout(function(){var r=document.documentElement;r.classList.remove("loading");r.classList.add("loaded","done")},9000)</script>
 </head>
 <body>
@@ -37,6 +38,7 @@
 <div class="cursor-dot" aria-hidden="true"></div>
 <div class="cursor-ring" aria-hidden="true"><span class="cur-label"></span></div>
 <div class="grid-bg" aria-hidden="true"></div>
+<canvas id="bg3d" aria-hidden="true"></canvas>
 
 <header class="nav" id="nav">
   <div class="nav-pill">
@@ -51,7 +53,7 @@
       <a href="#live" data-go="live" data-nav="live"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"> <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2" /> </svg><span>Live</span></a>
       <a href="#contact" data-go="contact" data-nav="contact"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"> <path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7" /> <rect x="2" y="4" width="20" height="16" rx="2" /> </svg><span>Contact</span></a>
     </nav>
-    <button class="motion" id="motion" type="button" aria-pressed="true" aria-label="Motion effects on. Press to reduce motion." title="Toggle motion"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"> <path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" /> <path d="M20 2v4" /> <path d="M22 4h-4" /> <circle cx="4" cy="20" r="2" /> </svg></button>
+    <button class="theme" id="theme" type="button" aria-label="Switch between day and night mode" title="Day / night"><svg class="ic moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"> <path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" /> </svg><svg class="ic sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"> <circle cx="12" cy="12" r="4" /> <path d="M12 2v2" /> <path d="M12 20v2" /> <path d="m4.93 4.93 1.41 1.41" /> <path d="m17.66 17.66 1.41 1.41" /> <path d="M2 12h2" /> <path d="M20 12h2" /> <path d="m6.34 17.66-1.41 1.41" /> <path d="m19.07 4.93-1.41 1.41" /> </svg></button>
     <button class="burger" id="burger" type="button" aria-label="Menu" aria-expanded="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"> <path d="M4 5h16" /> <path d="M4 12h16" /> <path d="M4 19h16" /> </svg></button>
   </div>
 </header>
@@ -77,9 +79,10 @@
   </div>
   <div class="hero-medal">
     <div class="medal-stage">
+      <svg class="certring" viewBox="0 0 200 200" aria-hidden="true"><defs><path id="cr" d="M100 100 m-88 0 a88 88 0 1 1 176 0 a88 88 0 1 1 -176 0"/></defs><text><textPath href="#cr" textLength="548" lengthAdjust="spacing">CERTIFIED PENETRATION TESTING PROFESSIONAL • EC-COUNCIL CPENT • </textPath></text></svg>
       <span class="orbit o1"></span><span class="orbit o2"></span>
       <span class="ring r1"></span><span class="ring r2"></span>
-      <img class="medal" src="assets/cpent-medal.webp" width="380" height="486" alt="EC-Council CPENT: Certified Penetration Testing Professional badge" fetchpriority="high">
+      <img class="medal" src="assets/cpent-medal.webp" width="640" height="820" alt="EC-Council CPENT: Certified Penetration Testing Professional badge" fetchpriority="high">
     </div>
   </div>
   <a class="scroll-cue" href="#about" data-go="about" aria-label="Scroll to about"><span></span></a>
@@ -135,6 +138,6 @@
   <span>Last updated 2 November 2026</span>
   <span>Built by hand, no frameworks.</span>
 </footer>
-<script src="assets/app.js?v=3" defer></script>
+<script src="assets/app.js?v=4" defer></script>
 </body>
 </html>
