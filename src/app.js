@@ -536,7 +536,7 @@
   }
   /* the roamers talk while you are away */
   var SAY = {
-    mecha: ['Hey... where did you go?', "I'm waiting here for you.", "It's boring to wait here.", 'Did you fall asleep on me?', 'Still here. Still waiting.', 'Move your mouse, I dare you.', 'I could be scanning ports right now.', 'Is the recruiter on a call? Take your time.', 'Fine, I will jump around a bit.', 'Psst. The resume button is up top.', 'I have walked this page twice already.', 'Hello? Anyone out there?'],
+    mecha: ['Hey... where did you go?', "I'm waiting here for you.", "It's boring to wait here.", 'Did you fall asleep on me?', 'Still here. Still waiting.', 'Move your mouse, I dare you.', 'I could be scanning ports right now.', 'Are you on a call? Take your time, I will wait.', 'Fine, I will jump around a bit.', 'Psst. The resume button is up top.', 'I have walked this page twice already.', 'Hello? Anyone out there?'],
     ship: ['Radio check. Anyone there?', 'Scanning for life signs...', 'No mouse detected. Standing by.', 'Bored. Shooting pixels.', 'Pilot to base: it is quiet out here.', 'Come back, cursor.', 'Patrolling sector About.']
   };
   var sayEl = document.createElement('div'); sayEl.className = 'rsay'; sayEl.setAttribute('aria-hidden', 'true'); document.body.appendChild(sayEl);
@@ -1063,7 +1063,7 @@
     history: function (o) { tmHist.forEach(function (h, i) { pr(o, ' ' + (i + 1) + '  ' + h, 'm'); }); },
     date: function (o) { pr(o, new Date().toString()); },
     pwd: function (o) { pr(o, '/home/visitor'); },
-    id: function (o) { pr(o, 'uid=1000(visitor) gid=1000(visitor) groups=1000(visitor),1337(recruiters)'); },
+    id: function (o) { pr(o, 'uid=1000(visitor) gid=1000(visitor) groups=1000(visitor),1337(visitors)'); },
     uname: function (o) { pr(o, 'Linux farhan 6.x-kali #1 SMP x86_64 GNU/Linux'); },
     arch: function (o) { pr(o, 'I use Arch, btw.', 'a'); closeTerm(); go('arch'); },
     btw: function (o) { CMDS.arch(o); },
@@ -1074,7 +1074,7 @@
       else if (/^-Rns?\s+(farhan|me)/.test(a)) { pr(o, 'error: cannot remove farhan: required by your next project.', 'r'); }
       else pr(o, 'error: no operation specified (use -h for help). Try: pacman -Syu', 'r');
     },
-    yay: function (o) { pr(o, 'aur/farhan 1.0-1 (+1337 99.99%)', 'a'); pr(o, '    Penetration tester, CPENT certified. Hirable.'); },
+    yay: function (o) { pr(o, 'aur/farhan 1.0-1 (+1337 99.99%)', 'a'); pr(o, '    Penetration tester, CPENT certified. Open to work.'); },
     neofetch: function (o) { pr(o, 'visitor@farhan', 'c'); pr(o, 'OS:    Arch Linux x86_64, btw'); pr(o, 'Shell: zsh (probably)'); pr(o, 'Role:  Penetration Tester'); pr(o, 'Cert:  CPENT'); pr(o, 'Rank:  TryHackMe top 3%'); },
     sudo: function (o) { pr(o, 'visitor is not in the sudoers file. This incident will be reported.', 'r'); },
     su: function (o) { pr(o, 'su: Authentication failure. Nice try.', 'r'); },
@@ -1082,19 +1082,19 @@
       a = (a || '').trim();
       if (a === '.secret') { pr(o, 'You found it. Beat the Impossible level in the Play section and see what happens.', 'y'); }
       else if (a === 'flag.txt' || a === '/root/flag.txt') { pr(o, 'cat: ' + a + ': Permission denied. Earn it in the Play section.', 'r'); }
-      else if (/passwd/.test(a)) { pr(o, 'root:x:0:0:root:/root:/bin/bash\nvisitor:x:1000:1000::/home/visitor:/bin/zsh\nfarhan:x:1001:1001:please hire me:/home/farhan:/bin/zsh'); }
+      else if (/passwd/.test(a)) { pr(o, 'root:x:0:0:root:/root:/bin/bash\nvisitor:x:1000:1000::/home/visitor:/bin/zsh\nfarhan:x:1001:1001:penetration tester:/home/farhan:/bin/zsh'); }
       else if (a) pr(o, 'cat: ' + a + ': No such file or directory', 'r'); else pr(o, 'cat: missing file operand', 'r');
     },
     rm: function (o) { pr(o, 'rm: it is dangerous to operate recursively on /. Reinstalling Arch takes a while, btw.', 'r'); },
     vim: function (o) { pr(o, 'You are now trapped in vim. Type :q! to escape (it will not work).', 'y'); },
     ':q': function (o) { pr(o, 'E37: No write since last change. Nice try.', 'y'); },
     ':q!': function (o) { pr(o, 'Fine. You are free.', 'ok'); closeTerm(); },
-    ping: function (o) { pr(o, 'PING farhan.local: 64 bytes, time=0.042 ms, still hiring-friendly'); },
+    ping: function (o) { pr(o, 'PING farhan.local: 64 bytes, time=0.042 ms, still online'); },
     nmap: function (o) { pr(o, 'Scanning the portfolio... 22/ssh closed, 80/http open, 443/https open, 31337/elite open (just kidding).', 'a'); },
     hack: function (o) { pr(o, 'Access granted. Just kidding. Try the Play section instead.', 'ok'); },
     matrix: function (o) { for (var i = 0; i < 6; i++) { var s = ''; for (var j = 0; j < 46; j++) s += Math.random() < 0.5 ? Math.floor(Math.random() * 2) : String.fromCharCode(65382 + Math.floor(Math.random() * 50)); pr(o, s, 'ok'); } },
     coffee: function (o) { pr(o, '   ( (\n    ) )\n  ........\n  |      |]\n  \\      /\n   `----\'\nCoffee ready. Fuel for the next writeup.', 'y'); },
-    hello: function (o) { pr(o, 'Hello, recruiter. Type resume to grab my CV.', 'c'); },
+    hello: function (o) { pr(o, 'Hello, visitor. Type resume to grab my CV.', 'c'); },
     hi: function (o) { CMDS.hello(o); },
     '42': function (o) { pr(o, 'The answer to life, the universe and a CTF flag.', 'y'); }
   };
@@ -1171,13 +1171,13 @@
     },
     which: function (o, a) { var c = (a[0] || '').toLowerCase(); if (!c) return; if (FSCMD[c] || CMDS[c]) pr(o, '/usr/bin/' + c); else pr(o, c + ' not found', 'r'); },
     man: function (o, a) { pr(o, a[0] ? 'No manual entry for ' + a[0] + '. Try help.' : 'What manual page do you want? Try help.', 'm'); },
-    env: function (o) { ['USER=visitor', 'HOME=/home/visitor', 'SHELL=/bin/zsh', 'EDITOR=vim', 'LANG=en_US.UTF-8', 'HIRE_ME=true'].forEach(function (l) { pr(o, l); }); },
+    env: function (o) { ['USER=visitor', 'HOME=/home/visitor', 'SHELL=/bin/zsh', 'EDITOR=vim', 'LANG=en_US.UTF-8', 'OPEN_TO_WORK=true'].forEach(function (l) { pr(o, l); }); },
     touch: function (o, a) { pr(o, 'touch: cannot touch ' + (a[0] || '') + ': Read-only file system', 'r'); },
     mkdir: function (o, a) { pr(o, 'mkdir: cannot create directory ' + (a[0] || '') + ': Read-only file system', 'r'); },
     cp: function (o) { pr(o, 'cp: Read-only file system', 'r'); }, mv: function (o) { pr(o, 'mv: Read-only file system', 'r'); },
     chmod: function (o) { pr(o, 'chmod: changing permissions: Operation not permitted', 'r'); }, chown: function (o) { pr(o, 'chown: changing ownership: Operation not permitted', 'r'); },
     curl: function (o) { pr(o, 'curl: I am not your target. Try the Play section.', 'y'); }, wget: function (o) { pr(o, 'wget: nothing to download here. Try: resume', 'y'); },
-    ssh: function (o) { pr(o, 'ssh: Permission denied (publickey). This box only talks to recruiters.', 'r'); },
+    ssh: function (o) { pr(o, 'ssh: Permission denied (publickey). This box only talks to invited guests.', 'r'); },
     open: function (o, a) { CMDS.goto(o, a.join(' ')); }
   };
   ['head', 'tail', 'less', 'more', 'bat'].forEach(function (c) { FSCMD[c] = FSCMD.cat; });
@@ -1364,7 +1364,7 @@
       st.done = true; clearInterval(timer); var e = Math.round((Date.now() - st.t0) / 1000); st.tok.done = 1; st.won = 1; st.time = e; renderTask(); barEl.parentNode.hidden = false; barEl.style.width = '100%';
       pr(out, 'ROOM COMPLETE. Flag accepted in ' + fmt(e) + ' with ' + st.hints + ' hint' + (st.hints === 1 ? '' : 's') + (LV[lvKey].strikes ? ' and ' + st.strikes + ' strike' + (st.strikes === 1 ? '' : 's') : '') + '.', 'ok');
       var prev = bestOf(lvKey); if (!prev || e < +prev) { try { localStorage.setItem('gbest_' + lvKey, String(e)); } catch (x) {} pr(out, 'New best time.', 'y'); }
-      if (lvKey === 'impossible') { pr(out, 'Respect. Title unlocked: Red Team Legend. Now go hire the guy who built this.', 'y'); try { localStorage.setItem('legend', '1'); } catch (x) {} }
+      if (lvKey === 'impossible') { pr(out, 'Respect. Title unlocked: Red Team Legend. Screenshot this and show your friends.', 'y'); try { localStorage.setItem('legend', '1'); } catch (x) {} }
       else pr(out, lvKey === 'easy' ? 'You just did a real recon-to-flag chain. Try Normal next.' : 'Nice. Think you can survive Impossible?', 'm');
       inp.disabled = true; hintB.disabled = true; showBest(); box.classList.add('won'); setTimeout(function () { box.classList.remove('won'); }, 1600);
       startB.querySelector('span').textContent = 'Play again'; startB.classList.add('primary');
@@ -1429,7 +1429,7 @@
       ['c', '$ sudo pacman -S farhan', 260], ['m', 'resolving dependencies...', 260], ['m', 'looking for conflicting packages...', 300], ['', '', 40],
       ['', 'Packages (1) farhan-1.0-1', 140], ['', 'Total Installed Size:  1337.00 MiB', 260], ['a', ':: Proceed with installation? [Y/n] Y', 420],
       ['bar', '(1/1) checking keys in keyring', 0], ['bar', '(1/1) checking package integrity', 0], ['m', '(1/1) loading package files', 160], ['m', '(1/1) checking for file conflicts', 160],
-      ['bar', '(1/1) installing farhan', 0], ['a', ':: Running post-transaction hooks...', 240], ['m', '(1/2) Arming the portfolio', 240], ['m', '(2/2) Updating the recruiter database', 360], ['ok', 'Done. farhan is installed. Run "resume" in the terminal (press Enter).', 0]
+      ['bar', '(1/1) installing farhan', 0], ['a', ':: Running post-transaction hooks...', 240], ['m', '(1/2) Arming the portfolio', 240], ['m', '(2/2) Updating the portfolio index', 360], ['ok', 'Done. farhan is installed. Run "resume" in the terminal (press Enter).', 0]
     ];
     function play() {
       var id = ++run; out.textContent = ''; var i = 0;
