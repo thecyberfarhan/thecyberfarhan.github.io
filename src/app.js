@@ -240,7 +240,7 @@
   window.addEventListener('resize', function () { moveInd(active); });
   $('#burger').addEventListener('click', function () { var o = pill.classList.toggle('open'); this.setAttribute('aria-expanded', o); });
 
-  var TITLES = { about: 'About', journey: 'Journey', tools: 'Tools', proof: 'Proof of work', live: 'Live stats', contact: 'Contact' }, appTitle = $('#apptitle'), curTitle = 'Farhan';
+  var TITLES = { about: 'About', journey: 'Journey', arch: 'Arch', tools: 'Tools', proof: 'Proof of work', live: 'Live stats', contact: 'Contact' }, appTitle = $('#apptitle'), curTitle = 'Farhan';
   function setTitle(id) {
     var t = TITLES[id] || 'Farhan'; if (!appTitle || t === curTitle) return; curTitle = t;
     var b = document.createElement('b'); b.textContent = t; appTitle.innerHTML = ''; appTitle.appendChild(b);
@@ -863,7 +863,7 @@
   function inView(el) { var r = el.getBoundingClientRect(); return r.top > 90 && r.bottom < innerHeight - 40 && r.left >= 0 && r.right <= innerWidth; }
   function sectionNow() {
     var sky = $('.sky'); if (sky) { var r = sky.getBoundingClientRect(); if (r.top < innerHeight * 0.6 && r.bottom > innerHeight * 0.4) return 'sky'; }
-    var cur = 'hero', ids = ['hero', 'about', 'journey', 'tools', 'proof', 'live', 'play', 'contact'];
+    var cur = 'hero', ids = ['hero', 'about', 'journey', 'tools', 'proof', 'live', 'play', 'arch', 'contact'];
     ids.forEach(function (id) { var s = document.getElementById(id); if (s && s.getBoundingClientRect().top < innerHeight * 0.5) cur = id; });
     return cur;
   }
@@ -1002,8 +1002,8 @@
     tm.classList.remove('on'); setTimeout(function () { tm.hidden = true; }, 220);
     try { tmIn.blur(); } catch (e) {}
   }
-  var SECS = ['about', 'journey', 'tools', 'proof', 'live', 'play', 'contact'];
-  var FILES = ['about/', 'journey/', 'tools/', 'proof/', 'live/', 'play/', 'contact/', 'resume.pdf'];
+  var SECS = ['about', 'journey', 'tools', 'proof', 'live', 'play', 'arch', 'contact'];
+  var FILES = ['about/', 'journey/', 'tools/', 'proof/', 'live/', 'play/', 'arch/', 'contact/', 'resume.pdf'];
   var CMDS = {
     help: function (o) {
       ['Commands:', '  ls              list sections', '  goto <section>  jump there (about, journey, tools, proof, live, play, contact)', '  whoami          who am I', '  skills          what I work with', '  certs           certifications', '  writeups        featured writeups', '  projects        things I built', '  education       school', '  contact         where to reach me', '  resume          download my resume', '  play            open the mini TryHackMe-style room', '  theme           toggle day / night', '  clear, exit     tidy up', 'Not everything is listed. Poke around.'].forEach(function (l) { pr(o, l, l.charAt(0) === ' ' ? '' : 'c'); });
@@ -1036,7 +1036,17 @@
     pwd: function (o) { pr(o, '/home/visitor'); },
     id: function (o) { pr(o, 'uid=1000(visitor) gid=1000(visitor) groups=1000(visitor),1337(recruiters)'); },
     uname: function (o) { pr(o, 'Linux farhan 6.x-kali #1 SMP x86_64 GNU/Linux'); },
-    neofetch: function (o) { pr(o, 'visitor@farhan', 'c'); pr(o, 'OS:    Farhan OS 1.0'); pr(o, 'Shell: zsh (probably)'); pr(o, 'Role:  Penetration Tester'); pr(o, 'Cert:  CPENT'); pr(o, 'Rank:  TryHackMe top 3%'); },
+    arch: function (o) { pr(o, 'I use Arch, btw.', 'a'); closeTerm(); go('arch'); },
+    btw: function (o) { CMDS.arch(o); },
+    pacman: function (o, a) {
+      a = (a || '').trim();
+      if (/^-Syu?\b|^-Syyu/.test(a)) { pr(o, ':: Synchronizing package databases...', 'm'); pr(o, ' there is nothing to do. The portfolio is up to date, btw.', 'ok'); }
+      else if (/^-S\s+farhan/.test(a)) { pr(o, 'resolving dependencies... installing farhan (Penetration Tester, CPENT)...', 'm'); pr(o, 'done. Next step: type resume.', 'ok'); }
+      else if (/^-Rns?\s+(farhan|me)/.test(a)) { pr(o, 'error: cannot remove farhan: required by your next project.', 'r'); }
+      else pr(o, 'error: no operation specified (use -h for help). Try: pacman -Syu', 'r');
+    },
+    yay: function (o) { pr(o, 'aur/farhan 1.0-1 (+1337 99.99%)', 'a'); pr(o, '    Penetration tester, CPENT certified. Hirable.'); },
+    neofetch: function (o) { pr(o, 'visitor@farhan', 'c'); pr(o, 'OS:    Arch Linux x86_64, btw'); pr(o, 'Shell: zsh (probably)'); pr(o, 'Role:  Penetration Tester'); pr(o, 'Cert:  CPENT'); pr(o, 'Rank:  TryHackMe top 3%'); },
     sudo: function (o) { pr(o, 'visitor is not in the sudoers file. This incident will be reported.', 'r'); },
     su: function (o) { pr(o, 'su: Authentication failure. Nice try.', 'r'); },
     cat: function (o, a) {
@@ -1046,7 +1056,7 @@
       else if (/passwd/.test(a)) { pr(o, 'root:x:0:0:root:/root:/bin/bash\nvisitor:x:1000:1000::/home/visitor:/bin/zsh\nfarhan:x:1001:1001:please hire me:/home/farhan:/bin/zsh'); }
       else if (a) pr(o, 'cat: ' + a + ': No such file or directory', 'r'); else pr(o, 'cat: missing file operand', 'r');
     },
-    rm: function (o) { pr(o, 'rm: it is dangerous to operate recursively on /. Also, I keep backups.', 'r'); },
+    rm: function (o) { pr(o, 'rm: it is dangerous to operate recursively on /. Reinstalling Arch takes a while, btw.', 'r'); },
     vim: function (o) { pr(o, 'You are now trapped in vim. Type :q! to escape (it will not work).', 'y'); },
     ':q': function (o) { pr(o, 'E37: No write since last change. Nice try.', 'y'); },
     ':q!': function (o) { pr(o, 'Fine. You are free.', 'ok'); closeTerm(); },
@@ -1286,5 +1296,32 @@
       });
     });
     setIdle();
+  })();
+
+  /* ---------- arch tribute: fake pacman install + uptime ---------- */
+  (function () {
+    var out = $('#pm-out'), re = $('#pm-re'), up = $('#nf-up'); if (!out) return;
+    var t0 = Date.now(); function upd() { var m = Math.floor((Date.now() - t0) / 60000); up.textContent = m < 1 ? 'less than a min' : m + (m === 1 ? ' min' : ' mins'); } upd(); setInterval(upd, 30000);
+    var run = 0;
+    function line(cls, txt) { var d = document.createElement('div'); if (cls) d.className = cls; d.textContent = txt; out.appendChild(d); return d; }
+    function bar(pct) { var n = Math.round(pct / 100 * 24); return '[' + new Array(n + 1).join('#') + new Array(25 - n).join('-') + '] ' + ('  ' + pct).slice(-3) + '%'; }
+    var STEPS = [
+      ['c', '$ sudo pacman -S farhan', 260], ['m', 'resolving dependencies...', 260], ['m', 'looking for conflicting packages...', 300], ['', '', 40],
+      ['', 'Packages (1) farhan-1.0-1', 140], ['', 'Total Installed Size:  1337.00 MiB', 260], ['a', ':: Proceed with installation? [Y/n] Y', 420],
+      ['bar', '(1/1) checking keys in keyring', 0], ['bar', '(1/1) checking package integrity', 0], ['m', '(1/1) loading package files', 160], ['m', '(1/1) checking for file conflicts', 160],
+      ['bar', '(1/1) installing farhan', 0], ['a', ':: Running post-transaction hooks...', 240], ['m', '(1/2) Arming the portfolio', 240], ['m', '(2/2) Updating the recruiter database', 360], ['ok', 'Done. farhan is installed. Run "resume" in the terminal (press Enter).', 0]
+    ];
+    function play() {
+      var id = ++run; out.textContent = ''; var i = 0;
+      if (!motion) { STEPS.forEach(function (s) { line(s[0] === 'bar' ? '' : s[0], s[0] === 'bar' ? s[1] + ' ' + bar(100) : s[1]); }); return; }
+      (function next() {
+        if (id !== run || i >= STEPS.length) return; var s = STEPS[i++];
+        if (s[0] === 'bar') { var d = line('', s[1] + ' ' + bar(0)), p = 0; (function tick() { if (id !== run) return; p = Math.min(100, p + 14 + Math.random() * 14); d.textContent = s[1] + ' ' + bar(Math.round(p)); if (p < 100) setTimeout(tick, 70); else setTimeout(next, 120); })(); }
+        else { line(s[0], s[1]); setTimeout(next, s[2]); }
+      })();
+    }
+    var shown = false, host = out.closest('.pm');
+    if ('IntersectionObserver' in window) { new IntersectionObserver(function (es, ob) { if (es[0].isIntersecting && !shown) { shown = true; play(); ob.disconnect(); } }, { threshold: 0.35 }).observe(host); } else play();
+    re.addEventListener('click', function () { shown = true; play(); });
   })();
 })();
