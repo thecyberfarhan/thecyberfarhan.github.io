@@ -1,0 +1,23 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>404 | Farhan</title><meta name="robots" content="noindex">
+<style>*{box-sizing:border-box;margin:0}html,body{height:100%}body{background:#0d1117;color:#c9d1d9;font:14px/1.6 "JetBrains Mono","Fira Code",ui-monospace,Consolas,monospace;display:grid;place-items:center;padding:16px}
+.t{width:min(680px,100%);border:1px solid #30363d;border-radius:12px;overflow:hidden;background:#0d1117;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+.b{display:flex;gap:6px;padding:9px 12px;background:#161b22;border-bottom:1px solid #30363d;align-items:center}.b i{width:9px;height:9px;border-radius:50%;background:#30363d}.b span{margin-left:auto;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8b949e}
+.o{padding:16px 18px;min-height:230px;white-space:pre-wrap;word-break:break-word}.o .r{color:#c2686c}.o .a{color:#7FA8CC}.o .m{color:#8b949e}.o .c{color:#e6edf3}
+form{display:flex;gap:8px;padding:11px 18px;border-top:1px solid #30363d;background:#161b22}form span{color:#B4232C;font-weight:700}input{flex:1;background:none;border:0;outline:0;color:#e6edf3;font:inherit;min-width:0}
+a{color:#7FA8CC}@media(max-width:560px){input{font-size:16px}}</style></head><body>
+<div class="t"><div class="b"><i></i><i></i><i></i><span>404</span></div><div class="o" id="o"></div>
+<form id="f" autocomplete="off"><span>visitor@farhan:~$</span><input id="i" autofocus autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="100" aria-label="Command"></form></div>
+<script>
+(function(){var o=document.getElementById('o'),i=document.getElementById('i');function p(t,c){var d=document.createElement('div');if(c)d.className=c;d.textContent=t;o.appendChild(d);o.scrollTop=o.scrollHeight;return d}
+var path=(location.pathname||'/').slice(0,80);
+p('$ cat '+path,'c');p('cat: '+path+': No such file or directory','r');p('');p('404. The page you wanted is not on this box.','c');p('Try: ls, cd ~, home, help','m');
+function go(){location.href='/'}
+document.getElementById('f').addEventListener('submit',function(e){e.preventDefault();var v=i.value.trim();i.value='';if(!v)return;p('visitor@farhan:~$ '+v,'c');var c=v.split(/\s+/)[0].toLowerCase();
+if(c==='ls'){p('index.html   about/   tools/   proof/   play/   contact/','a')}
+else if(c==='cd'||c==='home'||c==='exit'||c==='~'){p('Taking you home...','a');setTimeout(go,500)}
+else if(c==='help'){p('ls  cd ~  home  whoami  sudo','m')}
+else if(c==='whoami'){p('A lost visitor. The portfolio is at /','m')}
+else if(c==='sudo'){p('visitor is not in the sudoers file. This incident will be reported.','r')}
+else{p('zsh: command not found: '+c.slice(0,40)+'. Try help.','r')}});
+})();
+</script></body></html>

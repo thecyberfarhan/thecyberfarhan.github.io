@@ -721,3 +721,19 @@ html.has-cursor,html.has-cursor *,html.has-cursor input,html.has-cursor textarea
 html.has-cursor .cursor-dot.txt{width:2px;height:22px;margin:-11px 0 0 -1px;border-radius:1px;background:var(--accent)}
 html.has-cursor .cursor-ring.txt{opacity:0}
 .pm-out .cur{display:inline-block;width:8px;height:1em;background:var(--arch);vertical-align:-2px;animation:pmblink 1s steps(1) infinite}@keyframes pmblink{50%{opacity:0}}
+
+/* decluttered background: only the globe and the network remain */
+.aurora,.floor{display:none!important}
+/* roamer speech */
+.rsay{position:fixed;left:0;top:0;z-index:9990;max-width:min(260px,70vw);padding:8px 12px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font:600 12.5px/1.4 var(--sans);box-shadow:0 10px 30px var(--shadow);pointer-events:none;opacity:0;transition:opacity .25s}
+.rsay.on{opacity:1}
+html.quick #loader{transition:opacity .3s 0s!important}html.quick .ld-ui{transition-duration:.2s!important}
+
+/* how I test */
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:6px}
+.steps li{position:relative;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px 18px 16px;overflow:hidden}
+.steps li::after{content:"";position:absolute;left:0;top:0;height:2px;width:100%;background:linear-gradient(90deg,var(--accent),transparent)}
+.sn{display:block;font:700 .68rem var(--mono);letter-spacing:.16em;color:var(--accent);margin-bottom:6px}
+.steps b{display:block;color:var(--text);font-size:1.05rem;margin-bottom:4px}.steps p{font-size:.88rem;color:var(--muted);line-height:1.5}
+@media (max-width:980px){.steps{grid-template-columns:1fr 1fr}}@media (max-width:560px){.steps{grid-template-columns:1fr}.steps li{padding:14px}}
+#contact>.more{margin-top:22px}
