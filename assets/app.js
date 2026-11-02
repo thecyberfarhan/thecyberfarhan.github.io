@@ -232,7 +232,7 @@
 
   var secs = links.map(function (a) { return { a: a, s: document.getElementById(a.dataset.nav) }; });
   var hero = $('#hero'), copy = $('.hero-copy'), medalWrap = $('.hero-medal'), medal = $('.medal-stage');
-  var sy = 0, ticking = false, lastY = 0;
+  var sy = 0, ticking = false, lastY = 0, navHold = 0;
   function onScroll() {
     var y = window.scrollY, h = document.documentElement.scrollHeight - innerHeight, frac = h > 0 ? y / h : 0;
     sy = y;
@@ -240,7 +240,7 @@
     if (prog) prog.style.strokeDashoffset = 119.4 * (1 - frac);
     root.style.setProperty('--scroll', y);
     nav.classList.toggle('scrolled', y > 30);
-    nav.style.transform = (y > lastY && y > 500 && !pill.classList.contains('open')) ? 'translateY(-90px)' : '';
+    nav.style.transform = (performance.now() > navHold && y > lastY && y > 500 && !pill.classList.contains('open')) ? 'translateY(-90px)' : '';
     if (medal && !fineMouse) medal.style.setProperty('--my', Math.min(y / 14, 24) + 'deg');
     G.show = y < innerHeight * 1.5; if (G.show) startGlobe(); else G.running = false;
     lastY = y;
@@ -305,12 +305,12 @@
     var y = id === 'top' ? 0 : Math.round(target.getBoundingClientRect().top + window.scrollY);
     pill.classList.remove('open');
     if (busy) return;
-    busy = true;
+    busy = true; navHold = performance.now() + 2600; nav.style.transform = '';
     runScan(label || id, function () {
-      window.scrollTo(0, y); nav.style.transform = '';
+      navHold = performance.now() + 2200; window.scrollTo(0, y); nav.style.transform = '';
       var t = target.querySelector && target.querySelector('.title');
       if (t) { t.classList.remove('pulse'); void t.offsetWidth; t.classList.add('pulse'); }
-    }, function () { busy = false; try { history.replaceState(null, '', id === 'top' ? location.pathname : '#' + id); } catch (e) {} });
+    }, function () { busy = false; navHold = performance.now() + 1200; nav.style.transform = ''; try { history.replaceState(null, '', id === 'top' ? location.pathname : '#' + id); } catch (e) {} });
   }
   $$('[data-go]').forEach(function (a) {
     a.addEventListener('click', function (e) {
@@ -340,7 +340,7 @@
   /* ---------- pointer: reticle cursor, element-aware shapes, target lock, trail, click burst ---------- */
   var dot = $('.cursor-dot'), ring = $('.cursor-ring'), tag = $('.cursor-tag'), lock = $('.cur-lock'), shape = $('.cursor-shape'), fx = $('#curfx'), fctx = fx && fx.getContext('2d');
   var corners = $$('.cur-lock i'), CS = 13;
-  var mx = innerWidth / 2, my = innerHeight / 2, rx = mx, ry = my, cursorOn = false, lockEl = null, trail = [], L = { x: 0, y: 0, w: 34, h: 34, ready: false }, curKey = '', curMode = 'default', popT = null;
+  var mx = innerWidth / 2, my = innerHeight / 2, rx = mx, ry = my, cursorOn = false, lockEl = null, trail = [], L = { c: null, ready: false }, curKey = '', curMode = 'default', popT = null, spinAnim = null;
   function sizeFx() { if (!fx) return; fx.width = innerWidth; fx.height = innerHeight; }
   sizeFx(); window.addEventListener('resize', sizeFx);
   function tagText(a) {
@@ -386,16 +386,18 @@
     var p = 'translate3d(' + rx.toFixed(2) + 'px,' + ry.toFixed(2) + 'px,0)';
     ring.style.transform = p; shape.style.transform = p;
     tag.style.transform = 'translate3d(' + (rx + 34).toFixed(2) + 'px,' + (ry + 28).toFixed(2) + 'px,0)';
-    var tx, ty, tw, th;
-    if (lockEl) { var r = lockEl.getBoundingClientRect(), pad = 9; tx = r.left - pad; ty = r.top - pad; tw = r.width + pad * 2; th = r.height + pad * 2; }
-    else { tx = rx - 17; ty = ry - 17; tw = 34; th = 34; }
-    if (!L.ready) { L.x = tx; L.y = ty; L.w = tw; L.h = th; L.ready = true; }
-    L.x += (tx - L.x) * k2; L.y += (ty - L.y) * k2; L.w += (tw - L.w) * k2; L.h += (th - L.h) * k2;
-    var X0 = L.x, Y0 = L.y, X1 = L.x + L.w - CS, Y1 = L.y + L.h - CS;
-    corners[0].style.transform = 'translate3d(' + X0.toFixed(2) + 'px,' + Y0.toFixed(2) + 'px,0)';
-    corners[1].style.transform = 'translate3d(' + X1.toFixed(2) + 'px,' + Y0.toFixed(2) + 'px,0)';
-    corners[2].style.transform = 'translate3d(' + X0.toFixed(2) + 'px,' + Y1.toFixed(2) + 'px,0)';
-    corners[3].style.transform = 'translate3d(' + X1.toFixed(2) + 'px,' + Y1.toFixed(2) + 'px,0)';
+    var spinA = 0; if (!spinAnim) { var sv = ring.querySelector('svg'); spinAnim = sv && sv.getAnimations && sv.getAnimations()[0]; }
+    if (spinAnim && spinAnim.currentTime != null) spinA = (spinAnim.currentTime % 10000) / 10000 * 6.2832;
+    var tick = [[-1.5708], [0], [1.5708], [3.1416]], tp = [], q;
+    for (q = 0; q < 4; q++) tp.push([rx + Math.cos(tick[q][0] + spinA) * 24 - CS / 2, ry + Math.sin(tick[q][0] + spinA) * 24 - CS / 2]);
+    var tg;
+    if (lockEl) { var r = lockEl.getBoundingClientRect(), pad = 9, l0 = r.left - pad, t0 = r.top - pad, r0 = r.right + pad - CS, b0 = r.bottom + pad - CS; tg = [[l0, t0], [r0, t0], [l0, b0], [r0, b0]]; }
+    else tg = [tp[3], tp[0], tp[2], tp[1]];
+    if (!L.ready) { L.c = tg.map(function (p) { return [p[0], p[1]]; }); L.ready = true; }
+    for (q = 0; q < 4; q++) {
+      L.c[q][0] += (tg[q][0] - L.c[q][0]) * k2; L.c[q][1] += (tg[q][1] - L.c[q][1]) * k2;
+      corners[q].style.transform = 'translate3d(' + L.c[q][0].toFixed(2) + 'px,' + L.c[q][1].toFixed(2) + 'px,0)';
+    }
     if (fctx) {
       fctx.clearRect(0, 0, fx.width, fx.height);
       var moved = Math.abs(rx - lastTx) + Math.abs(ry - lastTy) > 0.8;
@@ -609,10 +611,30 @@
     tools: [['Tools', 'Eleven seconds is a long time to stare at a toolbox.']]
   };
   var MORE = ['Seriously, are you still there?', 'I can do this all day. Can you?', 'Okay, I am going to assume you went for coffee.', 'Last one, I promise. Scroll, click, anything.'];
-  var LEAD = ['Anyway, the person who built this site is easy to talk to.', 'Since you are clearly interested, why not say hi?', 'If you want to know who made all this, I can point you there.', 'Whoever built this is open to a conversation. Just saying.'];
-  var MORE2 = ['Seriously, are you still there?', 'I can do this all day. Can you?', 'Okay, I will assume you went for coffee. Contact me when you are back.', 'Last one, I promise. Scroll, click, or just say hi.'];
+  var LEADS = {
+    hero: ['Curious who is behind the terminal? Start with the About section.', 'This whole page is one portfolio. Want the tour?'],
+    about: ['Liked the intro? The tools section shows how it gets done.', 'Three cards down, a whole toolbox to go.'],
+    tools: ['Tools are only half the story. The writeups show them in action.', 'Plenty of tools here. Want to see them used?'],
+    proof: ['Found one you like? Open it, or tell the author.', 'These writeups are real. So is the person behind them.'],
+    sky: ['Those bars are real commits. The live stats have more.', 'Want the numbers behind the skyline?'],
+    live: ['Numbers are cute. The profile behind them is better.', 'All of this is live. Want to check the source?'],
+    contact: ['You made it to the end. Pick a channel and say hi.', 'Last stop. Say something, anything.']
+  };
+  function actionsFor(sec, el, final) {
+    var G = function (id, label) { return { label: label, id: id }; }, U = function (url, label) { return { label: label, url: url }; };
+    if (final) return [G('contact', 'Contact me'), G('top', 'Back to top')];
+    if (sec === 'hero') return [G('about', 'About me'), G('tools', 'See my tools')];
+    if (sec === 'about') return [G('tools', 'See my tools'), G('proof', 'Read my writeups')];
+    if (sec === 'tools') return [G('proof', 'Read my writeups'), G('live', 'Live stats')];
+    if (sec === 'proof') { var h = el && (el.tagName === 'A' ? el.href : null); return h ? [U(h, 'Open this writeup'), G('contact', 'Contact me')] : [U('https://github.com/thecyberfarhan/CTF-Writeups', 'All writeups'), G('contact', 'Contact me')]; }
+    if (sec === 'sky') return [G('live', 'Live stats'), G('contact', 'Contact me')];
+    if (sec === 'live') return [U('https://tryhackme.com/p/farhan.hussain', 'Open TryHackMe'), G('contact', 'Contact me')];
+    if (sec === 'contact') { var c = el && (el.tagName === 'A' ? el.href : null); return c ? [U(c, 'Open this'), G('proof', 'Read my writeups')] : [U('https://www.linkedin.com/in/cyber-farhan-hussain/', 'Open LinkedIn'), G('proof', 'Read my writeups')]; }
+    return [G('contact', 'Contact me'), G('about', 'About me')];
+  }
+  var MORE2 = ['Seriously, are you still there?', 'I can do this all day. Can you?', 'Okay, I will assume you went for coffee. Come back when you are ready.', 'Last one, I promise. Scroll, click, or just say hi.'];
   var nEl = document.createElement('div'); nEl.className = 'nudge'; nEl.setAttribute('role', 'status');
-  nEl.innerHTML = '<div class="nrow"><span class="tile"></span><div><b></b><p></p></div></div><small></small><div class="nbtns"><button type="button" data-t="contact">Contact me</button><button type="button" data-t="about">About me</button></div><button type="button" class="x" aria-label="Dismiss">&times;</button><button type="button" class="snd" aria-label="Toggle sound"></button><i class="tail"></i>';
+  nEl.innerHTML = '<div class="nrow"><span class="tile"></span><div><b></b><p></p></div></div><small></small><div class="nbtns"></div><button type="button" class="x" aria-label="Dismiss">&times;</button><button type="button" class="snd" aria-label="Toggle sound"></button><i class="tail"></i>';
   document.body.appendChild(nEl);
   var nTile = $('.tile', nEl), nName = $('b', nEl), nMsg = $('p', nEl), nLead = $('small', nEl), tail = $('.tail', nEl);
   var lastAct = performance.now(), lastN = 0, nCount = 0, spoke = null, hideT = null, lastPick = '', hovering = false, anchor = null, popT2 = null;
@@ -621,7 +643,8 @@
   window.addEventListener('pointerdown', function (e) { if (!e.target.closest || !e.target.closest('.nudge')) act(); }, { passive: true });
   var lastSY = 0; window.addEventListener('scroll', function () { if (Math.abs(window.scrollY - lastSY) > 24) { lastSY = window.scrollY; act(); } }, { passive: true });
   nEl.querySelector('.x').addEventListener('click', function () { hideNudge(); lastN = performance.now() + 8000; });
-  $$('.nbtns button', nEl).forEach(function (bt) { bt.addEventListener('click', function () { var t = bt.getAttribute('data-t'); hideNudge(); lastAct = performance.now(); go(t, t === 'about' ? 'About' : 'Contact'); }); });
+  var nBtns = $('.nbtns', nEl);
+  nBtns.addEventListener('click', function (e) { var bt = e.target.closest && e.target.closest('button'); if (!bt) return; var id = bt.getAttribute('data-id'), url = bt.getAttribute('data-url'); hideNudge(); lastAct = performance.now(); if (url) window.open(url, '_blank', 'noopener'); else if (id) go(id, id.charAt(0).toUpperCase() + id.slice(1)); });
   var VOL = { on: '<svg viewBox="0 0 24 24"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/></svg>', off: '<svg viewBox="0 0 24 24"><path d="M11 4.702a.7.7 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.7.7 0 0 0 11 19.298z"/><path d="m16.5 14.5 5-5"/><path d="m16.5 9.5 5 5"/></svg>' };
   var soundOn = true; try { soundOn = localStorage.getItem('nudgesound') !== 'off'; } catch (e) {}
   var sndBtn = $('.snd', nEl); function paintSnd() { sndBtn.innerHTML = soundOn ? VOL.on : VOL.off; }
@@ -654,7 +677,7 @@
     if (!sel) return null; var list = $$(sel).filter(inView); return list.length ? list[Math.floor(Math.random() * list.length)] : null;
   }
   function place() {
-    if (!anchor || !nEl.classList.contains('on')) return;
+    if (!anchor) return;
     var r = anchor.getBoundingClientRect();
     if (r.bottom < 50 || r.top > innerHeight - 30) { hideNudge(); return; }
     var w = nEl.offsetWidth, h = nEl.offsetHeight, cx = r.left + r.width / 2, x = Math.max(12, Math.min(cx - w / 2, innerWidth - w - 12)), below = r.top - h - 16 < 76, y = below ? r.bottom + 16 : r.top - h - 16;
@@ -673,11 +696,12 @@
     if (!msg || msg === lastPick) { var p2 = SECQ[sec] || SECQ.tools, h2 = p2[Math.floor(Math.random() * p2.length)]; name = h2[0]; msg = h2[1]; }
     lastPick = msg;
     var src = el && el.querySelector('svg.ic'); nTile.innerHTML = src ? src.outerHTML : '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
-    nName.textContent = name; nMsg.textContent = msg; nLead.textContent = LEAD[Math.floor(Math.random() * LEAD.length)];
+    var fin = nCount >= 4, ls = LEADS[sec] || LEADS.hero; nName.textContent = name; nMsg.textContent = msg; nLead.textContent = fin ? '' : ls[Math.floor(Math.random() * ls.length)];
+    nBtns.innerHTML = ''; actionsFor(sec, el, fin).forEach(function (a2, i) { var bt = document.createElement('button'); bt.type = 'button'; bt.textContent = a2.label; if (a2.url) bt.setAttribute('data-url', a2.url); else bt.setAttribute('data-id', a2.id); nBtns.appendChild(bt); });
     if (spoke) spoke.classList.remove('speak'); spoke = el; if (el) { el.classList.remove('speak'); void el.offsetWidth; el.classList.add('speak'); }
     anchor = el; nEl.classList.toggle('free', !el);
     if (!el) { nEl.style.transform = 'translate3d(' + Math.round(innerWidth / 2 - 155) + 'px,' + (innerHeight - 250) + 'px,0)'; }
-    nEl.classList.add('on'); nEl.classList.remove('pop'); void nEl.offsetWidth; nEl.classList.add('pop'); clearTimeout(popT2); popT2 = setTimeout(function () { nEl.classList.remove('pop'); }, 700);
+    place(); nEl.classList.add('on');
     lastN = performance.now(); nCount++;
     clearTimeout(hideT); if (!hovering) hideT = setTimeout(hideNudge, 13000);
     ping();

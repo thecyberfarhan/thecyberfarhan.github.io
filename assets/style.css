@@ -67,8 +67,8 @@ html.has-cursor .cursor-ring.hot .ret-wrap{transform:scale(.3);opacity:0}
 html.has-cursor .cursor-ring.down .ret-wrap{transform:scale(.55)}
 html.has-cursor .cursor-ring.pop .ret-wrap{animation:retpop .8s var(--ease)}
 @keyframes retpop{0%{transform:scale(.3);opacity:0}55%{transform:scale(1.3);opacity:1}100%{transform:scale(1);opacity:1}}
-.cur-lock{width:0;height:0;transition:opacity .25s}
-.cur-lock.on{opacity:1}
+.cur-lock{width:0;height:0;transition:opacity .2s .3s}
+.cur-lock.on{opacity:1;transition-delay:0s}
 .cur-lock i{position:absolute;left:0;top:0;width:13px;height:13px;border:0 solid var(--accent);will-change:transform}
 .cur-lock i:nth-child(1){border-width:2px 0 0 2px;border-top-left-radius:5px}
 .cur-lock i:nth-child(2){border-width:2px 2px 0 0;border-top-right-radius:5px}
@@ -355,10 +355,9 @@ main{position:relative;z-index:1}
 .ccard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c)}
 
 /* ---------- idle nudges: speech bubbles ---------- */
-.nudge{position:fixed;left:0;top:0;z-index:9500;width:min(310px,calc(100vw - 24px));padding:14px 34px 12px 14px;border-radius:16px;border:1px solid color-mix(in srgb,var(--accent) 55%,var(--border));background:var(--surface);box-shadow:0 20px 46px -14px var(--shadow);opacity:0;pointer-events:none;transition:opacity .35s var(--ease);will-change:transform}
-.nudge.on{opacity:1;pointer-events:auto}
-.nudge.pop{animation:bubblePop .6s var(--ease)}
-@keyframes bubblePop{0%{scale:.6;opacity:0}60%{scale:1.05}100%{scale:1;opacity:1}}
+.nudge{position:fixed;left:0;top:0;z-index:9500;width:min(310px,calc(100vw - 24px));padding:14px 34px 12px 14px;border-radius:16px;border:1px solid color-mix(in srgb,var(--accent) 55%,var(--border));background:var(--surface);box-shadow:0 20px 46px -14px var(--shadow);opacity:0;scale:.15;transform-origin:var(--tx,50%) 100%;pointer-events:none;transition:opacity .3s var(--ease),scale .38s var(--ease);will-change:transform}
+.nudge.below{transform-origin:var(--tx,50%) 0}
+.nudge.on{opacity:1;scale:1;pointer-events:auto;transition:opacity .35s var(--ease),scale .6s cubic-bezier(.34,1.56,.64,1)}
 .nudge .tail{position:absolute;width:14px;height:14px;background:var(--surface);border:1px solid color-mix(in srgb,var(--accent) 55%,var(--border));border-width:0 1px 1px 0;transform:rotate(45deg);left:var(--tx,50%);margin-left:-7px;bottom:-8px}
 .nudge.below .tail{bottom:auto;top:-8px;border-width:1px 0 0 1px}
 .nudge.free .tail{display:none}
