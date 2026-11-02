@@ -496,42 +496,36 @@
       if (p >= 1) { r.pl = J.pl; r.state = 'walk'; r.squash = 1; r.jumpAt = now + 2200 + Math.random() * 2600; r.y = J.y1; }
     }
     r.squash = Math.max(0, r.squash - dt / 260);
-    var x = r.x, y = r.y, s = 1.35, ph = r.legT, dir = r.dir, air = r.state !== 'walk', sq = 1 - r.squash * 0.12, walk = r.state === 'walk', pulse = 0.55 + Math.sin(now / 260) * 0.35, tipOn = (now % 1200) < 600;
-    ctx.save(); ctx.translate(x, y); ctx.scale(s * dir, s * sq); ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.lineWidth = 1.7;
-    ctx.strokeStyle = 'rgba(' + P.node + ',.95)'; var body = 'rgba(' + P.link + ',.22)', hot = 'rgba(' + P.hot + ',.95)';
-    /* soft ground shadow */
-    if (walk) { ctx.fillStyle = 'rgba(' + P.link + ',.12)'; ctx.beginPath(); ctx.ellipse(0, 1, 15, 2.5, 0, 0, 6.283); ctx.fill(); }
-    /* backpack thruster */
-    ctx.fillStyle = body; ctx.beginPath(); ctx.rect(-15, -46, 5, 15); ctx.fill(); ctx.stroke();
-    if (r.state === 'jump' || r.state === 'fall') { ctx.fillStyle = hot; ctx.beginPath(); ctx.moveTo(-14.5, -31); ctx.lineTo(-12.5, -31 + 8 + Math.random() * 9); ctx.lineTo(-10.5, -31); ctx.closePath(); ctx.fill(); }
-    /* legs: thigh, knee joint, shin, foot */
+    var x = r.x, y = r.y, s = 1.05, ph = r.legT, dir = r.dir, air = r.state !== 'walk', sq = 1 - r.squash * 0.14, walk = r.state === 'walk', pulse = 0.55 + Math.sin(now / 260) * 0.35, tipOn = (now % 1200) < 600, blink = (now % 3300) < 130, wave = walk && (now % 6000) < 1100;
+    ctx.save(); ctx.translate(x, y); ctx.scale(s * dir, s * sq); ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(' + P.node + ',.95)'; var body = 'rgba(' + P.link + ',.26)', hot = 'rgba(' + P.hot + ',.95)';
+    function rr(x0, y0, w, h, rad) { ctx.beginPath(); ctx.moveTo(x0 + rad, y0); ctx.lineTo(x0 + w - rad, y0); ctx.quadraticCurveTo(x0 + w, y0, x0 + w, y0 + rad); ctx.lineTo(x0 + w, y0 + h - rad); ctx.quadraticCurveTo(x0 + w, y0 + h, x0 + w - rad, y0 + h); ctx.lineTo(x0 + rad, y0 + h); ctx.quadraticCurveTo(x0, y0 + h, x0, y0 + h - rad); ctx.lineTo(x0, y0 + rad); ctx.quadraticCurveTo(x0, y0, x0 + rad, y0); ctx.closePath(); }
+    if (walk) { ctx.fillStyle = 'rgba(' + P.link + ',.14)'; ctx.beginPath(); ctx.ellipse(0, 1, 9, 2, 0, 0, 6.283); ctx.fill(); }
+    /* stubby legs and round feet */
     [-1, 1].forEach(function (side) {
-      var pp = ph + (side > 0 ? Math.PI : 0), fx2 = air ? side * 4 : Math.sin(pp) * 9 + side * 3, lift = air ? 11 : Math.max(0, Math.cos(pp)) * 5, kx = side * 4 + (air ? 3 : Math.sin(pp) * 4 + 3), ky = -12 - lift * 0.5;
-      ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(side * 4, -24); ctx.lineTo(kx, ky); ctx.stroke();
-      ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(kx, ky); ctx.lineTo(fx2, -lift - 2); ctx.stroke();
-      ctx.lineWidth = 1.7; ctx.fillStyle = body; ctx.beginPath(); ctx.rect(kx - 2, ky - 2, 4, 4); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(fx2 - 4, -lift); ctx.lineTo(fx2 + 6, -lift); ctx.lineTo(fx2 + 5, -lift - 3); ctx.lineTo(fx2 - 2, -lift - 3); ctx.closePath(); ctx.fill(); ctx.stroke();
+      var pp = ph + (side > 0 ? Math.PI : 0), fx2 = air ? side * 5 : Math.sin(pp) * 4.5 + side * 3.5, lift = air ? 5 : Math.max(0, Math.cos(pp)) * 3.2;
+      ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(side * 3.5, -10); ctx.lineTo(fx2, -lift - 2); ctx.stroke();
+      ctx.lineWidth = 1.5; ctx.fillStyle = body; ctx.beginPath(); ctx.ellipse(fx2 + 1, -lift - 1.2, 4, 2.2, 0, 0, 6.283); ctx.fill(); ctx.stroke();
     });
-    /* pelvis */
-    ctx.fillStyle = body; ctx.beginPath(); ctx.moveTo(-8, -27); ctx.lineTo(8, -27); ctx.lineTo(6, -22); ctx.lineTo(-6, -22); ctx.closePath(); ctx.fill(); ctx.stroke();
-    /* far arm (swings) */
-    var sw = walk ? Math.sin(ph) * 5 : -4;
-    ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(-10, -43); ctx.lineTo(-12 + sw * 0.4, -35); ctx.lineTo(-10 + sw, -28); ctx.stroke();
-    /* torso with chest core */
-    ctx.lineWidth = 1.7; ctx.fillStyle = body; ctx.beginPath(); ctx.moveTo(-10, -47); ctx.lineTo(10, -47); ctx.lineTo(7, -27); ctx.lineTo(-7, -27); ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.globalAlpha = 0.4; ctx.beginPath(); ctx.moveTo(-8, -38); ctx.lineTo(8, -38); ctx.stroke(); ctx.globalAlpha = 1;
-    var cg = ctx.createRadialGradient(0, -38, 0, 0, -38, 7); cg.addColorStop(0, 'rgba(' + P.hot + ',' + pulse.toFixed(2) + ')'); cg.addColorStop(1, 'rgba(' + P.hot + ',0)'); ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(0, -38, 7, 0, 6.283); ctx.fill();
-    ctx.fillStyle = hot; ctx.beginPath(); ctx.arc(0, -38, 2.4, 0, 6.283); ctx.fill();
-    /* shoulders */
-    ctx.fillStyle = 'rgba(' + P.link + ',.32)'; ctx.beginPath(); ctx.rect(-15, -50, 7, 8); ctx.rect(8, -50, 7, 8); ctx.fill(); ctx.stroke();
-    /* head, visor, antenna */
-    ctx.fillStyle = body; ctx.beginPath(); ctx.moveTo(-5.5, -49); ctx.lineTo(5.5, -49); ctx.lineTo(6, -58); ctx.lineTo(-6, -58); ctx.closePath(); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = hot; ctx.fillRect(0, -55.5, 6, 2.8);
-    ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(-3, -58); ctx.lineTo(-6, -66); ctx.stroke(); ctx.fillStyle = tipOn ? hot : 'rgba(' + P.link + ',.6)'; ctx.beginPath(); ctx.arc(-6, -66, 1.8, 0, 6.283); ctx.fill();
-    /* near arm holding a rifle */
-    ctx.lineWidth = 2.4; ctx.strokeStyle = 'rgba(' + P.node + ',.95)'; ctx.beginPath(); ctx.moveTo(11, -44); ctx.lineTo(15, -37); ctx.lineTo(19, -37 + (walk ? Math.sin(ph * 2) * 0.8 : 0)); ctx.stroke();
-    ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(13, -37); ctx.lineTo(31, -39); ctx.stroke(); ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(22, -41); ctx.lineTo(27, -41); ctx.stroke();
-    if (walk && (now % 3400) < 110) { ctx.strokeStyle = hot; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(32, -39); ctx.lineTo(44, -39.6); ctx.stroke(); ctx.fillStyle = hot; ctx.beginPath(); ctx.arc(33, -39, 2.2, 0, 6.283); ctx.fill(); }
+    /* tiny arms */
+    var sw = walk ? Math.sin(ph) * 3 : -2;
+    ctx.lineWidth = 2.4; ctx.beginPath(); ctx.moveTo(-7, -19); ctx.lineTo(-10.5 + sw * 0.3, -13 + (air ? -4 : 0)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(7, -19); if (wave) ctx.lineTo(11.5, -27 + Math.sin(now / 90) * 2.2); else ctx.lineTo(10.5 - sw * 0.3, -13 + (air ? -4 : 0)); ctx.stroke();
+    /* round little body with a glowing belly light */
+    ctx.lineWidth = 1.5; ctx.fillStyle = body; rr(-7, -23, 14, 14, 5); ctx.fill(); ctx.stroke();
+    var cg = ctx.createRadialGradient(0, -16, 0, 0, -16, 5); cg.addColorStop(0, 'rgba(' + P.hot + ',' + pulse.toFixed(2) + ')'); cg.addColorStop(1, 'rgba(' + P.hot + ',0)'); ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(0, -16, 5, 0, 6.283); ctx.fill();
+    ctx.fillStyle = hot; ctx.beginPath(); ctx.arc(0, -16, 1.7, 0, 6.283); ctx.fill();
+    /* big head with ears, eyes, smile and blush */
+    ctx.fillStyle = body; ctx.beginPath(); ctx.arc(-10.5, -30, 2.4, 0, 6.283); ctx.arc(10.5, -30, 2.4, 0, 6.283); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = body; rr(-9.5, -38, 19, 16, 7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(' + P.hot + ',.28)'; ctx.beginPath(); ctx.arc(-6.6, -27, 1.8, 0, 6.283); ctx.arc(6.6, -27, 1.8, 0, 6.283); ctx.fill();
+    var ey = blink ? 0.5 : 2.7; ctx.fillStyle = hot; ctx.beginPath(); ctx.ellipse(-3.6 + 1.1, -31, 2.1, ey, 0, 0, 6.283); ctx.ellipse(3.6 + 1.1, -31, 2.1, ey, 0, 0, 6.283); ctx.fill();
+    if (!blink) { ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.beginPath(); ctx.arc(-2.9 + 1.1, -32, 0.8, 0, 6.283); ctx.arc(4.3 + 1.1, -32, 0.8, 0, 6.283); ctx.fill(); }
+    ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(1.1, -27.6, 2.2, 0.15 * Math.PI, 0.85 * Math.PI); ctx.stroke();
+    /* antenna with a blinking bulb */
+    ctx.lineWidth = 1.3; ctx.beginPath(); ctx.moveTo(0, -38); ctx.lineTo(0, -43); ctx.stroke(); ctx.fillStyle = tipOn ? hot : 'rgba(' + P.link + ',.6)'; ctx.beginPath(); ctx.arc(0, -44, 2, 0, 6.283); ctx.fill();
+    /* little jump puffs */
+    if (r.state === 'jump') { ctx.fillStyle = 'rgba(' + P.hot + ',.85)'; [-1, 1].forEach(function (sd) { ctx.beginPath(); ctx.moveTo(sd * 3.5 - 1.5, -3); ctx.lineTo(sd * 3.5, -3 + 3 + Math.random() * 5); ctx.lineTo(sd * 3.5 + 1.5, -3); ctx.closePath(); ctx.fill(); }); }
     ctx.restore();
   }
   /* the roamers talk while you are away */
@@ -550,7 +544,7 @@
     }
     if (sy2.until && now > sy2.until) { hideSay(); sy2.until = 0; }
     if (sayEl.classList.contains('on')) {
-      var up = r.kind === 'mecha' ? 92 : 46, bx = Math.max(8, Math.min(innerWidth - sayW - 8, r.x - sayW / 2)), by = Math.max(8, r.y - up - sayH);
+      var up = r.kind === 'mecha' ? 64 : 46, bx = Math.max(8, Math.min(innerWidth - sayW - 8, r.x - sayW / 2)), by = Math.max(8, r.y - up - sayH);
       sayEl.style.transform = 'translate3d(' + bx.toFixed(1) + 'px,' + by.toFixed(1) + 'px,0)';
     }
   }
@@ -1021,7 +1015,7 @@
     d.appendChild(a); box.appendChild(d); box.scrollTop = box.scrollHeight;
   }
   function openTerm() {
-    if (!tm.hidden) return;
+    if (!tm.hidden || IS_TOUCH || innerWidth < 821) return;
     tm.hidden = false; void tm.offsetWidth; tm.classList.add('on');
     if (!tmBooted) { tmBooted = true; pr(tmOut, 'Farhan OS 1.0. Type help or ls to see what you can do.', 'm'); }
     setTimeout(function () { try { tmIn.focus({ preventScroll: true }); } catch (e) { tmIn.focus(); } }, 60);
@@ -1429,7 +1423,7 @@
       ['c', '$ sudo pacman -S farhan', 260], ['m', 'resolving dependencies...', 260], ['m', 'looking for conflicting packages...', 300], ['', '', 40],
       ['', 'Packages (1) farhan-1.0-1', 140], ['', 'Total Installed Size:  1337.00 MiB', 260], ['a', ':: Proceed with installation? [Y/n] Y', 420],
       ['bar', '(1/1) checking keys in keyring', 0], ['bar', '(1/1) checking package integrity', 0], ['m', '(1/1) loading package files', 160], ['m', '(1/1) checking for file conflicts', 160],
-      ['bar', '(1/1) installing farhan', 0], ['a', ':: Running post-transaction hooks...', 240], ['m', '(1/2) Arming the portfolio', 240], ['m', '(2/2) Updating the portfolio index', 360], ['ok', 'Done. farhan is installed. Run "resume" in the terminal (press Enter).', 0]
+      ['bar', '(1/1) installing farhan', 0], ['a', ':: Running post-transaction hooks...', 240], ['m', '(1/2) Arming the portfolio', 240], ['m', '(2/2) Updating the portfolio index', 360], ['ok', IS_TOUCH ? 'Done. farhan is installed.' : 'Done. farhan is installed. Run "resume" in the terminal (press Enter).', 0]
     ];
     function play() {
       var id = ++run; out.textContent = ''; var i = 0;
