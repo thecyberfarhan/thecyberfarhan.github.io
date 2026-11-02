@@ -13,7 +13,7 @@
 <link rel="canonical" href="https://thecyberfarhan.github.io/">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
 <link rel="preload" href="assets/cpent-medal.webp" as="image" type="image/webp">
-<link rel="stylesheet" href="assets/style.css?v=4">
+<link rel="stylesheet" href="assets/style.css?v=5">
 <style>html.loading{overflow:hidden}html{background:#0d1117}html[data-theme=light]{background:#f6f8fa}#loader{position:fixed;inset:0;background:#0d1117;z-index:10000}html[data-theme=light] #loader{background:#f6f8fa}.ld-mark{width:132px;height:132px}.ld-core{position:relative;z-index:2}#loader{display:grid;place-items:center}html.done #loader{display:none}</style>
 <script>setTimeout(function(){var r=document.documentElement;r.classList.remove("loading");r.classList.add("loaded","done")},9000)</script>
 </head>
@@ -36,7 +36,8 @@
 <div id="curtain" aria-hidden="true"><span class="cu-line"></span><span class="cu-label"></span></div>
 <div id="progress" aria-hidden="true"></div>
 <div class="cursor-dot" aria-hidden="true"></div>
-<div class="cursor-ring" aria-hidden="true"><span class="cur-label"></span></div>
+<div class="cursor-ring" aria-hidden="true"></div>
+<div class="cursor-tag" aria-hidden="true"></div>
 <div class="grid-bg" aria-hidden="true"></div>
 <canvas id="bg3d" aria-hidden="true"></canvas>
 
@@ -79,10 +80,9 @@
   </div>
   <div class="hero-medal">
     <div class="medal-stage">
-      <svg class="certring" viewBox="0 0 200 200" aria-hidden="true"><defs><path id="cr" d="M100 100 m-88 0 a88 88 0 1 1 176 0 a88 88 0 1 1 -176 0"/></defs><text><textPath href="#cr" textLength="548" lengthAdjust="spacing">CERTIFIED PENETRATION TESTING PROFESSIONAL • EC-COUNCIL CPENT • </textPath></text></svg>
       <span class="orbit o1"></span><span class="orbit o2"></span>
       <span class="ring r1"></span><span class="ring r2"></span>
-      <img class="medal" src="assets/cpent-medal.webp" width="640" height="820" alt="EC-Council CPENT: Certified Penetration Testing Professional badge" fetchpriority="high">
+      <div class="medal-wrap"><img class="medal" src="assets/cpent-medal.webp" width="640" height="640" alt="EC-Council CPENT: Certified Penetration Testing Professional badge" fetchpriority="high"></div>
     </div>
   </div>
   <a class="scroll-cue" href="#about" data-go="about" aria-label="Scroll to about"><span></span></a>
@@ -138,6 +138,6 @@
   <span>Last updated 2 November 2026</span>
   <span>Built by hand, no frameworks.</span>
 </footer>
-<script src="assets/app.js?v=4" defer></script>
+<script src="assets/app.js?v=5" defer></script>
 </body>
 </html>
