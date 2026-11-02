@@ -337,87 +337,165 @@
   })();
   window.addEventListener('keydown', function () { sOn = false; });
 
-  /* ---------- pointer: reticle cursor, element-aware shapes, target lock, trail, click burst ---------- */
-  var dot = $('.cursor-dot'), ring = $('.cursor-ring'), tag = $('.cursor-tag'), lock = $('.cur-lock'), shape = $('.cursor-shape'), fx = $('#curfx'), fctx = fx && fx.getContext('2d');
-  var corners = $$('.cur-lock i'), CS = 13;
-  var mx = innerWidth / 2, my = innerHeight / 2, rx = mx, ry = my, cursorOn = false, lockEl = null, trail = [], L = { c: null, ready: false }, curKey = '', curMode = 'default', popT = null, spinAnim = null;
+  /* ---------- cursor: reticle, target lock, trail, click burst, idle roamers ---------- */
+  var dot = $('.cursor-dot'), ring = $('.cursor-ring'), tag = $('.cursor-tag'), lock = $('.cur-lock'), fx = $('#curfx'), fctx = fx && fx.getContext('2d');
+  var corners = $$('.cur-lock i'), CS = 13, QS = new URLSearchParams(location.search), IDLE = +QS.get('idle') || 30000;
+  var mx = innerWidth / 2, my = innerHeight / 2, rx = mx, ry = my, cursorOn = false, lockEl = null, trail = [], C = null, spinAnim = null, popT = null, lastMove = performance.now(), roam = null, fr = 0, pcache = [], pc = 0;
   function sizeFx() { if (!fx) return; fx.width = innerWidth; fx.height = innerHeight; }
   sizeFx(); window.addEventListener('resize', sizeFx);
+  function targetOf(t) { var a = t && t.closest && t.closest('a,button,.tilt'); if (!a) return null; return (a.offsetWidth > 700 || a.offsetHeight > 520) ? null : a; }
   function tagText(a) {
     var l = a.getAttribute('data-cursor');
     if (l === null) l = a.hasAttribute('data-go') ? 'Go' : (a.tagName === 'A' && a.target === '_blank' ? 'Open' : '');
     return l;
   }
-  function modeFor(t) {
-    var c = t.closest ? function (s) { return t.closest(s); } : function () { return null; }, x = c('a,button');
-    if (x && x.offsetWidth <= 700 && x.offsetHeight <= 520) return { m: 'lock', el: x };
-    if ((x = c('.termcard,.cterm'))) return { m: 'block', el: x };
-    if ((x = c('.sky,.medal-stage'))) return { m: 'cross', el: x };
-    if ((x = c('.chip-tile,.tool-col li,.tech li,.pills li,.lc-stat'))) return { m: 'diamond', el: x };
-    if ((x = c('.tilt'))) return { m: 'halo', el: x };
-    if ((x = c('p,h1,h2,h3,.lead,.sub,.title,.ctext'))) return { m: 'bar', el: x };
-    return { m: 'default', el: null };
-  }
-  function applyMode(r) {
-    var key = r.m + (r.el ? (r.el.id || r.el.className) : '');
-    if (key === curKey) return; curKey = key;
-    var was = curMode; curMode = r.m;
-    lockEl = r.m === 'lock' ? r.el : null;
-    lock.classList.toggle('on', r.m === 'lock');
-    shape.className = 'cursor-shape' + (r.m !== 'lock' && r.m !== 'default' ? ' on m-' + r.m : '');
-    ring.classList.toggle('hot', r.m !== 'default'); dot.classList.toggle('hot', r.m === 'lock');
-    dot.style.opacity = (r.m === 'bar' || r.m === 'block') ? 0 : '';
-    if (r.m === 'default' && was !== 'default') { ring.classList.remove('pop'); void ring.offsetWidth; ring.classList.add('pop'); clearTimeout(popT); popT = setTimeout(function () { ring.classList.remove('pop'); }, 850); }
-    var tx = r.m === 'lock' ? tagText(r.el) : ''; tag.textContent = tx; tag.classList.toggle('on', !!tx);
+  function ringPop() { ring.classList.remove('pop'); void ring.offsetWidth; ring.classList.add('pop'); clearTimeout(popT); popT = setTimeout(function () { ring.classList.remove('pop'); }, 850); }
+  function setLock(a) {
+    if (a === lockEl) return; var had = !!lockEl; lockEl = a;
+    lock.classList.toggle('on', !!a); ring.classList.toggle('hot', !!a); dot.classList.toggle('hot', !!a);
+    var tx = a ? tagText(a) : ''; tag.textContent = tx; tag.classList.toggle('on', !!tx);
+    if (!a && had) setTimeout(ringPop, 140);
   }
   window.addEventListener('pointermove', function (e) {
     if (e.pointerType !== 'mouse') return;
     fineMouse = true;
     if (!cursorOn) { cursorOn = true; root.classList.add('has-cursor'); rx = e.clientX; ry = e.clientY; }
-    mx = e.clientX; my = e.clientY;
+    mx = e.clientX; my = e.clientY; lastMove = performance.now();
     dot.style.transform = 'translate3d(' + mx + 'px,' + my + 'px,0)';
-    applyMode(modeFor(e.target));
+    if (roam) endRoam(); else setLock(targetOf(e.target));
   }, { passive: true });
-  var lastF = performance.now(), lastTx = 0, lastTy = 0, fr = 0;
+
+  /* idle roamers: after 30 seconds of a still mouse the reticle becomes a ship or a mecha */
+  function platforms() {
+    var out = [];
+    $$('.card,.wcard,.chip-tile,.tool-col,.stat,.lc-stat,.ccard,.sky,.termcard,.cterm,.live-card,.title,.pills li,.btn,.tech li').forEach(function (el) {
+      var r = el.getBoundingClientRect();
+      if (r.width > 70 && r.top > 90 && r.top < innerHeight - 70 && r.right > 40 && r.left < innerWidth - 40) out.push({ el: el, x1: Math.max(r.left + 12, 12), x2: Math.min(r.right - 12, innerWidth - 12), y: r.top });
+    });
+    return out;
+  }
+  function startRoam() {
+    var kind = QS.get('roam') || (Math.random() < 0.5 ? 'ship' : 'mecha'), pl = kind === 'mecha' ? platforms() : [];
+    if (kind === 'mecha' && pl.length < 2) kind = 'ship';
+    roam = { kind: kind, x: rx, y: ry, vx: 0, vy: 0, ang: -1.5708, tx: rx, ty: ry, tt: 0, back: false, bt: 0, bx: 0, by: 0, lasers: [], pl: null, state: 'fall', dir: 1, legT: 0, jumpAt: 0, jump: null, lastShot: 0, vyy: 0, squash: 0, trail: [] };
+    root.classList.add('roaming'); setLock(null); trail = [];
+  }
+  function endRoam() { if (roam && !roam.back) { roam.back = true; roam.bt = performance.now(); roam.bx = roam.x; roam.by = roam.y; } }
+  function angDiff(a, b) { var d = b - a; while (d > Math.PI) d -= 6.2832; while (d < -Math.PI) d += 6.2832; return d; }
+  function drawShip(ctx, r, P, dt, now) {
+    if (now > r.tt) { r.tx = 80 + Math.random() * (innerWidth - 160); r.ty = 110 + Math.random() * (innerHeight - 220); r.tt = now + 1500 + Math.random() * 1800; }
+    var dx = r.tx - r.x, dy = r.ty - r.y, d = Math.hypot(dx, dy) || 1, sp = Math.min(320, d * 1.7), f = Math.min(1, dt * 0.0035);
+    r.vx += (dx / d * sp - r.vx) * f; r.vy += (dy / d * sp - r.vy) * f; r.x += r.vx * dt / 1000; r.y += r.vy * dt / 1000;
+    if (Math.hypot(r.vx, r.vy) > 25) r.ang += angDiff(r.ang, Math.atan2(r.vy, r.vx)) * Math.min(1, dt * 0.01);
+    r.trail.push({ x: r.x, y: r.y }); if (r.trail.length > 28) r.trail.shift();
+    if (now - r.lastShot > 2300) { r.lastShot = now; r.lasers.push({ x: r.x + Math.cos(r.ang) * 16, y: r.y + Math.sin(r.ang) * 16, a: r.ang, l: 1 }); }
+    drawTrailPts(ctx, r.trail, P);
+    r.lasers = r.lasers.filter(function (L2) { L2.l -= dt / 500; if (L2.l <= 0) return false; L2.x += Math.cos(L2.a) * dt * 0.9; L2.y += Math.sin(L2.a) * dt * 0.9; ctx.strokeStyle = 'rgba(' + P.hot + ',' + L2.l.toFixed(2) + ')'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(L2.x, L2.y); ctx.lineTo(L2.x - Math.cos(L2.a) * 22, L2.y - Math.sin(L2.a) * 22); ctx.stroke(); return true; });
+    ctx.save(); ctx.translate(r.x, r.y); ctx.rotate(r.ang); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(' + P.node + ',.95)'; ctx.fillStyle = 'rgba(' + P.link + ',.18)'; ctx.lineWidth = 1.8;
+    ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(-10, -11); ctx.lineTo(-5, 0); ctx.lineTo(-10, 11); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(4, 0); ctx.lineTo(-5, 0); ctx.stroke();
+    ctx.fillStyle = 'rgba(' + P.hot + ',.95)'; ctx.beginPath(); ctx.arc(4, 0, 2.4, 0, 6.283); ctx.fill();
+    ctx.strokeStyle = 'rgba(' + P.hot + ',.95)'; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(-7, 0); ctx.lineTo(-14 - Math.random() * 9, 0); ctx.stroke();
+    ctx.restore();
+  }
+  function drawTrailPts(ctx, pts, P) { if (pts.length < 3) return; for (var i = 1; i < pts.length; i++) { var q = i / pts.length; ctx.strokeStyle = 'rgba(' + P.link + ',' + (q * 0.4).toFixed(3) + ')'; ctx.lineWidth = q * 2.4; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(pts[i - 1].x, pts[i - 1].y); ctx.lineTo(pts[i].x, pts[i].y); ctx.stroke(); } }
+  function drawMecha(ctx, r, P, dt, now) {
+    if (!(pc++ % 8)) pcache = platforms();
+    var st = r.state, g = 1800, i, best, pl;
+    function nearestBelow(x, y) { best = null; pcache.forEach(function (p) { if (x > p.x1 - 20 && x < p.x2 + 20 && p.y >= y - 6 && (!best || p.y < best.y)) best = p; }); return best; }
+    if (st === 'fall') {
+      r.vyy += g * dt / 1000; r.y += r.vyy * dt / 1000;
+      pl = nearestBelow(r.x, r.y - r.vyy * dt / 1000);
+      if (pl && r.y >= pl.y) { r.pl = pl; r.y = pl.y; r.vyy = 0; r.state = 'walk'; r.squash = 1; r.jumpAt = now + 1800 + Math.random() * 1800; r.x = Math.max(pl.x1, Math.min(pl.x2, r.x)); }
+      else if (r.y > innerHeight + 60) { r.kind = 'ship'; r.vx = 0; r.vy = 0; r.y = innerHeight - 100; return; }
+    } else if (st === 'walk') {
+      var rc = r.pl.el.getBoundingClientRect();
+      if (rc.top < 90 || rc.top > innerHeight - 60 || rc.width < 60) { r.state = 'fall'; r.vyy = 0; r.pl = null; }
+      else {
+        var x1 = Math.max(rc.left + 12, 12), x2 = Math.min(rc.right - 12, innerWidth - 12); r.y = rc.top; r.pl.x1 = x1; r.pl.x2 = x2; r.pl.y = rc.top;
+        r.x += r.dir * 58 * dt / 1000; r.legT += dt * 0.011;
+        if (r.x <= x1) { r.x = x1; r.dir = 1; } if (r.x >= x2) { r.x = x2; r.dir = -1; }
+        if (now > r.jumpAt) {
+          var opts = pcache.filter(function (p) { return p.el !== r.pl.el && Math.abs((p.x1 + p.x2) / 2 - r.x) < 460 && Math.abs(p.y - r.y) < 320; });
+          if (opts.length) { var tp = opts[Math.floor(Math.random() * opts.length)], tx = tp.x1 + Math.random() * Math.max(1, tp.x2 - tp.x1); r.jump = { x0: r.x, y0: r.y, x1: tx, y1: tp.y, t: 0, dur: 620 + Math.hypot(tx - r.x, tp.y - r.y) * 0.9, pl: tp }; r.state = 'jump'; r.dir = tx > r.x ? 1 : -1; }
+          else r.jumpAt = now + 2000;
+        }
+      }
+    } else if (st === 'jump') {
+      var J = r.jump; J.t += dt; var p = Math.min(J.t / J.dur, 1), e = p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+      r.x = J.x0 + (J.x1 - J.x0) * p; r.y = J.y0 + (J.y1 - J.y0) * e - Math.sin(Math.PI * p) * (54 + Math.abs(J.y1 - J.y0) * 0.25);
+      if (p >= 1) { r.pl = J.pl; r.state = 'walk'; r.squash = 1; r.jumpAt = now + 2200 + Math.random() * 2600; r.y = J.y1; }
+    }
+    r.squash = Math.max(0, r.squash - dt / 260);
+    var x = r.x, y = r.y, s = 1.12, ph = r.legT, dir = r.dir, air = r.state !== 'walk', sq = 1 - r.squash * 0.12;
+    ctx.save(); ctx.translate(x, y); ctx.scale(s * dir, s * sq); ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.lineWidth = 1.9;
+    ctx.strokeStyle = 'rgba(' + P.node + ',.95)';
+    [-1, 1].forEach(function (side) {
+      var pp = ph + (side > 0 ? Math.PI : 0), fx2 = air ? side * 4 : Math.sin(pp) * 9 + side * 3, lift = air ? 11 : Math.max(0, Math.cos(pp)) * 5;
+      ctx.beginPath(); ctx.moveTo(side * 4, -20); ctx.lineTo(side * 4 + (air ? 3 : Math.sin(pp) * 4 + 3), -11 - lift * 0.5); ctx.lineTo(fx2, -lift); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(fx2 - 3, -lift); ctx.lineTo(fx2 + 4, -lift); ctx.stroke();
+      var hx = air ? side * 12 + 4 : Math.sin(pp + Math.PI) * 7 + side * 9;
+      ctx.beginPath(); ctx.moveTo(side * 9, -38); ctx.lineTo(hx, air ? -46 : -26); ctx.stroke();
+    });
+    ctx.fillStyle = 'rgba(' + P.link + ',.2)'; ctx.beginPath(); ctx.rect(-8, -42, 16, 21); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.rect(-6, -56, 12, 10); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, -56); ctx.lineTo(3, -63); ctx.stroke();
+    ctx.fillStyle = 'rgba(' + P.hot + ',.95)'; ctx.fillRect(1, -53, 4, 2.4); ctx.fillRect(-3, -37, 6, 5); ctx.beginPath(); ctx.arc(3, -64, 1.8, 0, 6.283); ctx.fill();
+    if (r.state === 'jump') { ctx.strokeStyle = 'rgba(' + P.hot + ',.9)'; ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(-4, -10); ctx.lineTo(-4, -2 + Math.random() * 8); ctx.moveTo(4, -10); ctx.lineTo(4, -2 + Math.random() * 8); ctx.stroke(); }
+    ctx.restore();
+  }
+  function drawRoam(ctx, P, dt, now) {
+    var r = roam;
+    if (r.back) {
+      var p = Math.min((now - r.bt) / 380, 1), e = 1 - Math.pow(1 - p, 3); r.x = r.bx + (mx - r.bx) * e; r.y = r.by + (my - r.by) * e;
+      ctx.save(); ctx.translate(r.x, r.y); ctx.scale(1 - e * 0.85, 1 - e * 0.85); ctx.globalAlpha = 1 - e; ctx.strokeStyle = 'rgba(' + P.node + ',.95)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(0, 0, 14, 0, 6.283); ctx.stroke(); ctx.restore();
+      if (p >= 1) { roam = null; root.classList.remove('roaming'); rx = mx; ry = my; ringPop(); }
+      return;
+    }
+    if (r.kind === 'ship') drawShip(ctx, r, P, dt, now); else drawMecha(ctx, r, P, dt, now);
+  }
+
+  var lastF = performance.now(), lastTx = 0, lastTy = 0;
   (function loop(now) {
     var dt = Math.min(now - lastF, 50); lastF = now;
-    var k = 1 - Math.pow(1 - 0.16, dt / 16.667), k2 = 1 - Math.pow(1 - 0.24, dt / 16.667);
+    var k = 1 - Math.pow(1 - 0.18, dt / 16.667), k2 = 1 - Math.pow(1 - 0.3, dt / 16.667);
     rx += (mx - rx) * k; ry += (my - ry) * k;
-    var p = 'translate3d(' + rx.toFixed(2) + 'px,' + ry.toFixed(2) + 'px,0)';
-    ring.style.transform = p; shape.style.transform = p;
+    var p0 = 'translate3d(' + rx.toFixed(2) + 'px,' + ry.toFixed(2) + 'px,0)';
+    ring.style.transform = p0;
     tag.style.transform = 'translate3d(' + (rx + 34).toFixed(2) + 'px,' + (ry + 28).toFixed(2) + 'px,0)';
+    if (cursorOn && !roam && (fr++ % 5 === 0)) setLock(targetOf(document.elementFromPoint(mx, my)));
     var spinA = 0; if (!spinAnim) { var sv = ring.querySelector('svg'); spinAnim = sv && sv.getAnimations && sv.getAnimations()[0]; }
     if (spinAnim && spinAnim.currentTime != null) spinA = (spinAnim.currentTime % 10000) / 10000 * 6.2832;
-    var tick = [[-1.5708], [0], [1.5708], [3.1416]], tp = [], q;
-    for (q = 0; q < 4; q++) tp.push([rx + Math.cos(tick[q][0] + spinA) * 24 - CS / 2, ry + Math.sin(tick[q][0] + spinA) * 24 - CS / 2]);
+    var ang = [-1.5708, 0, 1.5708, 3.1416], tp = [], q;
+    for (q = 0; q < 4; q++) tp.push([rx + Math.cos(ang[q] + spinA) * 24 - CS / 2, ry + Math.sin(ang[q] + spinA) * 24 - CS / 2]);
     var tg;
     if (lockEl) { var r = lockEl.getBoundingClientRect(), pad = 9, l0 = r.left - pad, t0 = r.top - pad, r0 = r.right + pad - CS, b0 = r.bottom + pad - CS; tg = [[l0, t0], [r0, t0], [l0, b0], [r0, b0]]; }
     else tg = [tp[3], tp[0], tp[2], tp[1]];
-    if (!L.ready) { L.c = tg.map(function (p) { return [p[0], p[1]]; }); L.ready = true; }
+    if (!C) C = tg.map(function (pp) { return [pp[0], pp[1]]; });
     for (q = 0; q < 4; q++) {
-      L.c[q][0] += (tg[q][0] - L.c[q][0]) * k2; L.c[q][1] += (tg[q][1] - L.c[q][1]) * k2;
-      corners[q].style.transform = 'translate3d(' + L.c[q][0].toFixed(2) + 'px,' + L.c[q][1].toFixed(2) + 'px,0)';
+      C[q][0] += (tg[q][0] - C[q][0]) * k2; C[q][1] += (tg[q][1] - C[q][1]) * k2;
+      corners[q].style.transform = 'translate3d(' + C[q][0].toFixed(2) + 'px,' + C[q][1].toFixed(2) + 'px,0)';
     }
     if (fctx) {
       fctx.clearRect(0, 0, fx.width, fx.height);
-      var moved = Math.abs(rx - lastTx) + Math.abs(ry - lastTy) > 0.8;
-      if (moved) { trail.push({ x: rx, y: ry }); if (trail.length > 20) trail.shift(); } else if (trail.length && (fr++ % 2 === 0)) trail.shift();
-      lastTx = rx; lastTy = ry;
-      if (trail.length > 2) {
-        var P = pal(), n = trail.length;
-        for (var i = 1; i < n; i++) {
-          var q = i / n; fctx.strokeStyle = 'rgba(' + (q > 0.82 ? P.hot : P.node) + ',' + (q * 0.45).toFixed(3) + ')'; fctx.lineWidth = q * 2.6; fctx.lineCap = 'round';
-          fctx.beginPath(); fctx.moveTo(trail[i - 1].x, trail[i - 1].y); fctx.lineTo(trail[i].x, trail[i].y); fctx.stroke();
-        }
+      var P = pal();
+      if (roam) drawRoam(fctx, P, dt, now);
+      else {
+        var moved = Math.abs(rx - lastTx) + Math.abs(ry - lastTy) > 0.8;
+        if (moved) { trail.push({ x: rx, y: ry }); if (trail.length > 20) trail.shift(); } else if (trail.length && (fr % 2 === 0)) trail.shift();
+        lastTx = rx; lastTy = ry;
+        if (trail.length > 2) for (var i = 1; i < trail.length; i++) { var qq = i / trail.length; fctx.strokeStyle = 'rgba(' + (qq > 0.82 ? P.hot : P.node) + ',' + (qq * 0.45).toFixed(3) + ')'; fctx.lineWidth = qq * 2.6; fctx.lineCap = 'round'; fctx.beginPath(); fctx.moveTo(trail[i - 1].x, trail[i - 1].y); fctx.lineTo(trail[i].x, trail[i].y); fctx.stroke(); }
+        if (cursorOn && now - lastMove > IDLE && !document.hidden) startRoam();
       }
     }
     requestAnimationFrame(loop);
   })(performance.now());
   document.addEventListener('mouseleave', function () { dot.style.opacity = ring.style.opacity = 0; });
   document.addEventListener('mouseenter', function () { dot.style.opacity = ring.style.opacity = ''; });
-  window.addEventListener('scroll', function () { if (cursorOn) { var el = document.elementFromPoint(mx, my); if (el) applyMode(modeFor(el)); } }, { passive: true });
+  window.addEventListener('scroll', function () { if (cursorOn && !roam) setLock(targetOf(document.elementFromPoint(mx, my))); }, { passive: true });
 
   window.addEventListener('pointerdown', function (e) {
+    if (roam) { endRoam(); }
     ring.classList.add('down');
     if (lockEl) { lock.classList.remove('hit'); void lock.offsetWidth; lock.classList.add('hit'); }
     var d, i;
@@ -482,6 +560,7 @@
     var n = innerWidth < 820 ? 34 : 70; nodes = [];
     for (var i = 0; i < n; i++) nodes.push({ x: Math.random() * BW, y: Math.random() * BH, vx: (Math.random() - 0.5) * 0.25, vy: (Math.random() - 0.5) * 0.25, z: 0.3 + Math.random() * 0.7, hot: i % 13 === 0 });
   }
+  var pkts = [], pulses = [], nextPkt = 0, nextPulse = 0;
   function drawNet(P) {
     var i, j, a, b, dx, dy, d, mxp = (bmx + 0.5) * BW, myp = (bmy + 0.5) * BH;
     for (i = 0; i < nodes.length; i++) {
@@ -513,11 +592,30 @@
       bctx.fillStyle = 'rgba(' + P.node + ',' + a.toFixed(3) + ')'; bctx.fillText(f.t, f.x * (BW - 160) + 20 + bmx * 20 * f.z, yy);
     }
   }
+  function drawLive(P) {
+    var now = performance.now(), i, a, b;
+    if (now > nextPkt && nodes.length > 4) {
+      nextPkt = now + 450 + Math.random() * 500;
+      for (var tries = 0; tries < 12; tries++) { a = nodes[Math.floor(Math.random() * nodes.length)]; b = nodes[Math.floor(Math.random() * nodes.length)]; var dx = a.x - b.x, dy = a.y - b.y; if (a !== b && dx * dx + dy * dy < 14400) { pkts.push({ a: a, b: b, t: 0, s: 0.008 + Math.random() * 0.01, hot: Math.random() < 0.3 }); break; } }
+    }
+    for (i = pkts.length - 1; i >= 0; i--) {
+      var p = pkts[i]; p.t += p.s; if (p.t >= 1) { pkts.splice(i, 1); continue; }
+      var x = p.a.x + (p.b.x - p.a.x) * p.t, y = p.a.y + (p.b.y - p.a.y) * p.t, col = p.hot ? P.hot : P.link;
+      bctx.fillStyle = 'rgba(' + col + ',.16)'; bctx.beginPath(); bctx.arc(x, y, 6, 0, 6.283); bctx.fill();
+      bctx.fillStyle = 'rgba(' + col + ',.9)'; bctx.beginPath(); bctx.arc(x, y, 2.2, 0, 6.283); bctx.fill();
+    }
+    if (now > nextPulse) { nextPulse = now + 4200 + Math.random() * 3000; pulses.push({ x: Math.random() * BW, y: Math.random() * BH, r: 0, hot: Math.random() < 0.4 }); }
+    for (i = pulses.length - 1; i >= 0; i--) {
+      var q = pulses[i]; q.r += 1.6; if (q.r > 320) { pulses.splice(i, 1); continue; }
+      bctx.strokeStyle = 'rgba(' + (q.hot ? P.hot : P.link) + ',' + (0.22 * (1 - q.r / 320)).toFixed(3) + ')'; bctx.lineWidth = 1.2; bctx.beginPath(); bctx.arc(q.x, q.y, q.r, 0, 6.283); bctx.stroke();
+      bctx.beginPath(); bctx.arc(q.x, q.y, q.r * 0.6, 0, 6.283); bctx.stroke();
+    }
+  }
   function drawBg() {
     if (!bctx || !BW) return;
     bctx.clearRect(0, 0, BW, BH);
     var P = pal(), fade;
-    if (!nodes.length) mkNodes(); drawNet(P); drawFlo(P);
+    if (!nodes.length) mkNodes(); drawNet(P); drawLive(P); drawFlo(P);
     for (var i = 0; i < shapes.length; i++) {
       var sh = shapes[i], cy = sh.doc - sy * sh.depth, cx = sh.x * BW + bmx * 30 * sh.depth;
       if (cy < -140 || cy > BH + 140) continue;
@@ -620,31 +718,60 @@
     live: ['Numbers are cute. The profile behind them is better.', 'All of this is live. Want to check the source?'],
     contact: ['You made it to the end. Pick a channel and say hi.', 'Last stop. Say something, anything.']
   };
-  function actionsFor(sec, el, final) {
+  var TIPS = [
+    ['Tip', 'The moon button in the navbar switches day and night, with a little circle animation.'],
+    ['Tip', 'Click anywhere on the page. Something happens.'],
+    ['Tip', 'The globe behind everything follows your mouse. Try dragging the pointer across it.'],
+    ['Tip', 'Hover over any card and the corners lock onto it.'],
+    ['Tip', 'Keep the mouse still for 30 seconds and watch what your cursor turns into.'],
+    ['Tip', 'The sound button on these bubbles mutes them for good.']
+  ];
+  var FACTS = {
+    hero: ['Fact', 'CPENT stands for Certified Penetration Testing Professional, an EC-Council certification.', 'About me', 'about'],
+    about: ['Fact', 'This page uses no frameworks, only hand-written HTML, CSS and JavaScript.', 'See the tools', 'tools'],
+    tools: ['Fact', 'There are 32 tools in the columns below, grouped by the phase of a test they belong to.', 'Read the writeups', 'proof'],
+    proof: ['Fact', '37 writeups so far: 32 from TryHackMe and 5 from Hack The Box.', 'Open the repo', 'https://github.com/thecyberfarhan/CTF-Writeups'],
+    sky: ['Fact', 'The best single day of the last year had 10 contributions.', 'Live stats', 'live'],
+    live: ['Fact', 'TryHackMe puts this profile in the top 3 percent, with 100+ rooms completed.', 'Open TryHackMe', 'https://tryhackme.com/p/farhan.hussain'],
+    contact: ['Fact', 'The terminal on the left cycles through five commands, then starts over.', 'See the writeups', 'proof']
+  };
+  var ASKS = {
+    hero: ['Question', 'Short on time? Pick one and I will take you there.', [['Tools', 'tools'], ['Writeups', 'proof'], ['Contact', 'contact']]],
+    about: ['Question', 'Want the toolbox first, or the proof?', [['Toolbox', 'tools'], ['Proof', 'proof']]],
+    tools: ['Question', 'Looking for something specific?', [['Writeups', 'proof'], ['TryHackMe', 'live'], ['Contact', 'contact']]],
+    proof: ['Question', 'Read one, or hear from the author directly?', [['All writeups', 'https://github.com/thecyberfarhan/CTF-Writeups'], ['Contact', 'contact']]],
+    sky: ['Question', 'Curious about the bigger picture?', [['Live stats', 'live'], ['Writeups', 'proof']]],
+    live: ['Question', 'Want to see the work behind these numbers?', [['Writeups', 'proof'], ['GitHub', 'https://github.com/thecyberfarhan']]],
+    contact: ['Question', 'Which door do you want to knock on?', [['LinkedIn', 'https://www.linkedin.com/in/cyber-farhan-hussain/'], ['GitHub', 'https://github.com/thecyberfarhan']]]
+  };
+  var MORE2 = ['Seriously, are you still there?', 'I can do this all day. Can you?', 'Okay, I will assume you went for coffee. Come back when you are ready.'];
+  function actionsFor(sec, el) {
     var G = function (id, label) { return { label: label, id: id }; }, U = function (url, label) { return { label: label, url: url }; };
-    if (final) return [G('contact', 'Contact me'), G('top', 'Back to top')];
     if (sec === 'hero') return [G('about', 'About me'), G('tools', 'See my tools')];
     if (sec === 'about') return [G('tools', 'See my tools'), G('proof', 'Read my writeups')];
     if (sec === 'tools') return [G('proof', 'Read my writeups'), G('live', 'Live stats')];
-    if (sec === 'proof') { var h = el && (el.tagName === 'A' ? el.href : null); return h ? [U(h, 'Open this writeup'), G('contact', 'Contact me')] : [U('https://github.com/thecyberfarhan/CTF-Writeups', 'All writeups'), G('contact', 'Contact me')]; }
+    if (sec === 'proof') { var h = el && el.tagName === 'A' ? el.href : null; return h ? [U(h, 'Open this writeup'), G('contact', 'Contact me')] : [U('https://github.com/thecyberfarhan/CTF-Writeups', 'All writeups'), G('contact', 'Contact me')]; }
     if (sec === 'sky') return [G('live', 'Live stats'), G('contact', 'Contact me')];
     if (sec === 'live') return [U('https://tryhackme.com/p/farhan.hussain', 'Open TryHackMe'), G('contact', 'Contact me')];
-    if (sec === 'contact') { var c = el && (el.tagName === 'A' ? el.href : null); return c ? [U(c, 'Open this'), G('proof', 'Read my writeups')] : [U('https://www.linkedin.com/in/cyber-farhan-hussain/', 'Open LinkedIn'), G('proof', 'Read my writeups')]; }
-    return [G('contact', 'Contact me'), G('about', 'About me')];
+    if (sec === 'contact') { var c = el && el.tagName === 'A' ? el.href : null; return c ? [U(c, 'Open this'), G('proof', 'Read my writeups')] : [U('https://www.linkedin.com/in/cyber-farhan-hussain/', 'Open LinkedIn'), G('proof', 'Read my writeups')]; }
+    return [G('contact', 'Contact me')];
   }
-  var MORE2 = ['Seriously, are you still there?', 'I can do this all day. Can you?', 'Okay, I will assume you went for coffee. Come back when you are ready.', 'Last one, I promise. Scroll, click, or just say hi.'];
+  var THEMES = ['steel', 'amber', 'violet', 'ink', 'ember'], ANIMS = ['pop', 'flip', 'drop', 'glitch', 'slide'];
   var nEl = document.createElement('div'); nEl.className = 'nudge'; nEl.setAttribute('role', 'status');
   nEl.innerHTML = '<div class="nrow"><span class="tile"></span><div><b></b><p></p></div></div><small></small><div class="nbtns"></div><button type="button" class="x" aria-label="Dismiss">&times;</button><button type="button" class="snd" aria-label="Toggle sound"></button><i class="tail"></i>';
   document.body.appendChild(nEl);
-  var nTile = $('.tile', nEl), nName = $('b', nEl), nMsg = $('p', nEl), nLead = $('small', nEl), tail = $('.tail', nEl);
-  var lastAct = performance.now(), lastN = 0, nCount = 0, spoke = null, hideT = null, lastPick = '', hovering = false, anchor = null, popT2 = null;
+  var nTile = $('.tile', nEl), nName = $('b', nEl), nMsg = $('p', nEl), nLead = $('small', nEl), nBtns = $('.nbtns', nEl);
+  var lastAct = performance.now(), lastN = 0, nCount = 0, spoke = null, hideT = null, lastPick = '', hovering = false, anchor = null, lastKind = '', lastTheme = '', lastAnim = '';
   function act() { lastAct = performance.now(); nCount = 0; hideNudge(); }
   ['wheel', 'keydown', 'touchstart'].forEach(function (ev) { window.addEventListener(ev, act, { passive: true }); });
   window.addEventListener('pointerdown', function (e) { if (!e.target.closest || !e.target.closest('.nudge')) act(); }, { passive: true });
   var lastSY = 0; window.addEventListener('scroll', function () { if (Math.abs(window.scrollY - lastSY) > 24) { lastSY = window.scrollY; act(); } }, { passive: true });
-  nEl.querySelector('.x').addEventListener('click', function () { hideNudge(); lastN = performance.now() + 8000; });
-  var nBtns = $('.nbtns', nEl);
-  nBtns.addEventListener('click', function (e) { var bt = e.target.closest && e.target.closest('button'); if (!bt) return; var id = bt.getAttribute('data-id'), url = bt.getAttribute('data-url'); hideNudge(); lastAct = performance.now(); if (url) window.open(url, '_blank', 'noopener'); else if (id) go(id, id.charAt(0).toUpperCase() + id.slice(1)); });
+  nEl.querySelector('.x').addEventListener('click', function () { hideNudge(); lastN = performance.now() + 20000; });
+  nBtns.addEventListener('click', function (e) {
+    var bt = e.target.closest && e.target.closest('button'); if (!bt) return;
+    var id = bt.getAttribute('data-id'), url = bt.getAttribute('data-url'); hideNudge(); lastAct = performance.now();
+    if (url) window.open(url, '_blank', 'noopener'); else if (id) go(id, id.charAt(0).toUpperCase() + id.slice(1));
+  });
   var VOL = { on: '<svg viewBox="0 0 24 24"><path d="M11 4.702a.705.705 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.705.705 0 0 0 11 19.298z"/><path d="M16 9a5 5 0 0 1 0 6"/><path d="M19.364 18.364a9 9 0 0 0 0-12.728"/></svg>', off: '<svg viewBox="0 0 24 24"><path d="M11 4.702a.7.7 0 0 0-1.203-.498L6.413 7.587A1.4 1.4 0 0 1 5.416 8H3a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h2.416a1.4 1.4 0 0 1 .997.413l3.383 3.384A.7.7 0 0 0 11 19.298z"/><path d="m16.5 14.5 5-5"/><path d="m16.5 9.5 5 5"/></svg>' };
   var soundOn = true; try { soundOn = localStorage.getItem('nudgesound') !== 'off'; } catch (e) {}
   var sndBtn = $('.snd', nEl); function paintSnd() { sndBtn.innerHTML = soundOn ? VOL.on : VOL.off; }
@@ -652,13 +779,13 @@
   var actx = null;
   function unlockAudio() { if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) {} } if (actx && actx.state === 'suspended') actx.resume(); }
   ['pointerdown', 'keydown'].forEach(function (ev) { window.addEventListener(ev, unlockAudio, { passive: true }); });
-  function ping() {
+  function ping(theme) {
     if (!soundOn || !actx || actx.state !== 'running') return;
-    var t = actx.currentTime;
-    [[660, 0], [990, 0.1], [1320, 0.2]].forEach(function (n) {
-      var o = actx.createOscillator(), g = actx.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(n[0], t + n[1]);
-      g.gain.setValueAtTime(0.0001, t + n[1]); g.gain.exponentialRampToValueAtTime(0.07, t + n[1] + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + n[1] + 0.3);
-      o.connect(g); g.connect(actx.destination); o.start(t + n[1]); o.stop(t + n[1] + 0.32);
+    var t = actx.currentTime, set = theme === 'ink' ? [[880, 0], [880, 0.09]] : theme === 'ember' ? [[440, 0], [330, 0.12]] : theme === 'amber' ? [[523, 0], [659, 0.1], [784, 0.2]] : [[660, 0], [990, 0.1]];
+    set.forEach(function (n) {
+      var o = actx.createOscillator(), g = actx.createGain(); o.type = theme === 'ink' ? 'square' : 'sine'; o.frequency.setValueAtTime(n[0], t + n[1]);
+      g.gain.setValueAtTime(0.0001, t + n[1]); g.gain.exponentialRampToValueAtTime(theme === 'ink' ? 0.03 : 0.06, t + n[1] + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + n[1] + 0.28);
+      o.connect(g); g.connect(actx.destination); o.start(t + n[1]); o.stop(t + n[1] + 0.3);
     });
   }
   nEl.addEventListener('mouseenter', function () { hovering = true; clearTimeout(hideT); });
@@ -687,28 +814,47 @@
     nEl.style.setProperty('--tx', Math.max(24, Math.min(cx - x, w - 24)).toFixed(1) + 'px');
   }
   (function nloop() { place(); requestAnimationFrame(nloop); })();
+  function other(list, last) { var pool = list.filter(function (x) { return x !== last; }); return pool[Math.floor(Math.random() * pool.length)]; }
+  function pickKind() {
+    var r = Math.random(), k = r < 0.4 ? 'sarcasm' : r < 0.6 ? 'tip' : r < 0.82 ? 'fact' : 'ask';
+    if (k === lastKind) k = other(['sarcasm', 'tip', 'fact', 'ask'], lastKind);
+    return k;
+  }
   function showNudge() {
-    var sec = sectionNow(), el = pickSpeaker(sec), name = el ? nameOf(el) : '', msg = '';
-    if (nCount >= 4) { name = 'Website'; msg = MORE2[Math.min(nCount - 4, MORE2.length - 1)]; el = null; }
-    else if (TOOLQ[name]) msg = TOOLQ[name];
-    else if (el && sec === 'proof' && name) { var one = SECQ.proof.filter(function (p) { return p[0] === name; })[0]; msg = one ? one[1] : 'Read me or keep staring. Both are valid, only one is useful.'; }
-    else { var pool = SECQ[sec] || SECQ.tools, hit = pool[Math.floor(Math.random() * pool.length)]; if (hit) { name = hit[0]; msg = hit[1]; } }
-    if (!msg || msg === lastPick) { var p2 = SECQ[sec] || SECQ.tools, h2 = p2[Math.floor(Math.random() * p2.length)]; name = h2[0]; msg = h2[1]; }
-    lastPick = msg;
+    var sec = sectionNow(), el = pickSpeaker(sec), name = '', msg = '', lead = '', acts = [], kind = nCount >= 3 ? 'final' : pickKind();
+    if (kind === 'sarcasm') {
+      name = el ? nameOf(el) : '';
+      if (TOOLQ[name]) msg = TOOLQ[name];
+      else if (el && sec === 'proof' && name) { var one = SECQ.proof.filter(function (p) { return p[0] === name; })[0]; msg = one ? one[1] : 'Read me or keep staring. Both are valid, only one is useful.'; }
+      else { var pool = SECQ[sec] || SECQ.tools, hit = pool[Math.floor(Math.random() * pool.length)]; if (hit) { name = hit[0]; msg = hit[1]; } }
+      if (!msg || msg === lastPick) { var p2 = SECQ[sec] || SECQ.tools, h2 = p2[Math.floor(Math.random() * p2.length)]; name = h2[0]; msg = h2[1]; }
+      if (Math.random() < 0.5) { var ls = LEADS[sec] || LEADS.hero; lead = ls[Math.floor(Math.random() * ls.length)]; }
+      acts = actionsFor(sec, el);
+    } else if (kind === 'tip') {
+      var tp = other(TIPS.map(function (x) { return x[1]; }), lastPick); name = 'Tip'; msg = tp; acts = [{ label: 'Got it', close: true }];
+    } else if (kind === 'fact') {
+      var f = FACTS[sec] || FACTS.hero; name = f[0]; msg = f[1]; acts = [f[3].indexOf('http') === 0 ? { label: f[2], url: f[3] } : { label: f[2], id: f[3] }];
+    } else if (kind === 'ask') {
+      var q = ASKS[sec] || ASKS.hero; name = q[0]; msg = q[1]; acts = q[2].map(function (b) { return b[1].indexOf('http') === 0 ? { label: b[0], url: b[1] } : { label: b[0], id: b[1] }; });
+    } else { name = 'Website'; msg = MORE2[Math.min(nCount - 3, MORE2.length - 1)]; el = null; acts = [{ label: 'Contact me', id: 'contact' }, { label: 'Back to top', id: 'top' }]; }
+    if (msg === lastPick) return;
+    lastPick = msg; lastKind = kind;
+    var theme = other(THEMES, lastTheme), anim = other(ANIMS, lastAnim); lastTheme = theme; lastAnim = anim;
     var src = el && el.querySelector('svg.ic'); nTile.innerHTML = src ? src.outerHTML : '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
-    var fin = nCount >= 4, ls = LEADS[sec] || LEADS.hero; nName.textContent = name; nMsg.textContent = msg; nLead.textContent = fin ? '' : ls[Math.floor(Math.random() * ls.length)];
-    nBtns.innerHTML = ''; actionsFor(sec, el, fin).forEach(function (a2, i) { var bt = document.createElement('button'); bt.type = 'button'; bt.textContent = a2.label; if (a2.url) bt.setAttribute('data-url', a2.url); else bt.setAttribute('data-id', a2.id); nBtns.appendChild(bt); });
+    nName.textContent = name; nMsg.textContent = msg; nLead.textContent = lead; nLead.style.display = lead ? '' : 'none';
+    nBtns.innerHTML = ''; acts.forEach(function (a2) { var bt = document.createElement('button'); bt.type = 'button'; bt.textContent = a2.label; if (a2.url) bt.setAttribute('data-url', a2.url); else if (a2.id) bt.setAttribute('data-id', a2.id); else bt.setAttribute('data-close', '1'); nBtns.appendChild(bt); });
     if (spoke) spoke.classList.remove('speak'); spoke = el; if (el) { el.classList.remove('speak'); void el.offsetWidth; el.classList.add('speak'); }
-    anchor = el; nEl.classList.toggle('free', !el);
-    if (!el) { nEl.style.transform = 'translate3d(' + Math.round(innerWidth / 2 - 155) + 'px,' + (innerHeight - 250) + 'px,0)'; }
+    anchor = el; nEl.className = 'nudge t-' + theme + ' a-' + anim + (el ? '' : ' free'); void nEl.offsetWidth;
+    if (!el) nEl.style.transform = 'translate3d(' + Math.round(innerWidth / 2 - 160) + 'px,' + (innerHeight - 260) + 'px,0)';
     place(); nEl.classList.add('on');
     lastN = performance.now(); nCount++;
-    clearTimeout(hideT); if (!hovering) hideT = setTimeout(hideNudge, 13000);
-    ping();
+    clearTimeout(hideT); if (!hovering) hideT = setTimeout(hideNudge, 14000);
+    ping(theme);
   }
+  nBtns.addEventListener('click', function (e) { var bt = e.target.closest && e.target.closest('button'); if (bt && bt.hasAttribute('data-close')) hideNudge(); });
   setInterval(function () {
     if (document.hidden || !root.classList.contains('done') || !motion) return;
-    var now = performance.now(), idle = now - lastAct;
-    if (idle > 12000 && now - lastN > 22000 && nCount < 8) showNudge();
+    var now = performance.now(), idle = now - lastAct, gap = Math.min(55000 + nCount * 30000, 150000);
+    if (idle > 35000 && now - lastN > gap && nCount < 5) showNudge();
   }, 1000);
 })();
