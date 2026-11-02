@@ -55,24 +55,42 @@ html.done #loader{display:none}
 #curfx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:9997}
 .cursor-dot{width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:var(--text);transition:opacity .3s,background .3s,width .3s,height .3s,margin .3s}
 .cursor-ring{width:60px;height:60px;margin:-30px 0 0 -30px;transition:opacity .3s}
-.cursor-ring svg{width:100%;height:100%;overflow:visible;animation:retspin 10s linear infinite;transition:transform .55s var(--ease),opacity .3s}
+.ret-wrap{display:block;width:100%;height:100%;transition:transform .5s var(--ease),opacity .3s}
+.cursor-ring svg{width:100%;height:100%;overflow:visible;animation:retspin 10s linear infinite}
 .ret-c{fill:none;stroke:var(--text);stroke-opacity:.5;stroke-width:1.2;stroke-dasharray:20 8}
 .ret-t{stroke:var(--accent);stroke-width:2;stroke-linecap:round}
 @keyframes retspin{to{transform:rotate(360deg)}}
 html.has-cursor,html.has-cursor a,html.has-cursor button,html.has-cursor .tilt{cursor:none}
 html.has-cursor .cursor-dot,html.has-cursor .cursor-ring{opacity:1}
 html.has-cursor .cursor-dot.hot{background:var(--accent);width:8px;height:8px;margin:-4px 0 0 -4px}
-html.has-cursor .cursor-ring.hot svg{transform:scale(.3);opacity:0}
-html.has-cursor .cursor-ring.down svg{transform:scale(.5);animation-duration:1.4s}
+html.has-cursor .cursor-ring.hot .ret-wrap{transform:scale(.3);opacity:0}
+html.has-cursor .cursor-ring.down .ret-wrap{transform:scale(.55)}
+html.has-cursor .cursor-ring.pop .ret-wrap{animation:retpop .8s var(--ease)}
+@keyframes retpop{0%{transform:scale(.3);opacity:0}55%{transform:scale(1.3);opacity:1}100%{transform:scale(1);opacity:1}}
 .cur-lock{width:0;height:0;transition:opacity .25s}
 .cur-lock.on{opacity:1}
-.cur-lock i{position:absolute;width:13px;height:13px;border:0 solid var(--accent);transition:transform .3s var(--ease)}
-.cur-lock i:nth-child(1){left:0;top:0;border-width:2px 0 0 2px;border-top-left-radius:5px}
-.cur-lock i:nth-child(2){right:0;top:0;border-width:2px 2px 0 0;border-top-right-radius:5px}
-.cur-lock i:nth-child(3){left:0;bottom:0;border-width:0 0 2px 2px;border-bottom-left-radius:5px}
-.cur-lock i:nth-child(4){right:0;bottom:0;border-width:0 2px 2px 0;border-bottom-right-radius:5px}
+.cur-lock i{position:absolute;left:0;top:0;width:13px;height:13px;border:0 solid var(--accent);will-change:transform}
+.cur-lock i:nth-child(1){border-width:2px 0 0 2px;border-top-left-radius:5px}
+.cur-lock i:nth-child(2){border-width:2px 2px 0 0;border-top-right-radius:5px}
+.cur-lock i:nth-child(3){border-width:0 0 2px 2px;border-bottom-left-radius:5px}
+.cur-lock i:nth-child(4){border-width:0 2px 2px 0;border-bottom-right-radius:5px}
 .cur-lock.hit i{animation:hit .55s var(--ease)}
-@keyframes hit{35%{transform:scale(1.9);opacity:.35}}
+@keyframes hit{35%{filter:drop-shadow(0 0 6px var(--accent)) brightness(1.8);border-color:var(--text)}}
+/* per-element cursor shapes */
+.cursor-shape{position:fixed;left:0;top:0;pointer-events:none;z-index:9999;opacity:0;width:0;height:0;margin:0;border:0 solid var(--accent);border-radius:50%;transition:opacity .25s,width .4s var(--ease),height .4s var(--ease),margin .4s var(--ease),border-radius .4s var(--ease),background .3s,transform 0s}
+html.has-cursor .cursor-shape.on{opacity:1}
+.cursor-shape::before,.cursor-shape::after{content:"";position:absolute;opacity:0;transition:opacity .3s}
+.cursor-shape.m-bar{width:3px;height:30px;margin:-15px 0 0 -1.5px;border-radius:3px;background:var(--accent)}
+.cursor-shape.m-block{width:10px;height:20px;margin:-10px 0 0 -5px;border-radius:2px;background:var(--accent);animation:blockblink 1s steps(1) infinite}
+@keyframes blockblink{50%{opacity:.15}}
+.cursor-shape.m-diamond{width:24px;height:24px;margin:-12px 0 0 -12px;border:1.6px solid var(--accent);border-radius:4px;background:color-mix(in srgb,var(--accent) 18%,transparent);rotate:45deg;animation:diaspin 6s linear infinite}
+@keyframes diaspin{to{rotate:405deg}}
+.cursor-shape.m-halo{width:72px;height:72px;margin:-36px 0 0 -36px;border:1px dashed color-mix(in srgb,var(--text) 45%,transparent);background:radial-gradient(circle,color-mix(in srgb,var(--accent) 22%,transparent),transparent 68%);animation:haloturn 8s linear infinite}
+@keyframes haloturn{to{rotate:360deg}}
+.cursor-shape.m-cross{width:44px;height:44px;margin:-22px 0 0 -22px;border:1.2px solid var(--accent)}
+.cursor-shape.m-cross::before,.cursor-shape.m-cross::after{opacity:1;background:var(--accent)}
+.cursor-shape.m-cross::before{left:-34px;right:-34px;top:50%;height:1px;margin-top:-.5px;-webkit-mask-image:linear-gradient(90deg,transparent,#000 28%,transparent 42%,transparent 58%,#000 72%,transparent);mask-image:linear-gradient(90deg,transparent,#000 28%,transparent 42%,transparent 58%,#000 72%,transparent)}
+.cursor-shape.m-cross::after{top:-34px;bottom:-34px;left:50%;width:1px;margin-left:-.5px;-webkit-mask-image:linear-gradient(180deg,transparent,#000 28%,transparent 42%,transparent 58%,#000 72%,transparent);mask-image:linear-gradient(180deg,transparent,#000 28%,transparent 42%,transparent 58%,#000 72%,transparent)}
 .shock,.flash,.streak{position:fixed;pointer-events:none;z-index:9998}
 .shock{width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;border:1.5px solid var(--accent);animation:shock .95s var(--ease) both}
 @keyframes shock{from{transform:scale(.3);opacity:1}to{transform:scale(8);opacity:0}}
@@ -129,7 +147,7 @@ html[data-theme=light] .theme .sun{display:block}html[data-theme=light] .theme .
 .eyebrow{font-size:.74rem;text-transform:uppercase;letter-spacing:.18em;color:var(--muted);font-weight:700;margin:34px 0 14px}
 
 /* ---------- hero ---------- */
-.hero{min-height:100svh;max-width:1180px;margin:0 auto;padding:130px clamp(16px,4vw,32px) 60px;display:grid;grid-template-columns:1.15fr .85fr;gap:40px;align-items:center;position:relative}
+.hero{overflow:clip;min-height:100svh;max-width:1180px;margin:0 auto;padding:130px clamp(16px,4vw,32px) 60px;display:grid;grid-template-columns:1.15fr .85fr;gap:40px;align-items:center;position:relative}
 #globe{position:fixed;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;opacity:.85}
 html.loading #globe{z-index:10001}
 main{position:relative;z-index:1}
@@ -336,17 +354,31 @@ main{position:relative;z-index:1}
 .ccard:hover .carrow{transform:translateX(6px);color:var(--c)}
 .ccard::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--c)}
 
-/* ---------- idle nudges ---------- */
-.nudge{position:fixed;left:24px;bottom:24px;z-index:9500;display:flex;gap:12px;align-items:flex-start;max-width:min(380px,calc(100vw - 48px));padding:14px 16px 14px 14px;border-radius:14px;border:1px solid var(--border);background:var(--nav-bg2);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:0 18px 50px -12px var(--shadow);opacity:0;transform:translate3d(0,24px,0) rotateX(-30deg);transform-origin:50% 100%;pointer-events:none;transition:opacity .5s var(--ease),transform .7s var(--ease)}
-.nudge.on{opacity:1;transform:none;pointer-events:auto}
-.nudge .tile{width:40px;height:40px;font-size:1.2rem;color:var(--c,var(--accent))}
-.nudge b{display:block;font:700 11px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--c,var(--accent));margin-bottom:3px}
+/* ---------- idle nudges: speech bubbles ---------- */
+.nudge{position:fixed;left:0;top:0;z-index:9500;width:min(310px,calc(100vw - 24px));padding:14px 34px 12px 14px;border-radius:16px;border:1px solid color-mix(in srgb,var(--accent) 55%,var(--border));background:var(--surface);box-shadow:0 20px 46px -14px var(--shadow);opacity:0;pointer-events:none;transition:opacity .35s var(--ease);will-change:transform}
+.nudge.on{opacity:1;pointer-events:auto}
+.nudge.pop{animation:bubblePop .6s var(--ease)}
+@keyframes bubblePop{0%{scale:.6;opacity:0}60%{scale:1.05}100%{scale:1;opacity:1}}
+.nudge .tail{position:absolute;width:14px;height:14px;background:var(--surface);border:1px solid color-mix(in srgb,var(--accent) 55%,var(--border));border-width:0 1px 1px 0;transform:rotate(45deg);left:var(--tx,50%);margin-left:-7px;bottom:-8px}
+.nudge.below .tail{bottom:auto;top:-8px;border-width:1px 0 0 1px}
+.nudge.free .tail{display:none}
+.nudge .nrow{display:flex;gap:11px;align-items:flex-start}
+.nudge .tile{width:34px;height:34px;font-size:1.05rem;color:var(--c,var(--accent))}
+.nudge b{display:block;font:700 10.5px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:3px}
 .nudge p{font-size:.88rem;color:var(--text);line-height:1.45}
-.nudge button{position:absolute;top:6px;right:8px;color:var(--muted);font-size:.9rem;line-height:1}
+.nudge small{display:block;margin-top:8px;font-size:.78rem;color:var(--muted);line-height:1.4}
+.nudge .nbtns{display:flex;gap:8px;margin-top:9px}
+.nudge .nbtns button{padding:6px 12px;border-radius:999px;border:1px solid var(--border);background:var(--tile);color:var(--text);font-size:.76rem;font-weight:600;transition:background .25s,border-color .25s,transform .3s var(--ease)}
+.nudge .nbtns button:first-child{background:var(--accent);border-color:var(--accent);color:#fff}
+.nudge .nbtns button:hover{transform:translateY(-2px);border-color:var(--text)}
+.nudge .x{position:absolute;top:5px;right:9px;color:var(--muted);font-size:1rem;line-height:1}
+.nudge .snd{position:absolute;right:9px;bottom:9px;display:grid;place-items:center;width:22px;height:22px;border-radius:6px;color:var(--muted);transition:background .25s,color .25s}
+.nudge .snd:hover{background:var(--tile);color:var(--text)}
+.nudge .snd svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .speak{animation:speak 1.6s ease-in-out 3}
 @keyframes speak{50%{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 55%,transparent)}}
 @media (max-width:980px){.live-grid,.contact-grid{grid-template-columns:1fr}.gauges{grid-template-columns:repeat(3,1fr)}}
-@media (max-width:620px){.gauges{grid-template-columns:1fr}.ccards{grid-template-columns:1fr}.nudge{left:12px;right:12px;bottom:12px;max-width:none}}
+@media (max-width:620px){.gauges{grid-template-columns:1fr}.ccards{grid-template-columns:1fr}}
 
 /* ---------- light / dark asset swaps ---------- */
 .sky .sky-l{display:none}
@@ -389,12 +421,6 @@ html.theming *,html.theming *::before,html.theming *::after{transition:backgroun
 .cterm-body div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cterm-body .cmd{color:var(--text)}.cterm-body .ok{color:var(--steel)}
 
-/* ---------- nudge: longer stay, sound button, attention pulse ---------- */
-.nudge.on{animation:nudgeIn .8s var(--ease)}
-@keyframes nudgeIn{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 60%,transparent)}60%{box-shadow:0 0 0 14px transparent}100%{box-shadow:0 18px 50px -12px var(--shadow)}}
-.nudge .snd{top:auto;right:10px;bottom:8px;font-size:.95rem;display:grid;place-items:center;width:22px;height:22px;border-radius:6px;transition:background .25s,color .25s}
-.nudge .snd:hover{background:var(--tile);color:var(--text)}
-.nudge .snd svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
-.nudge{padding-right:34px}
+
 .plat,.lvl{white-space:nowrap}
 .plat{letter-spacing:.08em}
