@@ -13,14 +13,13 @@
 <link rel="canonical" href="https://thecyberfarhan.github.io/">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
 <link rel="preload" href="assets/cpent-medal.webp" as="image" type="image/webp">
-<link rel="stylesheet" href="assets/style.css?v=6">
+<link rel="stylesheet" href="assets/style.css?v=7">
 <style>html.loading{overflow:hidden}html{background:#0d1117}html[data-theme=light]{background:#e9edf2}#loader{position:fixed;inset:0;background-color:#0d1117;z-index:10000}html[data-theme=light] #loader{background-color:#e9edf2}#loader{display:grid;place-items:center}html.done #loader{display:none}</style>
 <script>setTimeout(function(){var r=document.documentElement;r.classList.remove("loading");r.classList.add("loaded","done")},9000)</script>
 </head>
 <body>
 
 <div id="loader" role="status" aria-live="polite" aria-label="Loading">
-  <canvas id="ldcv" aria-hidden="true"></canvas>
   <div class="ld-ui" aria-hidden="true">
     <div class="ld-msg">scanning network</div>
     <div class="ld-pct">0%</div>
@@ -29,11 +28,14 @@
 </div>
 <canvas id="scan" aria-hidden="true"></canvas>
 <div id="progress" aria-hidden="true"></div>
+<canvas id="curfx" aria-hidden="true"></canvas>
 <div class="cursor-dot" aria-hidden="true"></div>
-<div class="cursor-ring" aria-hidden="true"></div>
+<div class="cursor-ring" aria-hidden="true"><svg viewBox="0 0 60 60"><circle class="ret-c" cx="30" cy="30" r="22"/><path class="ret-t" d="M30 2v9M30 49v9M2 30h9M49 30h9"/></svg></div>
+<div class="cur-lock" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
 <div class="cursor-tag" aria-hidden="true"></div>
 <div class="grid-bg" aria-hidden="true"></div>
 <canvas id="bg3d" aria-hidden="true"></canvas>
+<canvas id="globe" aria-hidden="true"></canvas>
 
 <header class="nav" id="nav">
   <div class="nav-pill">
@@ -55,7 +57,6 @@
 
 <main id="top">
 <section class="hero" id="hero">
-  <canvas id="globe" aria-hidden="true"></canvas>
   <div class="hero-copy">
     <p class="prompt"><span class="typed">$ whoami</span></p>
     <h1 class="split" data-reveal>Farhan</h1>
@@ -73,12 +74,20 @@
     </div>
   </div>
   <div class="hero-medal">
+    <div class="medal-col">
     <div class="medal-stage">
       <span class="orbit o1"></span><span class="orbit o2"></span>
       <span class="ring r1"></span><span class="ring r2"></span>
       <div class="medal-wrap"><img class="medal" src="assets/cpent-medal.webp" width="640" height="640" alt="EC-Council CPENT: Certified Penetration Testing Professional badge" fetchpriority="high"></div>
     </div>
+      <div class="termcard" aria-hidden="true">
+      <div class="term-bar"><i></i><i></i><i></i><span>lab session</span></div>
+      <div class="term-body"></div>
+    </div>
+    </div>
   </div>
+  <div class="hud" aria-hidden="true"><span>NODES <b id="hud-nodes">0</b></span><span>LINKS <b id="hud-links">0</b></span><span>UPTIME <b id="hud-up">00:00</b></span></div>
+  <div class="ticker" aria-hidden="true"><div class="ticker-track"><span>Nmap</span><em></em><span>Burp Suite</span><em></em><span>Metasploit</span><em></em><span>BloodHound</span><em></em><span>Impacket</span><em></em><span>Hashcat</span><em></em><span>Wireshark</span><em></em><span>ffuf</span><em></em><span>SQLMap</span><em></em><span>Nuclei</span><em></em><span>Mimikatz</span><em></em><span>Hydra</span><em></em><span>Python</span><em></em><span>Bash</span><em></em><span>Docker</span><em></em><span>Nmap</span><em></em><span>Burp Suite</span><em></em><span>Metasploit</span><em></em><span>BloodHound</span><em></em><span>Impacket</span><em></em><span>Hashcat</span><em></em><span>Wireshark</span><em></em><span>ffuf</span><em></em><span>SQLMap</span><em></em><span>Nuclei</span><em></em><span>Mimikatz</span><em></em><span>Hydra</span><em></em><span>Python</span><em></em><span>Bash</span><em></em><span>Docker</span><em></em></div></div>
   <a class="scroll-cue" href="#about" data-go="about" aria-label="Scroll to about"><span></span></a>
 </section>
 
@@ -132,6 +141,6 @@
   <span>Last updated 2 November 2026</span>
   <span>Built by hand, no frameworks.</span>
 </footer>
-<script src="assets/app.js?v=6" defer></script>
+<script src="assets/app.js?v=7" defer></script>
 </body>
 </html>
