@@ -748,3 +748,5 @@ html.quick #loader{transition:opacity .3s 0s!important}html.quick .ld-ui{transit
 
 /* phones: no command palette (no Enter key, the floating button only adds clutter) */
 @media (max-width:820px),(pointer:coarse){.tm-btn,.tm{display:none!important}}
+
+#about .more{display:flex;flex-wrap:wrap;gap:12px}

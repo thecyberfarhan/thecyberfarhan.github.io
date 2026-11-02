@@ -5,7 +5,8 @@
 ## Start here
 - [Portfolio](https://thecyberfarhan.github.io/): single-page site with tools, proof of work, journey and contact.
 - [Resume (PDF, one page)](https://thecyberfarhan.github.io/assets/Farhan_Hussain_Resume.pdf): skills, certification, projects, education.
-- [Sample penetration test report (PDF)](https://thecyberfarhan.github.io/assets/Sample_Pentest_Report.pdf): fictional lab target, shows how findings, evidence and remediation are written.
+- [Sample penetration test report (PDF)](https://thecyberfarhan.github.io/assets/Sample_Pentest_Report.pdf): fictional company, written in plain language for executives and managers.
+- [Technical appendix to the sample report (PDF)](https://thecyberfarhan.github.io/assets/Sample_Technical_Appendix.pdf): evidence, reproduction steps and fix examples for the IT team.
 
 ## Proof of work
 - [CTF writeups on GitHub](https://github.com/thecyberfarhan/CTF-Writeups): 37 structured writeups from TryHackMe, Hack The Box and PortSwigger, each with a key takeaway.
