@@ -981,7 +981,7 @@
     }, 2000);
   }
 
-  /* ---------- command palette (Enter) + mini hack-the-box ---------- */
+  /* ---------- command palette (Enter) + mini TryHackMe-style room ---------- */
   var tm = $('#tm'), tmOut = $('#tm-out'), tmIn = $('#tm-input'), tmBtn = $('#tm-btn');
   var tmHist = [], tmHi = 0, tmBooted = false;
   function pr(box, text, cls) {
@@ -1006,7 +1006,7 @@
   var FILES = ['about/', 'journey/', 'tools/', 'proof/', 'live/', 'play/', 'contact/', 'resume.pdf'];
   var CMDS = {
     help: function (o) {
-      ['Commands:', '  ls              list sections', '  goto <section>  jump there (about, journey, tools, proof, live, play, contact)', '  whoami          who am I', '  skills          what I work with', '  certs           certifications', '  writeups        featured writeups', '  projects        things I built', '  education       school', '  contact         where to reach me', '  resume          download my resume', '  play            open the mini hack-the-box', '  theme           toggle day / night', '  clear, exit     tidy up', 'Not everything is listed. Poke around.'].forEach(function (l) { pr(o, l, l.charAt(0) === ' ' ? '' : 'c'); });
+      ['Commands:', '  ls              list sections', '  goto <section>  jump there (about, journey, tools, proof, live, play, contact)', '  whoami          who am I', '  skills          what I work with', '  certs           certifications', '  writeups        featured writeups', '  projects        things I built', '  education       school', '  contact         where to reach me', '  resume          download my resume', '  play            open the mini TryHackMe-style room', '  theme           toggle day / night', '  clear, exit     tidy up', 'Not everything is listed. Poke around.'].forEach(function (l) { pr(o, l, l.charAt(0) === ' ' ? '' : 'c'); });
     },
     ls: function (o, a) {
       if (/a/.test(a || '')) { pr(o, FILES.concat(['.secret']).join('   '), 'a'); } else pr(o, FILES.join('   '), 'a');
@@ -1095,30 +1095,44 @@
     }
   });
 
-  /* ---------- the game: three levels, scripted target ---------- */
+  /* ---------- the game: a tiny TryHackMe-style room, three levels ---------- */
   (function () {
     var box = $('#game'); if (!box) return;
-    var sugBox = $('#g-sug'), out = $('#g-out'), form = $('#g-form'), inp = $('#g-input'), chips = $('#g-chips'), startB = $('#g-start'), hintB = $('#g-hint');
-    var tEl = $('#g-time'), hEl = $('#g-hints'), bEl = $('#g-best'), lvBtns = $$('.g-lv button', box);
-    var T = '(?:target|10\\.10\\.11\\.42)', B64 = 'c3ZjX2FkbWluOlN1cDNyUzNjcmV0IQ==', ROT = 'frperg_xrl_9';
+    var out = $('#g-out'), form = $('#g-form'), inp = $('#g-input'), startB = $('#g-start'), hintB = $('#g-hint'), descEl = $('#g-desc'), taskEl = $('#g-task'), barEl = $('#g-bar');
+    var tEl = $('#g-time'), hEl = $('#g-hints'), bEl = $('#g-best'), aEl = $('#g-alerts'), aWrap = $('#g-alerts-w'), lvBtns = $$('.g-lv button', box);
+    var T = '(?:target|10\\.10\\.11\\.42)', B64 = 'c3ZjX2FkbWluOlN1cDNyUzNjcmV0IQ==', ROT = 'frperg_xrl_9', HASH_D = '4ca7c5c27c2314eecc71f67501abb724', HASH_R = '4ece57a61323b52ccffdbef021956754';
+    var IP = '10.10.11.42';
     var LV = {
       easy: {
-        limit: 0, hintsOn: true, chipsOn: true,
-        intro: 'EASY: one box, one path. Target 10.10.11.42 (alias: target). Suggested commands appear below.',
-        hints: ['Start with a port scan.', 'The web server is open. Fetch the home page and read the source.', 'Developers leave comments. See what the page mentions.', 'The notes hold a login. Use it on the admin page with curl -u user:pass.'],
+        tag: 'Easy', sub: 'Guided. About 2 minutes.', limit: 0, hintsOn: true, strikes: 0,
+        desc: 'Never hacked anything? Perfect. You are breaking into a made-up company website. I explain every command, and you just press Run. No typing needed.',
+        mission: ['ROOM: Break In', 'The company site acme.corp lives on a machine at ' + IP + ' (we call it "target").', 'Your mission: get in, find the secret flag, and submit it. Follow the task card above. Press Run on each step.'],
+        tasks: [
+          { tok: 'scan', t: 'Scan for open doors', why: 'A computer has numbered doors called ports. Each open one runs a service. nmap knocks on them and tells you which are open.', cmd: 'nmap target' },
+          { tok: 'home', t: 'Look at the website', why: 'Port 80 is a website. curl fetches a web page and prints it as text, like a browser without pictures. Read it, and look for notes hidden in comments (they start with <!--).', cmd: 'curl target' },
+          { tok: 'notes', t: 'Follow the clue', why: 'The page mentioned a file called notes.txt. Ask the server for it, the same way.', cmd: 'curl target/notes.txt' },
+          { tok: 'flag', t: 'Log in as admin', why: 'The notes gave you a username and password. curl -u sends them. Use them on the /admin page to get the flag.', cmd: 'curl -u admin:letmein target/admin' },
+          { tok: 'done', t: 'Submit the flag', why: 'You found the flag. On TryHackMe you paste it in as the answer. Here, press Run to submit it.', cmd: 'submit THM{easy_peasy_recon}' }
+        ],
+        hints: ['Press the green Run button on the task card. It types the command for you.'],
         acts: [
-          { re: new RegExp('^nmap\\b.*' + T), gives: 'scan', sug: 'nmap target', out: 'Starting Nmap 7.94\nNmap scan report for target (10.10.11.42)\nPORT   STATE SERVICE\n22/tcp open  ssh\n80/tcp open  http\nNmap done: 1 IP address (1 host up)' },
-          { re: new RegExp('^curl\\b.*' + T + '/admin.*(admin:letmein|admin letmein)'), needs: ['notes'], gives: 'flag', out: 'Welcome back, admin.\nFLAG{easy_peasy_recon}' },
-          { re: new RegExp('^curl\\b.*' + T + '/admin'), needs: ['notes'], out: '401 Unauthorized. Send credentials: curl -u user:pass target/admin' },
-          { re: new RegExp('^curl\\b.*' + T + '/notes\\.txt'), needs: ['home'], gives: 'notes', sug: 'curl target/notes.txt', out: 'admin panel: /admin\nlogin: admin / letmein' },
-          { re: new RegExp('^curl\\b(?:\\s+-\\w+)*\\s+(?:http://)?' + T + '/?$'), needs: ['scan'], gives: 'home', sug: 'curl target', out: '<html><title>Acme Corp</title>\n<h1>Coming soon</h1>\n<!-- TODO: remove /notes.txt before launch -->\n</html>' },
-          { sugOnly: true, needs: ['notes'], sug: 'curl -u admin:letmein target/admin', gives: 'flag' }
-        ]
+          { re: new RegExp('^nmap\\b.*' + T), gives: 'scan', out: 'Starting Nmap 7.94\nNmap scan report for target (' + IP + ')\nPORT   STATE SERVICE\n22/tcp open  ssh\n80/tcp open  http\n\nTwo doors are open. Port 80 is a website, so that is where we look next.' },
+          { re: new RegExp('^curl\\b(?=.*(?:admin:letmein|admin letmein))(?=.*' + T + '/admin)'), needs: ['notes'], gives: 'flag', out: 'Welcome back, admin.\nTHM{easy_peasy_recon}\n\nThat is the flag. Copy it with the next step.' },
+          { re: new RegExp('^curl\\b.*' + T + '/admin'), needs: ['notes'], out: '401 Unauthorized. The page wants a username and password: curl -u user:pass target/admin' },
+          { re: new RegExp('^curl\\b.*' + T + '/notes\\.txt'), needs: ['home'], gives: 'notes', out: 'admin panel: /admin\nlogin: admin / letmein\n\nA username and a password, left in a public file.' },
+          { re: new RegExp('^curl\\b(?:\\s+-\\w+)*\\s+(?:https?://)?' + T + '/?$'), needs: ['scan'], gives: 'home', out: '<html><title>Acme Corp</title>\n<h1>Coming soon</h1>\n<!-- TODO: remove /notes.txt before launch -->\n</html>\n\nSee the comment? A developer mentioned a file, notes.txt.' }
+        ],
+        flag: 'THM{easy_peasy_recon}'
       },
       normal: {
-        limit: 0, hintsOn: true, chipsOn: false,
-        intro: 'NORMAL: web box. Target 10.10.11.42 (alias: target). No suggestions; hints cost you.',
-        hints: ['Scan it. Not every web port is 80.', 'Check robots.txt on the second web port.', 'Walk into the folder it mentions.', 'Fetch that file. It looks encoded.', 'Decode it with base64 -d.', 'You have credentials and an SSH port.', 'Look around the home folder.'],
+        tag: 'Normal', sub: 'Unguided. 5 to 10 minutes.', limit: 0, hintsOn: true, strikes: 0,
+        desc: 'A realistic little web box: ports, a hidden folder, encoded loot and an SSH login. You get a task list but no commands. Hints are available, and they are counted.',
+        mission: ['ROOM: Backup Blues', 'A small company left something lying around on ' + IP + ' (alias "target").', 'Get a shell, then capture the flag. The task list above shows the route, not the commands. That part is up to you.'],
+        tasks: [
+          { tok: 'scan', t: 'Find every open port' }, { tok: 'robots', t: 'See what the web server asks crawlers to ignore' }, { tok: 'listing', t: 'Open the folder it tried to hide' },
+          { tok: 'b64', t: 'Grab the interesting file' }, { tok: 'creds', t: 'Decode it' }, { tok: 'shell', t: 'Log in over SSH' }, { tok: 'flag', t: 'Read the flag, then submit it' }
+        ],
+        hints: ['Scan it. Not every web server runs on port 80.', 'Check robots.txt on the second web port.', 'Walk into the folder it mentions.', 'Fetch that file. It looks encoded.', 'Decode it with base64 -d.', 'You have credentials and an SSH port.', 'Look around with ls, then cat the flag.'],
         acts: [
           { re: new RegExp('^nmap\\b.*' + T), gives: 'scan', out: 'Starting Nmap 7.94\nPORT     STATE SERVICE\n22/tcp   open  ssh\n80/tcp   open  http\n8080/tcp open  http-alt\nNmap done: 1 IP address (1 host up)' },
           { re: new RegExp('^curl\\b.*' + T + ':8080/robots\\.txt'), needs: ['scan'], gives: 'robots', out: 'User-agent: *\nDisallow: /backup/' },
@@ -1126,103 +1140,142 @@
           { re: new RegExp('^curl\\b.*' + T + ':8080/backup/?$'), needs: ['robots'], gives: 'listing', out: 'Index of /backup\n  db.bak.b64    2.1K' },
           { re: new RegExp('base64\\s+(-d|--decode)'), has: B64, needs: ['b64'], gives: 'creds', out: 'svc_admin:Sup3rS3cret!' },
           { re: new RegExp('^ssh\\b.*svc_admin@' + T), needs: ['creds'], out: "svc_admin@target's password:", ask: { re: /^Sup3rS3cret!$/, gives: 'shell', out: 'Welcome to Ubuntu 22.04 LTS\nYou have a shell as svc_admin. Try ls and cat.' } },
-          { re: /^cat\s+flag\.txt$/, needs: ['shell'], gives: 'flag', out: 'FLAG{b64_is_not_encryption}' },
+          { re: /^cat\s+flag\.txt$/, needs: ['shell'], gives: 'flag', out: 'THM{b64_is_not_encryption}' },
           { re: /^ls\b/, needs: ['shell'], out: 'flag.txt  notes.md' }
-        ]
+        ],
+        flag: 'THM{b64_is_not_encryption}'
       },
       impossible: {
-        limit: 180, hintsOn: false, chipsOn: false,
-        intro: 'IMPOSSIBLE: hardened box. 3 minutes. No hints. Target 10.10.11.42 (alias: target). The IDS is watching.',
+        tag: 'Impossible', sub: 'No help. 4 minutes. 5 strikes.', limit: 240, hintsOn: false, strikes: 5,
+        desc: 'Nine stages. No hints, no task list, no mercy. A clock runs and the IDS locks you out after 5 strikes (wrong guesses, blocked requests, failed logins). Almost nobody finishes.',
+        mission: ['ROOM: Ghost in the Shell', 'Hardened box at ' + IP + ' (alias "target"). It logs everything.', 'No map this time. Enumerate, pivot, escalate. Root flag only.'],
+        tasks: [],
         hints: [],
         acts: [
           { re: new RegExp('^nmap\\b(?=.*-p-)(?=.*' + T + ')'), gives: 'allports', out: 'Starting Nmap 7.94 (all 65535 ports)\nPORT      STATE SERVICE\n22/tcp    open  ssh\n80/tcp    open  http\n31337/tcp open  Elite\nNmap done: 1 IP address (1 host up)' },
-          { re: new RegExp('^nmap\\b.*' + T), out: 'Starting Nmap 7.94\nPORT   STATE SERVICE\n22/tcp open  ssh\n80/tcp open  http\nNothing else on the top 1000 ports. Maybe look wider.' },
+          { re: new RegExp('^nmap\\b.*' + T), out: 'Starting Nmap 7.94\nPORT   STATE SERVICE\n22/tcp open  ssh\n80/tcp open  http\nNothing else on the top 1000 ports.' },
           { re: new RegExp('^nc\\b.*' + T + '\\s+31337'), needs: ['allports'], gives: 'banner', out: 'AUTH SERVICE v0.9\nChallenge token (rot13): ' + ROT + '\nDecode it and send it in an X-Key header to the web server.' },
           { re: new RegExp('(rot13|tr\\b.*N-ZA-Mn-za-m).*' + ROT + '|' + ROT + '.*(rot13|tr\\b.*N-ZA-Mn-za-m)'), needs: ['banner'], gives: 'key', out: 'secret_key_9' },
-          { re: new RegExp('^curl\\b(?=.*-H\\s*["\']?X-Key:\\s*secret_key_9)(?=.*' + T + "/export\\?id=.*(?:'|%27).*(?:\\bor\\b|%20or%20|\\+or\\+))", 'i'), needs: ['key'], gives: 'hash', out: 'id | user  | hash\n 1 | root  | 5f4dcc3b5aa765d61d8327deb882cf99\n 2 | guest | 084e0343a0486ff05530df6c705c8bb4' },
-          { re: new RegExp('^curl\\b(?=.*-H\\s*["\']?X-Key:\\s*secret_key_9)(?=.*' + T + '/export\\?id=)'), needs: ['key'], out: 'id | user  | hash\n 1 | guest | (no access)\nSomething about this input handling feels loose.' },
+          { re: new RegExp('^curl\\b(?=.*-H\\s*["\']?X-Key:\\s*secret_key_9)(?=.*' + T + "/export\\?id=.*(?:'|%27).*(?:\\bor\\b|%20or%20|\\+or\\+))", 'i'), needs: ['key'], gives: 'hash', out: 'id | user   | hash\n 1 | root   | ' + HASH_R + '\n 2 | deploy | ' + HASH_D + '\n 3 | guest  | (no access)' },
+          { re: new RegExp('^curl\\b(?=.*-H\\s*["\']?X-Key:\\s*secret_key_9)(?=.*' + T + '/export\\?id=)'), needs: ['key'], strike: 'Request flagged by the WAF.', out: 'id | user  | hash\n 1 | guest | (no access)' },
           { re: new RegExp('^curl\\b(?=.*-H\\s*["\']?X-Key:\\s*secret_key_9)(?=.*' + T + ')'), needs: ['key'], gives: 'dash', out: 'Internal dashboard\n  /export?id=<n>   report export' },
-          { re: new RegExp('^curl\\b.*' + T), out: '403 Forbidden' },
-          { re: /^(hashcat|john|crack)\b.*5f4dcc3b5aa765d61d8327deb882cf99/, needs: ['hash'], gives: 'pw', out: '5f4dcc3b5aa765d61d8327deb882cf99:password\nStatus: Cracked' },
-          { re: new RegExp('^ssh\\b.*root@' + T), needs: ['pw'], out: "root@target's password:", ask: { re: /^password$/, gives: 'shell', out: 'root@target:~# you are root. Try cat /root/flag.txt' } },
-          { re: /^cat\s+\/root\/flag\.txt$/, needs: ['shell'], gives: 'flag', out: 'FLAG{no_hints_no_mercy}' }
-        ]
+          { re: new RegExp('^curl\\b.*' + T), strike: '403 Forbidden. The IDS noticed.', out: '403 Forbidden' },
+          { re: new RegExp('^(hashcat|john|crack)\\b.*' + HASH_D), needs: ['hash'], gives: 'pw', out: HASH_D + ':letmein123\nStatus: Cracked' },
+          { re: new RegExp('^(hashcat|john|crack)\\b.*' + HASH_R), needs: ['hash'], out: 'Exhausted. Not in the wordlist. Do not waste time on this one.' },
+          { re: new RegExp('^ssh\\b.*deploy@' + T), needs: ['pw'], out: "deploy@target's password:", ask: { re: /^letmein123$/, gives: 'shell', out: 'deploy@target:~$ you are in as deploy (not root).' } },
+          { re: new RegExp('^ssh\\b.*root@' + T), strike: 'Permission denied (publickey). Logged.', out: 'Permission denied (publickey).' },
+          { re: /^sudo\s+-l\b/, needs: ['shell'], gives: 'sudol', out: 'User deploy may run the following commands:\n    (root) NOPASSWD: /usr/bin/find' },
+          { re: /^sudo\s+find\b.*-exec\s+\/bin\/(ba)?sh/, needs: ['shell'], gives: 'root', out: '# whoami\nroot' },
+          { re: /^cat\s+\/root\/flag\.txt$/, needs: ['root'], gives: 'flag', out: 'THM{no_hints_no_mercy}' },
+          { re: /^cat\s+\/root\/flag\.txt$/, needs: ['shell'], strike: 'cat: /root/flag.txt: Permission denied', out: 'cat: /root/flag.txt: Permission denied' },
+          { re: /^(ls|id|whoami)\b/, needs: ['shell'], out: 'deploy' }
+        ],
+        flag: 'THM{no_hints_no_mercy}'
       }
     };
-    var FLAGS = { easy: 'FLAG{easy_peasy_recon}', normal: 'FLAG{b64_is_not_encryption}', impossible: 'FLAG{no_hints_no_mercy}' };
     var lvKey = 'easy', st = null, timer = 0, idle = true;
     function fmt(s) { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
     function bestOf(k) { try { return localStorage.getItem('gbest_' + k); } catch (e) { return null; } }
     function showBest() { var b = bestOf(lvKey); bEl.textContent = b ? fmt(+b) : '-'; }
-    function setIdle(msg) {
-      idle = true; clearInterval(timer); st = null; form.querySelector('input').disabled = true; chips.textContent = ''; sugBox.hidden = true; hintB.disabled = true;
-      startB.querySelector('span').textContent = 'Start'; tEl.textContent = LV[lvKey].limit ? fmt(LV[lvKey].limit) : '0:00'; hEl.textContent = '0'; showBest();
-      lvBtns.forEach(function (b) { b.disabled = false; });
-      if (msg !== false) { out.textContent = ''; pr(out, msg || 'Pick a difficulty and press Start.', 'm'); }
+    function el(tag, cls, txt) { var d = document.createElement(tag); if (cls) d.className = cls; if (txt != null) d.textContent = txt; return d; }
+    function showDesc() {
+      var L = LV[lvKey]; descEl.textContent = '';
+      var h = el('div', 'gd-h'); h.appendChild(el('b', 'gd-t', L.tag)); h.appendChild(el('span', 'gd-s', L.sub)); descEl.appendChild(h); descEl.appendChild(el('p', '', L.desc));
     }
-    function sugNext() {
-      chips.textContent = ''; sugBox.hidden = true; if (!st || !LV[lvKey].chipsOn) return;
-      var a = LV[lvKey].acts.filter(function (x) { return x.sug && !st.tok[x.gives] && (x.needs || []).every(function (n) { return st.tok[n]; }); })[0];
-      if (!a || st.tok.flag) return;
-      var b = document.createElement('button'); b.type = 'button'; b.textContent = a.sug;
-      b.addEventListener('click', function () { inp.value = a.sug; inp.focus(); });
-      chips.appendChild(b); sugBox.hidden = false;
+    function sendCmd(c, run) { inp.value = c; if (run) { form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true })); } else inp.focus(); }
+    function renderTask() {
+      var L = LV[lvKey]; taskEl.textContent = ''; var tok = st ? st.tok : {};
+      if (!st || !L.tasks.length) { taskEl.hidden = true; barEl.style.width = '0'; barEl.parentNode.hidden = !L.tasks.length; if (st && lvKey === 'impossible') { taskEl.hidden = false; taskEl.className = 'g-task hard'; taskEl.appendChild(el('div', 'gt-k', 'No guidance')); taskEl.appendChild(el('p', '', 'Root the box. Watch the clock and the strikes.')); } return; }
+      taskEl.hidden = false; var done = L.tasks.filter(function (t) { return tok[t.tok]; }).length;
+      barEl.parentNode.hidden = false; barEl.style.width = Math.round(done / L.tasks.length * 100) + '%';
+      if (lvKey === 'easy') {
+        var cur = L.tasks.filter(function (t) { return !tok[t.tok]; })[0]; taskEl.className = 'g-task guided';
+        if (!cur) { taskEl.appendChild(el('div', 'gt-k', 'Complete')); return; }
+        var n = L.tasks.indexOf(cur) + 1;
+        taskEl.appendChild(el('div', 'gt-k', 'Task ' + n + ' of ' + L.tasks.length));
+        taskEl.appendChild(el('h4', '', cur.t)); taskEl.appendChild(el('p', '', cur.why));
+        var row = el('div', 'gt-cmd'); row.appendChild(el('code', '', cur.cmd));
+        var rb = el('button', 'gt-run'); rb.type = 'button'; rb.appendChild(el('span', '', 'Run')); rb.addEventListener('click', function () { sendCmd(cur.cmd, true); });
+        var cb = el('button', 'gt-copy'); cb.type = 'button'; cb.textContent = 'Put in box'; cb.addEventListener('click', function () { sendCmd(cur.cmd, false); });
+        row.appendChild(rb); row.appendChild(cb); taskEl.appendChild(row);
+      } else {
+        taskEl.className = 'g-task list'; taskEl.appendChild(el('div', 'gt-k', 'Tasks ' + done + ' of ' + L.tasks.length));
+        var ul = el('ul', 'gt-l'); L.tasks.forEach(function (t, i) { var li = el('li', tok[t.tok] ? 'ok' : '', t.t); li.setAttribute('data-n', i + 1); ul.appendChild(li); }); taskEl.appendChild(ul);
+      }
+    }
+    function setIdle(msg) {
+      idle = true; clearInterval(timer); st = null; inp.disabled = true; hintB.disabled = true; var L = LV[lvKey];
+      startB.querySelector('span').textContent = 'Start the room'; startB.classList.add('primary'); tEl.textContent = L.limit ? fmt(L.limit) : '0:00'; hEl.textContent = '0';
+      aWrap.hidden = !L.strikes; aEl.textContent = '0/' + L.strikes; showBest(); showDesc(); renderTask(); taskEl.hidden = true; barEl.parentNode.hidden = true;
+      lvBtns.forEach(function (b) { b.disabled = false; });
+      if (msg !== false) { out.textContent = ''; pr(out, 'Pick a difficulty above, then press "Start the room".', 'm'); pr(out, 'Target: ' + IP + '   You: 10.10.14.7', 'm'); }
     }
     function start() {
       clearInterval(timer);
-      var L = LV[lvKey]; st = { tok: {}, hints: 0, t0: Date.now(), ask: null, done: false }; idle = false;
-      out.textContent = ''; pr(out, L.intro, 'y'); pr(out, 'Type help for commands. Find the flag, then: submit FLAG{...}', 'm');
-      inp.disabled = false; hintB.disabled = !L.hintsOn; startB.querySelector('span').textContent = 'Restart'; hEl.textContent = '0';
-      lvBtns.forEach(function (b) { b.disabled = b.dataset.lv !== lvKey ? false : false; });
-      timer = setInterval(tick, 250); tick(); sugNext(); setTimeout(function () { try { inp.focus({ preventScroll: true }); } catch (e) { inp.focus(); } }, 50);
+      var L = LV[lvKey]; st = { tok: {}, hints: 0, t0: Date.now(), ask: null, done: false, strikes: 0 }; idle = false;
+      out.textContent = ''; pr(out, L.mission[0], 'y'); pr(out, L.mission[1]); pr(out, L.mission[2], 'm'); pr(out, '', ''); pr(out, 'Type help any time.', 'm');
+      inp.disabled = false; hintB.disabled = !L.hintsOn; startB.querySelector('span').textContent = 'Restart'; startB.classList.remove('primary'); hEl.textContent = '0';
+      aWrap.hidden = !L.strikes; aEl.textContent = '0/' + L.strikes;
+      timer = setInterval(tick, 250); tick(); renderTask(); setTimeout(function () { try { inp.focus({ preventScroll: true }); } catch (e) { inp.focus(); } }, 50);
     }
+    function lock(msg) { st.done = true; clearInterval(timer); pr(out, msg, 'r'); inp.disabled = true; hintB.disabled = true; startB.classList.add('primary'); startB.querySelector('span').textContent = 'Try again'; }
     function tick() {
-      if (!st || st.done) return; var el = (Date.now() - st.t0) / 1000, L = LV[lvKey];
-      if (L.limit) {
-        var left = L.limit - el; tEl.textContent = fmt(left);
-        if (left <= 0) { st.done = true; clearInterval(timer); pr(out, 'IDS TRIGGERED. Connection dropped. Press Restart to try again.', 'r'); inp.disabled = true; hintB.disabled = true; chips.textContent = ''; }
-      } else tEl.textContent = fmt(el);
+      if (!st || st.done) return; var e = (Date.now() - st.t0) / 1000, L = LV[lvKey];
+      if (L.limit) { var left = L.limit - e; tEl.textContent = fmt(left); tEl.parentNode.classList.toggle('low', left < 30); if (left <= 0) lock('TIME. The IDS closed your session. Press "Try again".'); }
+      else tEl.textContent = fmt(e);
+    }
+    function strike(why) {
+      var L = LV[lvKey]; if (!L.strikes) return; st.strikes++; aEl.textContent = st.strikes + '/' + L.strikes; pr(out, 'STRIKE ' + st.strikes + '/' + L.strikes + ': ' + why, 'r');
+      box.classList.add('shake'); setTimeout(function () { box.classList.remove('shake'); }, 400);
+      if (st.strikes >= L.strikes) lock('IDS TRIGGERED. 5 strikes. Connection dropped. Press "Try again".');
     }
     function win() {
-      st.done = true; clearInterval(timer); var el = Math.round((Date.now() - st.t0) / 1000);
-      pr(out, 'FLAG ACCEPTED. Box owned in ' + fmt(el) + ' with ' + st.hints + ' hint' + (st.hints === 1 ? '' : 's') + '.', 'ok');
-      var prev = bestOf(lvKey); if (!prev || el < +prev) { try { localStorage.setItem('gbest_' + lvKey, String(el)); } catch (e) {} pr(out, 'New best time.', 'y'); }
-      if (lvKey === 'impossible') { pr(out, 'Respect. Title unlocked: Red Team Legend. Now go hire the guy who built this.', 'y'); try { localStorage.setItem('legend', '1'); } catch (e) {} }
-      else pr(out, 'Try the next difficulty.', 'm');
-      inp.disabled = true; hintB.disabled = true; chips.textContent = ''; showBest(); box.classList.add('won'); setTimeout(function () { box.classList.remove('won'); }, 1600);
-      startB.querySelector('span').textContent = 'Play again';
+      st.done = true; clearInterval(timer); var e = Math.round((Date.now() - st.t0) / 1000); st.tok.done = 1; renderTask(); barEl.style.width = '100%';
+      pr(out, 'ROOM COMPLETE. Flag accepted in ' + fmt(e) + ' with ' + st.hints + ' hint' + (st.hints === 1 ? '' : 's') + (LV[lvKey].strikes ? ' and ' + st.strikes + ' strike' + (st.strikes === 1 ? '' : 's') : '') + '.', 'ok');
+      var prev = bestOf(lvKey); if (!prev || e < +prev) { try { localStorage.setItem('gbest_' + lvKey, String(e)); } catch (x) {} pr(out, 'New best time.', 'y'); }
+      if (lvKey === 'impossible') { pr(out, 'Respect. Title unlocked: Red Team Legend. Now go hire the guy who built this.', 'y'); try { localStorage.setItem('legend', '1'); } catch (x) {} }
+      else pr(out, lvKey === 'easy' ? 'You just did a real recon-to-flag chain. Try Normal next.' : 'Nice. Think you can survive Impossible?', 'm');
+      inp.disabled = true; hintB.disabled = true; showBest(); box.classList.add('won'); setTimeout(function () { box.classList.remove('won'); }, 1600);
+      startB.querySelector('span').textContent = 'Play again'; startB.classList.add('primary');
     }
     function run(line) {
-      var raw = line.trim(); if (!raw || !st || st.done) return;
+      var raw = line.trim().replace(/\s+/g, ' '); if (!raw || !st || st.done) return;
       pr(out, 'attacker@kali:~$ ' + (st.ask ? '********' : raw), 'c');
       var L = LV[lvKey];
       if (st.ask) {
-        if (st.ask.re.test(raw)) { var k = st.ask; st.ask = null; st.tok[k.gives] = 1; pr(out, k.out, 'ok'); }
-        else { st.fail = (st.fail || 0) + 1; pr(out, 'Permission denied, please try again.', 'r'); if (st.fail >= 3) { st.ask = null; st.fail = 0; pr(out, 'Connection closed after 3 failed attempts.', 'm'); } }
-        sugNext(); return;
+        if (st.ask.re.test(raw)) { var k = st.ask; st.ask = null; st.fail = 0; st.tok[k.gives] = 1; pr(out, k.out, 'ok'); renderTask(); }
+        else { st.fail = (st.fail || 0) + 1; pr(out, 'Permission denied, please try again.', 'r'); strike('failed login.'); if (st.fail >= 3) { st.ask = null; st.fail = 0; pr(out, 'Connection closed after 3 failed attempts.', 'm'); } }
+        return;
       }
-      var low = raw, name = low.split(/\s+/)[0].toLowerCase();
-      var m = raw.match(/^(?:submit\s+)?(FLAG\{[^}]*\})$/i);
-      if (m) { if (m[1] === FLAGS[lvKey]) win(); else pr(out, 'Wrong flag. Keep digging.', 'r'); return; }
-      if (name === 'target' || name === '10.10.11.42') { pr(out, 'target is the box you are attacking: 10.10.11.42. Use it as an argument, e.g. nmap target', 'y'); return; }
-      if (name === 'help') { pr(out, 'Target: 10.10.11.42 (alias: target). Your IP: 10.10.14.7.', 'y'); pr(out, 'nmap, curl, nc, ssh, cat, ls, base64, tr, hashcat, hint, clear, submit FLAG{...}', 'a'); pr(out, 'Tip: the host is "target". Flags look like FLAG{...}.', 'm'); return; }
+      var name = raw.split(' ')[0].toLowerCase();
+      var m = raw.match(/^(?:submit\s+)?(THM\{[^}]*\})$/i);
+      if (m) { if (!st.tok.flag) { pr(out, 'You have not found a flag yet. Keep going.', 'r'); return; } if (m[1] === L.flag) win(); else { pr(out, 'Wrong flag. Keep digging.', 'r'); strike('wrong flag.'); } return; }
+      if (name === 'target' || name === IP) { pr(out, '"target" is the machine you are attacking (' + IP + '). Use it inside a command, e.g. nmap target', 'y'); return; }
+      if (name === 'help') {
+        pr(out, 'Target: ' + IP + ' (alias: target). Your IP: 10.10.14.7.', 'y');
+        pr(out, lvKey === 'easy' ? 'You do not need to type anything: press Run on the task card.' : 'Tools: nmap, curl, nc, ssh, cat, ls, base64, tr, sudo, hashcat, hint, clear, submit THM{...}', 'a'); return;
+      }
       if (name === 'clear') { out.textContent = ''; return; }
       if (name === 'hint') { hintB.click(); return; }
       var hit = null;
-      L.acts.some(function (a) { if (a.sugOnly || !a.re.test(raw)) return false; if (a.has && raw.indexOf(a.has) < 0) return false; if ((a.needs || []).every(function (n) { return st.tok[n]; })) { hit = a; return true; } return false; });
+      L.acts.some(function (a) { if (!a.re.test(raw)) return false; if (a.has && raw.indexOf(a.has) < 0) return false; if ((a.needs || []).every(function (n) { return st.tok[n]; })) { hit = a; return true; } return false; });
       if (hit) {
-        pr(out, hit.out, 'a'); if (hit.gives && !hit.ask) st.tok[hit.gives] = 1; if (hit.ask) st.ask = hit.ask;
-        if (st.tok.flag && !hit.ask && /FLAG\{/.test(hit.out)) pr(out, 'Flag found. Now: submit it.', 'y');
-        sugNext(); return;
+        pr(out, hit.out, hit.strike ? 'r' : 'a'); if (hit.gives && !hit.ask) st.tok[hit.gives] = 1; if (hit.ask) st.ask = hit.ask;
+        if (hit.strike) strike(hit.strike);
+        if (st.tok.flag && !hit.ask && /THM\{/.test(hit.out) && lvKey !== 'easy') pr(out, 'Flag found. Now submit it: submit THM{...}', 'y');
+        renderTask(); return;
       }
-      var generic = { nmap: 'Host seems down. Did you use the right target? (try: target)', curl: 'curl: (22) The requested URL returned error: 404', nc: 'nc: connection refused', ssh: 'ssh: Permission denied (publickey).', cat: 'cat: no such file here', ls: 'tools  wordlists  loot', base64: 'base64: nothing useful to decode here', tr: 'nothing useful here', hashcat: 'No hashes loaded.', john: 'No password hashes loaded.', echo: raw.replace(/^echo\s*/, ''), pwd: '/home/attacker', whoami: 'attacker', id: 'uid=1000(attacker)' };
-      if (generic.hasOwnProperty(name)) pr(out, generic[name], 'm'); else pr(out, name + ': command not found. Type help.', 'r');
+      var generic = { nmap: 'Host seems down. Did you use the right target? (try: target)', curl: 'curl: (22) The requested URL returned error: 404', nc: 'nc: connection refused', ssh: 'ssh: Permission denied (publickey).', cat: 'cat: no such file here', ls: 'tools  wordlists  loot', base64: 'base64: nothing useful to decode here', tr: 'nothing useful here', hashcat: 'No hashes loaded.', john: 'No password hashes loaded.', sudo: 'sudo: a password is required', echo: raw.replace(/^echo\s*/, ''), pwd: '/home/attacker', whoami: 'attacker', id: 'uid=1000(attacker)' };
+      if (generic.hasOwnProperty(name)) { pr(out, generic[name], 'm'); if (/^(nmap|curl|nc|ssh)$/.test(name)) strike('pointless request logged.'); }
+      else pr(out, name + ': command not found. Type help.', 'r');
     }
     form.addEventListener('submit', function (e) { e.preventDefault(); var v = inp.value; inp.value = ''; run(v); });
     startB.addEventListener('click', start);
     hintB.addEventListener('click', function () {
       if (!st || st.done) return; var L = LV[lvKey]; if (!L.hintsOn) return;
-      var n = Object.keys(st.tok).length, h = L.hints[Math.min(n, L.hints.length - 1)]; st.hints++; hEl.textContent = String(st.hints); pr(out, 'HINT ' + st.hints + ': ' + h + '  [target 10.10.11.42, alias "target"]', 'y');
+      st.hints++; hEl.textContent = String(st.hints);
+      if (lvKey === 'easy') { var cur = L.tasks.filter(function (t) { return !st.tok[t.tok]; })[0]; pr(out, 'HINT: ' + (cur ? 'press Run on the task card, or type: ' + cur.cmd : 'you are done'), 'y'); return; }
+      var n = Object.keys(st.tok).length, h = L.hints[Math.min(n, L.hints.length - 1)]; pr(out, 'HINT ' + st.hints + ': ' + h + '  [target ' + IP + ', alias "target"]', 'y');
     });
     lvBtns.forEach(function (b) {
       b.addEventListener('click', function () {
