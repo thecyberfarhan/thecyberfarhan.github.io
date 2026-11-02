@@ -812,7 +812,25 @@
   }
   nEl.addEventListener('mouseenter', function () { hovering = true; clearTimeout(hideT); });
   nEl.addEventListener('mouseleave', function () { hovering = false; clearTimeout(hideT); hideT = setTimeout(hideNudge, 5000); });
-  function hideNudge() { nEl.classList.remove('on'); anchor = null; if (spoke) { spoke.classList.remove('speak'); spoke = null; } clearTimeout(hideT); }
+  var hiding = false;
+  function frames(el, kind, dir) {
+    var er = el.getBoundingClientRect(), w = nEl.offsetWidth, h = nEl.offsetHeight, m = /translate3d\(([-\d.]+)px,\s*([-\d.]+)px/.exec(nEl.style.transform) || [0, 0, 0], x = +m[1], y = +m[2];
+    var s = Math.max(0.1, Math.min(er.width / w, er.height / h, 0.45)), sx = er.left + er.width / 2 - w * s / 2, sy = er.top + er.height / 2 - h * s / 2;
+    var T = function (px, py, sc, extra) { return 'translate3d(' + px.toFixed(1) + 'px,' + py.toFixed(1) + 'px,0) ' + (extra || '') + 'scale(' + sc + ')'; };
+    var extraStart = kind === 'flip' ? 'perspective(700px) rotateX(75deg) ' : kind === 'slide' ? 'rotate(-16deg) ' : kind === 'drop' ? 'rotate(12deg) ' : '';
+    var f = [{ transform: T(sx, sy, s, extraStart), opacity: 0 }, { transform: T(x, y, kind === 'glitch' ? 1 : 1.07), opacity: 1, offset: 0.72 }, { transform: T(x, y, 1), opacity: 1 }];
+    if (kind === 'glitch') f.splice(1, 0, { transform: T(sx + (x - sx) * 0.4 + 6, sy + (y - sy) * 0.4, 0.6), opacity: 1, offset: 0.35 });
+    return dir === 'in' ? f : f.slice().reverse().filter(function (z, i, a) { return a.length === 3 ? i !== 1 : true; });
+  }
+  function hideNudge() {
+    if (hiding || !nEl.classList.contains('on')) { anchor = null; clearTimeout(hideT); return; }
+    var el = anchor; anchor = null; clearTimeout(hideT);
+    if (spoke) { spoke.classList.remove('speak'); spoke = null; }
+    if (el && nEl.animate && el.isConnected) {
+      hiding = true; var fr = frames(el, 'pop', 'in'), an = nEl.animate([fr[2], fr[0]], { duration: 260, easing: 'cubic-bezier(.5,0,.8,.4)', fill: 'forwards' });
+      an.onfinish = function () { nEl.classList.remove('on'); hiding = false; an.cancel(); };
+    } else nEl.classList.remove('on');
+  }
   function inView(el) { var r = el.getBoundingClientRect(); return r.top > 90 && r.bottom < innerHeight - 40 && r.left >= 0 && r.right <= innerWidth; }
   function sectionNow() {
     var sky = $('.sky'); if (sky) { var r = sky.getBoundingClientRect(); if (r.top < innerHeight * 0.6 && r.bottom > innerHeight * 0.4) return 'sky'; }
@@ -868,7 +886,8 @@
     if (spoke) spoke.classList.remove('speak'); spoke = el; if (el) { el.classList.remove('speak'); void el.offsetWidth; el.classList.add('speak'); }
     anchor = el; nEl.className = 'nudge t-' + theme + ' a-' + anim + (el ? '' : ' free'); void nEl.offsetWidth;
     if (!el) nEl.style.transform = 'translate3d(' + Math.round(innerWidth / 2 - 160) + 'px,' + (innerHeight - 260) + 'px,0)';
-    place(); nEl.classList.add('on');
+    place(); nEl.classList.add('on'); hiding = false;
+    if (el && nEl.animate) { var kind = anim === 'drop' ? 'drop' : anim; nEl.animate(frames(el, kind, 'in'), { duration: kind === 'glitch' ? 460 : 620, easing: kind === 'glitch' ? 'steps(7,end)' : 'cubic-bezier(.2,.9,.25,1)' }); }
     lastN = performance.now(); nCount++;
     clearTimeout(hideT); if (!hovering) hideT = setTimeout(hideNudge, 14000);
     ping(theme);
