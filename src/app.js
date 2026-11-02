@@ -1,6 +1,8 @@
 (function () {
   'use strict';
   var root = document.documentElement;
+  try { if (window.top !== window.self) { root.style.display = 'none'; window.top.location = window.location.href; } } catch (e) { root.style.display = 'none'; }
+  ['#tm-input', '#g-input'].forEach(function (s) { var i = document.querySelector(s); if (i) i.maxLength = 200; });
   var $ = function (s, c) { return (c || document).querySelector(s); };
   var $$ = function (s, c) { return Array.prototype.slice.call((c || document).querySelectorAll(s)); };
   var motion = true;
@@ -408,7 +410,8 @@
     if (!cursorOn) { cursorOn = true; root.classList.add('has-cursor'); rx = e.clientX; ry = e.clientY; startCursor(); }
     mx = e.clientX; my = e.clientY; lastMove = performance.now();
     dot.style.transform = 'translate3d(' + mx + 'px,' + my + 'px,0)';
-    if (roam) endRoam(); else setLock(targetOf(e.target));
+    var txt = !!(e.target.closest && e.target.closest('input,textarea,[contenteditable="true"]')); dot.classList.toggle('txt', txt); ring.classList.toggle('txt', txt);
+    if (roam) endRoam(); else setLock(txt ? null : targetOf(e.target));
   }, { passive: true });
 
   /* idle roamers: after 30 seconds of a still mouse the reticle becomes a ship or a mecha */
@@ -985,7 +988,7 @@
   var tm = $('#tm'), tmOut = $('#tm-out'), tmIn = $('#tm-input'), tmBtn = $('#tm-btn');
   var tmHist = [], tmHi = 0, tmBooted = false;
   function pr(box, text, cls) {
-    var d = document.createElement('div'); if (cls) d.className = cls; d.textContent = text; box.appendChild(d); box.scrollTop = box.scrollHeight; requestAnimationFrame(function () { box.scrollTop = box.scrollHeight; }); return d;
+    var d = document.createElement('div'); if (cls) d.className = cls; d.textContent = text; box.appendChild(d); while (box.childElementCount > 400) box.removeChild(box.firstChild); box.scrollTop = box.scrollHeight; requestAnimationFrame(function () { box.scrollTop = box.scrollHeight; }); return d;
   }
   function prLink(box, label, href, dl) {
     var d = document.createElement('div'), a = document.createElement('a'); a.href = href; a.textContent = label; if (dl) a.setAttribute('download', 'Farhan_Hussain_Resume.pdf'); else { a.target = '_blank'; a.rel = 'noopener'; }
@@ -1071,6 +1074,9 @@
   };
   var CNAMES = Object.keys(CMDS);
   /* ---------- a tiny read-only shell: virtual filesystem, cd, ls, cat and friends ---------- */
+  /* abuse guard: at most 12 commands per 2 seconds per terminal */
+  function rate(b) { var n = Date.now(); b.t = (b.t || []).filter(function (x) { return n - x < 2000; }); if (b.t.length >= 12) return false; b.t.push(n); return true; }
+  var tmRate = {}, gRate = {};
   var HOME = {
     about: { 'whoami.txt': ['Farhan Hussain. Web and API penetration tester, CPENT certified.', 'Based in Bahawalnagar, Pakistan. Open to junior pentest roles.'], 'README.md': ['# About', 'What I do: web and API penetration testing, reported clearly.', 'How I work: labs, public writeups, a repeatable method.', 'What I build: Python tooling that removes repetitive work.'] },
     journey: { 'timeline.txt': ['2023-2025  Intermediate (HSSC), ICS, Al-Hayat College, 87%', 'Labs       TryHackMe (100+ rooms), Hack The Box, HTB Academy, PicoCTF, PortSwigger, Hacker101', 'Writeups   37 published on GitHub', 'Tooling    Python venv manager (~1,800 LOC), automation scripts', '2026       CPENT certified (EC-Council), TryHackMe top 3%', 'Now        Open to work: Junior Penetration Tester / Web and API Security Tester'] },
@@ -1152,8 +1158,9 @@
   FSCMD.dir = FSCMD.ls; FSCMD.ll = function (o, a) { FSCMD.ls(o, ['-l'].concat(a)); }; FSCMD.la = function (o, a) { FSCMD.ls(o, ['-a'].concat(a)); };
   FSCMD.rm = function (o, a) { if (/^-\w*r/.test(a[0] || '') && a.indexOf('/') >= 0) CMDS.rm(o); else pr(o, 'rm: cannot remove ' + (a.filter(function (x) { return x.charAt(0) !== '-'; })[0] || '') + ': Read-only file system', 'r'); };
   function runTerm(line) {
-    var raw = line.trim(); if (!raw) return;
-    pr(tmOut, promptStr() + raw, 'c'); tmHist.push(raw); tmHi = tmHist.length;
+    var raw = line.trim().slice(0, 200); if (!raw) return;
+    if (!rate(tmRate)) { pr(tmOut, 'Too many commands too fast. Slow down.', 'r'); return; }
+    pr(tmOut, promptStr() + raw, 'c'); tmHist.push(raw); if (tmHist.length > 100) tmHist.shift(); tmHi = tmHist.length;
     var toks = raw.match(/"[^"]*"|'[^']*'|\S+/g) || [], name = toks[0], args = toks.slice(1), low = name.toLowerCase();
     if (name.indexOf('./') === 0) { var f = name.slice(2), n = lookup(cwd.concat(f)); if (n && n.exec) { CMDS[n.exec](tmOut, ''); } else pr(tmOut, name + ': Permission denied or not found', 'r'); tmOut.scrollTop = tmOut.scrollHeight; return; }
     if (FSCMD.hasOwnProperty(low)) FSCMD[low](tmOut, args);
@@ -1306,7 +1313,9 @@
       lvBtns.forEach(function (b) { b.disabled = false; });
       if (msg !== false) { out.textContent = ''; }
     }
+    var lastStart = 0;
     function start() {
+      var nowS = Date.now(); if (nowS - lastStart < 400) return; lastStart = nowS;
       clearInterval(timer);
       overEl.hidden = true; var L = LV[lvKey]; st = { tok: {}, hints: 0, t0: Date.now(), ask: null, done: false, strikes: 0 }; idle = false;
       out.textContent = ''; pr(out, L.mission[0], 'y'); pr(out, L.mission[1]); pr(out, L.mission[2], 'm'); pr(out, '', ''); pr(out, 'Type help any time.', 'm');
@@ -1335,7 +1344,8 @@
       startB.querySelector('span').textContent = 'Play again'; startB.classList.add('primary');
     }
     function run(line) {
-      var raw = line.trim().replace(/\s+/g, ' '); if (!raw || !st || st.done) return;
+      var raw = line.trim().slice(0, 200).replace(/\s+/g, ' '); if (!raw || !st || st.done) return;
+      if (!rate(gRate)) { pr(out, 'Rate limit: too many commands too fast.', 'r'); return; }
       pr(out, 'attacker@' + host() + ':~$ ' + (st.ask ? '********' : raw), 'c');
       var L = LV[lvKey];
       if (st.ask) {
@@ -1404,8 +1414,14 @@
         else { line(s[0], s[1]); setTimeout(next, s[2]); }
       })();
     }
-    var shown = false, host = out.closest('.pm');
-    if ('IntersectionObserver' in window) { new IntersectionObserver(function (es, ob) { if (es[0].isIntersecting && !shown) { shown = true; play(); ob.disconnect(); } }, { threshold: 0.35 }).observe(host); } else play();
-    re.addEventListener('click', function () { shown = true; play(); });
+    var shown = false, host = out.closest('.pm'), grid = out.closest('.arch-grid') || host;
+    function idleView() { out.textContent = ''; line('c', '$ sudo pacman -S farhan'); var c = line('', ''); c.innerHTML = '<span class="cur"></span>'; }
+    idleView();
+    function trigger() { if (shown) return; shown = true; play(); }
+    if ('IntersectionObserver' in window) { var io = new IntersectionObserver(function (es) { if (es.some(function (x) { return x.isIntersecting; })) { trigger(); io.disconnect(); } }, { threshold: 0.05 }); io.observe(grid); } else trigger();
+    function inView() { var r = grid.getBoundingClientRect(); return r.top < innerHeight * 0.9 && r.bottom > 0; }
+    function onScroll() { if (shown) { window.removeEventListener('scroll', onScroll); return; } if (inView()) trigger(); }
+    window.addEventListener('scroll', onScroll, { passive: true }); setTimeout(onScroll, 1500);
+    var lastRe = 0; re.addEventListener('click', function () { var n = Date.now(); if (n - lastRe < 600) return; lastRe = n; shown = true; play(); });
   })();
 })();
