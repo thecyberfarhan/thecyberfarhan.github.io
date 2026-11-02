@@ -239,6 +239,18 @@
   window.addEventListener('resize', function () { moveInd(active); });
   $('#burger').addEventListener('click', function () { var o = pill.classList.toggle('open'); this.setAttribute('aria-expanded', o); });
 
+  var TITLES = { about: 'About', tools: 'Tools', proof: 'Proof of work', live: 'Live stats', contact: 'Contact' }, appTitle = $('#apptitle'), curTitle = 'Farhan';
+  function setTitle(id) {
+    var t = TITLES[id] || 'Farhan'; if (!appTitle || t === curTitle) return; curTitle = t;
+    var b = document.createElement('b'); b.textContent = t; appTitle.innerHTML = ''; appTitle.appendChild(b);
+  }
+  var tabInd = $('.tabind');
+  function moveTabInd() {
+    if (!tabInd) return; var a = $('.tabbar a.on:not(.fab)');
+    if (!a || !a.offsetWidth) { tabInd.style.opacity = 0; return; }
+    tabInd.style.opacity = 1; tabInd.style.width = a.offsetWidth + 'px'; tabInd.style.transform = 'translateX(' + a.offsetLeft + 'px)';
+  }
+  window.addEventListener('resize', moveTabInd);
   var secs = links.map(function (a) { return { a: a, s: document.getElementById(a.dataset.nav) }; });
   var hero = $('#hero'), copy = $('.hero-copy'), medalWrap = $('.hero-medal'), medal = $('.medal-stage');
   var sy = 0, ticking = false, lastY = 0, navHold = 0;
@@ -256,7 +268,7 @@
     var cur = null;
     secs.forEach(function (o) { if (o.s && o.s.getBoundingClientRect().top < innerHeight * 0.45) cur = o; });
     var nxt = cur ? cur.a : null;
-    if (nxt !== active) { active = nxt; links.forEach(function (a) { a.classList.toggle('on', a === active); }); moveInd(active); $$('.tabbar a').forEach(function (a) { a.classList.toggle('on', !!active && a.dataset.nav === active.dataset.nav); }); }
+    if (nxt !== active) { active = nxt; links.forEach(function (a) { a.classList.toggle('on', a === active); }); moveInd(active); $$('.tabbar a').forEach(function (a) { a.classList.toggle('on', !!active && a.dataset.nav === active.dataset.nav); }); setTitle(active ? active.dataset.nav : ''); moveTabInd(); }
     ticking = false;
   }
   window.addEventListener('scroll', function () { if (!ticking) { ticking = true; requestAnimationFrame(onScroll); } }, { passive: true });
@@ -917,12 +929,23 @@
   /* ---------- phone-only: share, tilt with the phone, touch roamers, haptic taps ---------- */
   var toast = document.createElement('div'); toast.className = 'toast'; toast.setAttribute('role', 'status'); document.body.appendChild(toast);
   function say(t) { toast.textContent = t; toast.classList.add('on'); clearTimeout(say.t); say.t = setTimeout(function () { toast.classList.remove('on'); }, 2200); }
-  var shareBtn = $('#share');
-  if (shareBtn) shareBtn.addEventListener('click', function () {
-    var data = { title: document.title, text: 'Farhan, CPENT-certified penetration tester. Tools, writeups and contact.', url: location.origin + location.pathname };
-    if (navigator.share) navigator.share(data).catch(function () {});
-    else if (navigator.clipboard) navigator.clipboard.writeText(data.url).then(function () { say('Link copied'); }, function () { say(data.url); }); else say(data.url);
-  });
+  var shareBtn = $('#share'), sheet = $('#sheet'), sheetBg = $('#sheetbg'), shareData = { title: document.title, text: 'Farhan, CPENT-certified penetration tester. Tools, writeups and contact.', url: location.origin + location.pathname };
+  function openSheet() { if (!sheet) return; var nat = $('.sh-native', sheet); if (nat) nat.style.display = navigator.share ? '' : 'none'; sheet.style.transform = ''; sheet.setAttribute('aria-hidden', 'false'); root.classList.add('sheet-open'); }
+  function closeSheet() { if (!sheet) return; root.classList.remove('sheet-open'); sheet.setAttribute('aria-hidden', 'true'); sheet.style.transform = ''; sheet.classList.remove('drag'); }
+  if (shareBtn) shareBtn.addEventListener('click', openSheet);
+  if (sheetBg) sheetBg.addEventListener('click', closeSheet);
+  window.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSheet(); });
+  if (sheet) {
+    sheet.addEventListener('click', function (e) {
+      var bt = e.target.closest && e.target.closest('button[data-act]'); if (!bt) { if (e.target.closest && e.target.closest('a')) setTimeout(closeSheet, 150); return; }
+      if (bt.dataset.act === 'share' && navigator.share) navigator.share(shareData).catch(function () {}).then(closeSheet);
+      else if (bt.dataset.act === 'copy') { (navigator.clipboard ? navigator.clipboard.writeText(shareData.url) : Promise.reject()).then(function () { say('Link copied'); }, function () { say(shareData.url); }); closeSheet(); }
+    });
+    var sY = 0, dY = 0, dragging = false;
+    sheet.addEventListener('touchstart', function (e) { sY = e.touches[0].clientY; dY = 0; dragging = true; sheet.classList.add('drag'); }, { passive: true });
+    sheet.addEventListener('touchmove', function (e) { if (!dragging) return; dY = Math.max(0, e.touches[0].clientY - sY); sheet.style.transform = 'translateY(' + dY + 'px)'; }, { passive: true });
+    sheet.addEventListener('touchend', function () { if (!dragging) return; dragging = false; sheet.classList.remove('drag'); if (dY > 90) closeSheet(); else sheet.style.transform = ''; });
+  }
   $$('.tabbar a, .share, .theme').forEach(function (el) { el.addEventListener('pointerdown', function () { if (navigator.vibrate && IS_TOUCH) navigator.vibrate(8); }); });
 
   if (IS_TOUCH && window.DeviceOrientationEvent) {

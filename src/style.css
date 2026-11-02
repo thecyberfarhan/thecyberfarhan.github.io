@@ -507,3 +507,38 @@ html.theming *,html.theming *::before,html.theming *::after{transition:backgroun
   .floor{left:0;right:0}
   .floor::before,.floor::after{inset:-60% -25% 0 -25%}
 }
+
+/* ---------- phone app shell: title bar, raised contact button, share sheet ---------- */
+.apptitle,.tabind,.sheet,.sheet-bg{display:none}
+@media (max-width:820px){
+  .apptitle{display:block;flex:1;height:22px;overflow:hidden;position:relative;text-align:center;margin:0 6px}
+  .apptitle b{display:block;font:700 .82rem var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--text);animation:titlein .5s var(--ease)}
+  @keyframes titlein{from{transform:translateY(120%);opacity:0}to{transform:none;opacity:1}}
+  .tabbar{position:fixed}
+  .tabbar a{position:relative;z-index:1}
+  .tabbar a.on{background:none}
+  .tabind{display:block;position:absolute;top:6px;bottom:6px;left:0;width:0;border-radius:999px;background:var(--tile);border:1px solid var(--border);opacity:0;z-index:0;transition:transform .5s cubic-bezier(.34,1.35,.5,1),width .45s var(--ease),opacity .2s;pointer-events:none}
+  .tabbar a.fab{flex:0 0 60px;height:60px;min-height:60px;margin:-22px 6px 0;padding:0;border-radius:50%;background:var(--accent);color:#fff;border:3px solid var(--bg);box-shadow:0 12px 26px color-mix(in srgb,var(--accent) 42%,transparent);transition:transform .4s cubic-bezier(.34,1.5,.5,1),box-shadow .3s}
+  .tabbar a.fab span{display:none}
+  .tabbar a.fab .ic{font-size:1.45rem;color:#fff}
+  .tabbar a.fab:active{transform:scale(.92)}
+  .tabbar a.fab.on{box-shadow:0 0 0 4px color-mix(in srgb,var(--accent) 28%,transparent),0 12px 26px color-mix(in srgb,var(--accent) 50%,transparent)}
+  .tabbar a.fab.on .ic{transform:none}
+  .sheet-bg{display:block;position:fixed;inset:0;z-index:9700;background:rgba(5,8,12,.55);opacity:0;pointer-events:none;transition:opacity .35s}
+  .sheet{display:block;position:fixed;left:0;right:0;bottom:0;z-index:9710;padding:10px 16px calc(18px + env(safe-area-inset-bottom));border-radius:22px 22px 0 0;border:1px solid var(--border);border-bottom:0;background:var(--surface);box-shadow:0 -20px 60px -10px var(--shadow);transform:translateY(105%);transition:transform .5s cubic-bezier(.2,.9,.25,1);touch-action:none}
+  html.sheet-open .sheet-bg{opacity:1;pointer-events:auto}
+  html.sheet-open .sheet{transform:none}
+  html.sheet-open{overflow:hidden}
+  .sheet.drag{transition:none}
+  .grab{display:block;width:42px;height:4px;border-radius:3px;background:var(--border);margin:2px auto 14px}
+  .sh-head{display:flex;align-items:center;gap:12px;margin-bottom:12px;padding:0 4px}
+  .sh-head img{width:48px;height:48px;border-radius:50%;border:2px solid var(--accent);object-fit:cover}
+  .sh-head b{display:block;font-size:1.02rem;color:var(--text)}
+  .sh-head span{font-size:.78rem;color:var(--muted)}
+  .sh-list{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .sh-list button,.sh-list a{display:flex;align-items:center;gap:10px;padding:14px;border-radius:14px;background:var(--tile);border:1px solid var(--border);color:var(--text);font-size:.88rem;font-weight:600;min-height:52px;-webkit-tap-highlight-color:transparent;transition:transform .25s var(--ease),border-color .25s}
+  .sh-list .ic{font-size:1.2rem;color:var(--muted)}
+  .sh-list button:active,.sh-list a:active{transform:scale(.97);border-color:var(--accent)}
+  .sh-native{grid-column:1/-1;background:var(--accent)!important;border-color:var(--accent)!important;color:#fff!important}
+  .sh-native .ic{color:#fff!important}
+}
