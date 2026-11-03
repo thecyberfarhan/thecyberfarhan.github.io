@@ -187,13 +187,6 @@
       ['sqlmap -u "http://lab/item?id=1" --batch', ['[*] testing parameter id', '[+] id is injectable (boolean-based)']],
       ['hashcat -m 0 hash.txt rockyou.txt', ['5f4dcc3b5aa765d61d8327deb882cf99:password', '[+] 1/1 hashes cracked']]
     ], 7, 2200);
-    termLoop($('.cterm-body'), [
-      ['./contact.sh --open', ['[+] availability: immediate', '[+] location: remote, on-site or relocation', '[+] status: open to conversations']],
-      ['cat ~/.plan', ['1. read the sample report', '2. skim a writeup or two', '3. send me a message']],
-      ['whoami && id', ['farhan', 'uid=1000(farhan) gid=1000(pentester)', '[+] certified: CPENT']],
-      ['./say_hi.sh', ['[*] waiting for your message...', '[+] email is the fastest route']],
-      ['ping -c 1 farhan', ['PING farhan: 56 data bytes', '[+] reachable, reply pending your message']]
-    ], 8, 2600);
   }
   var upT0 = performance.now();
   function hudTick() {
@@ -378,7 +371,7 @@
   function easeIO(t) { t = clampV(t, 0, 1); return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
   function angDiff(a, b) { var d = b - a; while (d > Math.PI) d -= 6.2832; while (d < -Math.PI) d += 6.2832; return d; }
   var AST = [], ST = null, needMove = false, FEET = 23, fought = false;
-  function COLS(P, side) { return side === 'f' ? { s: P.node, f: P.link, h: P.node, fl: P.link } : { s: P.hot, f: P.hot, h: P.wireHot, fl: P.hot }; }
+  function COLS(P, side) { return side === 'f' ? { s: P.hot, f: P.hot, h: P.wireHot, fl: P.hot } : { s: P.node, f: P.link, h: P.node, fl: P.link }; }
 
   /* background asteroids */
   function mkAsteroid(rad) {
@@ -472,7 +465,7 @@
   function fireShip(u, v, hit, dmg, big) {
     var a0 = u.ang, side = (u.fs = -(u.fs || 1)), ang = a0 + (hit ? 0 : (Math.random() < 0.5 ? -1 : 1) * rnd(0.2, 0.34)), tip = shipMuzzle(u, side), ox = tip.x, oy = tip.y, sp = big ? 1.05 : 0.82;
     ST.lasers.push({ x: ox, y: oy, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, side: u.side, hit: hit, dmg: dmg, tgt: v, home: hit, life: 2300, big: !!big });
-    if (big) { burst(ox, oy, 10, 'spark', '255,255,255', 0.4, 300); ringFx(ox, oy, u.side === 'f' ? '127,168,204' : '180,35,44', 26); }
+    if (big) { burst(ox, oy, 10, 'spark', '255,255,255', 0.4, 300); ringFx(ox, oy, u.side === 'f' ? '180,35,44' : '127,168,204', 26); }
     burst(ox, oy, 3, 'spark', '255,255,255', 0.2, 180);
   }
   function jinkShip(u, p) { if (Math.random() < p && u.jink <= 0) { u.jink = 560; u.jdir = Math.random() < 0.5 ? -1 : 1; if (u.roll <= 0) u.roll = 0.01; } }
@@ -487,11 +480,16 @@
     if (hit) ST.nfire = (ST.nfire || 0) + 1;
     ST.lasers.push({ x: mx, y: my, vx: u.dir * 0.95, vy: hit ? (ty - my) / (dist / 0.95) : 0, side: u.side, hit: hit, dmg: dmg, tgt: v, home: false, life: 1600, mech: true, big: !!big });
     if (big) { burst(mx, my, 10, 'spark', '255,255,255', 0.4, 300); ringFx(mx, my, '255,255,255', 30); }
-    burst(mx, my, 4, 'spark', '255,255,255', 0.25, 170); ringFx(mx, my, u.side === 'f' ? '127,168,204' : '180,35,44', 12); u.x -= u.dir * 2;
+    burst(mx, my, 4, 'spark', '255,255,255', 0.25, 170); ringFx(mx, my, u.side === 'f' ? '180,35,44' : '127,168,204', 12); u.x -= u.dir * 2;
     if (!hit) v.dodgeAt = s.clk + Math.max(0, dist / 0.95 - 230);
   }
   function applyHit(u, dmg, P, big) {
-    if (!u.alive) return; if (u.guard > 0.3) { ringFx(u.x + u.dir * 16, u.y + FEET - 22, '255,255,255', 40); burst(u.x + u.dir * 16, u.y + FEET - 22, 10, 'shard', P.hot, 0.35, 500); } u.guard = 0; u.charge = 0; ST.nhit = (ST.nhit || 0) + 1; u.hp = Math.max(u.side === 'f' ? 35 : 0, u.hp - dmg); u.flash = 1; u.kx += (u.side === 'f' ? -1 : 1) * 40; if (u.m > 0.5) { u.stag = 260; u.kx += (u.side === 'f' ? -1 : 1) * 60; } burst(u.x, u.y, big ? 16 : 8, 'spark', P.hot, big ? 0.55 : 0.4, 420);
+    if (!u.alive) return;
+    /* an active shield actually blocks now: most of the damage and all of the knockback/stagger are absorbed, and a good block is rewarded with a follow-up counter-swing (see mechStep's 'guard' branch) */
+    var blocked = u.guard > 0.3;
+    if (blocked) { ringFx(u.x + u.dir * 16, u.y + FEET - 22, '255,255,255', 46); burst(u.x + u.dir * 16, u.y + FEET - 22, 14, 'shard', '255,255,255', 0.4, 520); dmg *= 0.15; u.blockedHit = true; }
+    u.guard = 0; u.charge = 0; ST.nhit = (ST.nhit || 0) + 1; u.hp = Math.max(u.side === 'f' ? 35 : 0, u.hp - dmg); u.flash = 1;
+    if (!blocked) { u.kx += (u.side === 'f' ? -1 : 1) * 40; if (u.m > 0.5) { u.stag = 260; u.kx += (u.side === 'f' ? -1 : 1) * 60; } burst(u.x, u.y, big ? 16 : 8, 'spark', P.hot, big ? 0.55 : 0.4, 420); }
     if (big) ST.slow = Math.max(ST.slow || 0, 110);
     if (u.side === 'e' && u.hp <= 0) ST.killed = true;
   }
@@ -511,7 +509,7 @@
   }
   function drawLasers(ctx, P) {
     ST.lasers.forEach(function (l) {
-      var c = l.side === 'f' ? P.link : P.hot, len = 22, m = Math.hypot(l.vx, l.vy) || 1;
+      var c = l.side === 'f' ? P.hot : P.link, len = 22, m = Math.hypot(l.vx, l.vy) || 1;
       ctx.lineCap = 'round'; ctx.strokeStyle = 'rgba(' + c + ',.25)'; ctx.lineWidth = l.big ? 12 : 6; if (l.big) len = 48; ctx.beginPath(); ctx.moveTo(l.x, l.y); ctx.lineTo(l.x - l.vx / m * len, l.y - l.vy / m * len); ctx.stroke();
       ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = l.big ? 3.6 : 2; ctx.beginPath(); ctx.moveTo(l.x, l.y); ctx.lineTo(l.x - l.vx / m * len, l.y - l.vy / m * len); ctx.stroke();
     });
@@ -521,7 +519,7 @@
     var tip = mechMuzzle(u), mx = tip.x, my = tip.y, tx = hit ? v.x : v.x + (Math.random() < 0.5 ? -1 : 1) * rnd(55, 95), ty = v.y + FEET - 22;
     ST.bombs.push({ x: mx, y: my, x0: mx, y0: my, tx: tx, ty: ty, t: 0, dur: 820, side: u.side, hit: hit, dmg: dmg, tgt: v });
     if (!hit) v.dodgeAt = s.clk + 560;
-    burst(mx, my, 4, 'smoke', u.side === 'f' ? '127,168,204' : '180,35,44', 0.14, 320);
+    burst(mx, my, 4, 'smoke', u.side === 'f' ? '180,35,44' : '127,168,204', 0.14, 320);
   }
   function stepBombs(dt, P) {
     var bs = ST.bombs, i, b;
@@ -538,7 +536,7 @@
   }
   function drawBombs(ctx, P) {
     ST.bombs.forEach(function (b) {
-      var c = b.side === 'f' ? P.link : P.hot, pulse = 0.6 + Math.sin(b.t / 60) * 0.4;
+      var c = b.side === 'f' ? P.hot : P.link, pulse = 0.6 + Math.sin(b.t / 60) * 0.4;
       ctx.save(); ctx.fillStyle = 'rgba(' + c + ',' + (0.55 + pulse * 0.4).toFixed(2) + ')'; ctx.beginPath(); ctx.arc(b.x, b.y, 5.5, 0, 6.283); ctx.fill();
       ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 1.4; ctx.stroke(); ctx.restore();
     });
@@ -547,7 +545,7 @@
   /* drawing the ships and the cute mechs */
   function drawBar(ctx, P, u, yo) {
     u.hpS += (u.hp - u.hpS) * 0.12; if (u.hpS < 0.5 && !u.alive) return;
-    var w = 30, x = u.x - w / 2, y = u.y - yo; ctx.save(); ctx.globalAlpha = 0.8 * u.al; ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(x - 1, y - 1, w + 2, 5); ctx.fillStyle = 'rgba(' + (u.side === 'f' ? P.link : P.hot) + ',.95)'; ctx.fillRect(x, y, w * Math.max(0, u.hpS) / 100, 3); ctx.restore();
+    var w = 30, x = u.x - w / 2, y = u.y - yo; ctx.save(); ctx.globalAlpha = 0.8 * u.al; ctx.fillStyle = 'rgba(0,0,0,.45)'; ctx.fillRect(x - 1, y - 1, w + 2, 5); ctx.fillStyle = 'rgba(' + (u.side === 'f' ? P.hot : P.link) + ',.95)'; ctx.fillRect(x, y, w * Math.max(0, u.hpS) / 100, 3); ctx.restore();
   }
   function drawShipU(ctx, P, u, now) {
     var al = u.al * (1 - u.m); if (al <= 0.02) return;
@@ -644,9 +642,12 @@
     if (u.flash > 0) { ctx.fillStyle = 'rgba(255,255,255,' + (u.flash * 0.6).toFixed(2) + ')'; poly([[-8, -40], [8, -40], [8, -10], [-8, -10]]); ctx.fill(); }
     if (u.charge > 0.02) { var cx2 = 14 + aim * 2, cy2 = -15 - aim * 6, cr = 3 + u.charge * 9, cgl = ctx.createRadialGradient(cx2 + 10, cy2, 0, cx2 + 10, cy2, cr); cgl.addColorStop(0, 'rgba(255,255,255,.95)'); cgl.addColorStop(0.4, 'rgba(' + c.h + ',.8)'); cgl.addColorStop(1, 'rgba(' + c.h + ',0)'); ctx.fillStyle = cgl; ctx.beginPath(); ctx.arc(cx2 + 10, cy2, cr, 0, 6.283); ctx.fill(); }
     if (u.guard > 0.02) {
-      ctx.globalAlpha = al * u.guard; ctx.lineWidth = 2.2; ctx.strokeStyle = 'rgba(' + c.h + ',.95)'; ctx.fillStyle = 'rgba(' + c.h + ',.22)';
+      ctx.globalAlpha = al * u.guard; ctx.lineWidth = 2.2; ctx.strokeStyle = 'rgba(' + c.h + ',.95)'; ctx.fillStyle = 'rgba(' + c.f + ',.5)';
       poly([[8, -39], [22, -30], [20, -10], [8, -4], [-4, -10], [-6, -30]]); ctx.fill(); ctx.stroke();
-      ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(8, -36); ctx.lineTo(8, -7); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,.45)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(8, -36); ctx.lineTo(8, -7); ctx.stroke();
+      /* a clear boss/emblem in the middle so the plate reads as a shield, not just a glow panel */
+      ctx.fillStyle = hot; ctx.beginPath(); ctx.arc(8, -22, 3.4, 0, 6.283); ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,.6)'; ctx.lineWidth = 0.8; ctx.stroke();
+      if (u.blockedHit) { ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 1.6; [0, 1, 2].forEach(function (k) { var rr = 6 + k * 5; ctx.beginPath(); ctx.arc(8, -22, rr, 0, 6.283); ctx.globalAlpha = al * u.guard * (1 - k / 3); ctx.stroke(); }); ctx.globalAlpha = al; }
       ctx.globalAlpha = al;
     }
     if (u.m < 0.97 && u.m > 0.03) { var sy4 = -46 * u.m; ctx.lineWidth = 1.4; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.beginPath(); ctx.moveTo(-16, sy4); ctx.lineTo(16, sy4); ctx.stroke(); ctx.strokeStyle = 'rgba(' + c.h + ',.8)'; [[-15, -2], [15, -2]].forEach(function (b) { ctx.beginPath(); ctx.moveTo(b[0], -48); ctx.lineTo(b[0] + b[0] / 15 * -4, -48); ctx.moveTo(b[0], -48); ctx.lineTo(b[0], -43); ctx.moveTo(b[0], -2); ctx.lineTo(b[0] + b[0] / 15 * -4, -2); ctx.moveTo(b[0], -2); ctx.lineTo(b[0], -7); ctx.stroke(); }); }
@@ -672,9 +673,10 @@
   var PATROL = ['Scanning the sector...', 'All quiet. Too quiet.', 'No contacts. Staying sharp.', 'Radar looks clear.', 'Patrolling sector About.', 'Nothing here but rocks.'];
 
   /* stage caption: the fight follows the real stages of a test */
-  var capEl = document.createElement('div'); capEl.className = 'story-cap'; capEl.setAttribute('aria-hidden', 'true'); capEl.innerHTML = '<span class="n"></span><b></b><i></i>'; document.body.appendChild(capEl);
-  function setCap(n, name, detail) { capEl.children[0].textContent = '0' + n; capEl.children[1].textContent = name; capEl.children[2].textContent = detail; capEl.classList.add('on'); }
-  function hideCap() { capEl.classList.remove('on'); }
+  /* the bottom-left stage caption ("01 RECON scanning the page" etc) was removed;
+     setCap/hideCap stay as no-ops so the rest of the story code doesn't need to change */
+  function setCap() {}
+  function hideCap() {}
   function stageFor(ph, st) {
     if (ph === 'morph' || ph === 'patrol') return [1, 'Recon', 'scanning the page'];
     if (ph === 'detect') return [1, 'Recon', 'threat located'];
@@ -685,17 +687,11 @@
     if (ph === 'toMech') return [3, 'Escalate', 'pivoting to the host: transforming'];
     if (ph === 'toShip') return [3, 'Escalate', 'pulling out'];
     if (ph === 'victory') return [4, 'Report', 'finding closed'];
-    if (ph === 'cta') return [4, 'Report', 'open to work'];
     return [4, 'Report', 'all clear'];
   }
   function FOUGHT() { return fought; }
-  function ctaTarget() {
-    var c = [$('.mail-big'), $('.cta a[download]'), $('.link-rows a[download]')], i, r;
-    for (i = 0; i < c.length; i++) { if (!c[i]) continue; r = c[i].getBoundingClientRect(); if (r.width > 0 && r.top >= 90 && r.bottom <= innerHeight - 40 && r.left >= 0 && r.right <= innerWidth) return c[i]; }
-    return null;
-  }
-  function toCta(s, now) { if (ctaTarget()) { s.ph = 'cta'; s.pt = 0; s.ctaSay = 0; s.nextSay = now + 3500; } else { s.ph = 'roam'; s.pt = 0; s.roamEnd = 20000; s.nextSay = now + 1500; } }
-  function afterWin(s, now) { s.quiet = true; sayAs('f', 'Back on patrol.', 1800); toCta(s, now); }
+  /* the ship's only job after a win is to go back to patrolling/roaming and repeat -- no more flying to Contact to pitch itself */
+  function afterWin(s, now) { s.quiet = true; sayAs('f', 'Back on patrol.', 1800); s.ph = 'roam'; s.pt = 0; s.roamEnd = 20000; s.nextSay = now + 1500; }
 
   /* the story */
   function startRoam() {
@@ -726,7 +722,7 @@
 
   function pickPlat() {
     var best = null, bd = 1e9;
-    $$('.card,.wcard,.tool-col,.stat,.live-card,.ccard,.nf,.pm,.game,.open-card,.termcard,.cterm,.jt-b,.sky,.steps li,.lrow,.big-stats,.about-l,.rail,.c-l,.link-rows').forEach(function (el) {
+    $$('.card,.wcard,.tool-col,.stat,.live-card,.ccard,.nf,.pm,.game,.open-card,.termcard,.jt-b,.sky,.steps li,.lrow,.big-stats,.about-l,.rail,.c-l,.link-rows').forEach(function (el) {
       var r = el.getBoundingClientRect(); if (r.width < 300 || r.top < 170 || r.top > innerHeight - 150 || r.left < -10 || r.right > innerWidth + 10) return;
       var d = Math.abs(r.top - innerHeight * 0.55) + Math.abs((r.left + r.right) / 2 - innerWidth / 2) * 0.3; if (d < bd) { bd = d; best = el; }
     });
@@ -737,7 +733,7 @@
   /* mech AI */
   function canDodge(u) { return u.alive && !u.air && u.mode !== 'melee' && !(u.stag > 0); }
   function mechPick(u, v, s, due) {
-    var dist = Math.abs(v.x - u.x), r = Math.random(), wide = (ST.bw || 400) > 330; u.hitNext = false; u.after = ''; u.mt = rnd(500, 1000); u.burst = 0; u.jump = null; u.charge = 0; u.guard = 0; u.dive = 0; u.up = false; u.bombThrown = false;
+    var dist = Math.abs(v.x - u.x), r = Math.random(), wide = (ST.bw || 400) > 330; u.hitNext = false; u.after = ''; u.mt = rnd(500, 1000); u.burst = 0; u.jump = null; u.charge = 0; u.guard = 0; u.dive = 0; u.up = false; u.bombThrown = false; u.blockedHit = false;
     if (due) {
       u.hitNext = true;
       if (dist > 170 && Math.random() < 0.22) { u.mode = 'barrage'; u.mt = 160; u.burst = 7; sayAs(u.side, u.side === 'f' ? 'Full auto!' : 'Suppressing fire!', 1300); return; }
@@ -789,7 +785,12 @@
         else { if (chit) dueUse(); mechFire(s, u, v, chit, chit ? hitD() : 0, true); u.charge = 0; u.mt = 420; u.mode = 'shoot'; u.burst = 0; }
       }
     } else if (m === 'guard') {
-      u.guard = Math.min(1, u.guard + dt / 120); u.aim = 0; if (u.mt <= 0 || due()) { mechPick(u, v, s, due()); }
+      u.guard = Math.min(1, u.guard + dt / 120); u.aim = 0;
+      if (u.mt <= 0 || due()) {
+        /* a shield that actually blocked something earns a follow-up counter-swing instead of just resetting to a random move */
+        if (u.blockedHit && dist < 90 && Math.random() < 0.65) { u.blockedHit = false; u.hitNext = false; u.after = ''; u.want = 46; u.mode = 'walk'; u.dash = true; u.mt = rnd(400, 650); sayAs(u.side, u.side === 'f' ? 'My turn!' : 'Enough blocking.', 1200); }
+        else mechPick(u, v, s, due());
+      }
     } else if (m === 'barrage') {
       u.aim = Math.min(1, u.aim + dt / 110);
       if (u.mt <= 0) {
@@ -833,7 +834,7 @@
   }
   function mechStrike(u, v, s, P, planned, hitD, dueUse) {
     var dist = Math.abs(v.x - u.x); ST.ns = (ST.ns || 0) + 1;
-    if (!planned && v.mode === 'melee' && v.alive && dist < 80 && !v.air && !u.air) { var mxx = (u.x + v.x) / 2, myy = u.y + FEET - 24; ringFx(mxx, myy, '255,255,255', 46); ringFx(mxx, myy, P.hot, 26); burst(mxx, myy, 16, 'spark', '255,255,255', 0.5, 450); u.kx -= u.dir * 70; v.kx += u.dir * 70; ST.nclash = (ST.nclash || 0) + 1; return; } if (planned) ST.nsp = (ST.nsp || 0) + 1; if (dist < 70) ST.nsd = (ST.nsd || 0) + 1; if (v.air) ST.nsa = (ST.nsa || 0) + 1; ringFx(u.x + u.dir * 24, u.y + FEET - 22, u.side === 'f' ? P.link : P.hot, 18);
+    if (!planned && v.mode === 'melee' && v.alive && dist < 80 && !v.air && !u.air) { var mxx = (u.x + v.x) / 2, myy = u.y + FEET - 24; ringFx(mxx, myy, '255,255,255', 46); ringFx(mxx, myy, P.hot, 26); burst(mxx, myy, 16, 'spark', '255,255,255', 0.5, 450); u.kx -= u.dir * 70; v.kx += u.dir * 70; ST.nclash = (ST.nclash || 0) + 1; return; } if (planned) ST.nsp = (ST.nsp || 0) + 1; if (dist < 70) ST.nsd = (ST.nsd || 0) + 1; if (v.air) ST.nsa = (ST.nsa || 0) + 1; ringFx(u.x + u.dir * 24, u.y + FEET - 22, u.side === 'f' ? P.hot : P.link, 18);
     if (dist < 70 && !v.air) {
       if (planned) { dueUse(); applyHit(v, hitD(), P); ringFx(v.x, v.y + FEET - 22, '255,255,255', 36); burst(v.x, v.y + FEET - 22, 8, 'spark', P.hot, 0.45, 420);
         if (u.struck === 2 && v.alive && !v.air) { v.stag = 0; v.mode = 'jump'; v.jump = { x0: v.x, x1: v.x + u.dir * 70, t: 0, dur: 760, h: 92 }; v.air = true; v.aim = 0.2; ST.nup = (ST.nup || 0) + 1; ringFx(v.x, v.y + FEET - 6, P.link, 30); } }
@@ -1001,8 +1002,8 @@
       if (now > f.tt) { f.tx = 90 + Math.random() * (innerWidth - 180); f.ty = 120 + Math.random() * (innerHeight - 240); f.tt = now + 1500 + Math.random() * 1800; }
       flyTo(f, f.tx, f.ty, dt, 320, 0.0035);
       if (now > s.nextSay) { s.nextSay = now + rnd(6500, 9500); sayAs('f', PATROL[Math.floor(Math.random() * PATROL.length)], 2400); }
-      if (ph === 'patrol' && s.pt > s.patrolEnd) { if (s.quiet) toCta(s, now); else newThreat(); }
-      if (ph === 'roam' && s.pt > s.roamEnd) { if (now - s.born > 150000) { s.ph = 'sleep'; s.pt = 0; sayAs('f', 'Going dark. Wake me with a mouse.', 2500); } else if (!s.quiet && !FOUGHT()) newThreat(); else toCta(s, now); }
+      if (ph === 'patrol' && s.pt > s.patrolEnd) { if (s.quiet) { s.ph = 'roam'; s.pt = 0; s.roamEnd = 20000; } else newThreat(); }
+      if (ph === 'roam' && s.pt > s.roamEnd) { if (now - s.born > 150000) { s.ph = 'sleep'; s.pt = 0; sayAs('f', 'Going dark. Wake me with a mouse.', 2500); } else if (!s.quiet && !FOUGHT()) newThreat(); else { s.pt = 0; s.roamEnd = 20000; } }
     } else if (ph === 'detect') {
       var T = s.T, aT = Math.atan2(T.py - f.y, T.px - f.x), toX = T.px - Math.cos(aT) * 300, toY = T.py - Math.sin(aT) * 300;
       s.ping = (s.ping || 0) + dt; T.rot += 0.0006 * dt;
@@ -1065,13 +1066,6 @@
       else { if (s.vt > 200 && !s.vroll) { s.vroll = true; f.roll = 0.01; } flyTo(f, f.x, f.y, dt, 100, 0.002); }
       if (s.vt > 600 && !s.vsaid) { s.vsaid = true; sayAs('f', 'Threat neutralised.', 2200); }
       if (s.vt > 2600) { s.vsaid = false; s.vroll = false; s.vvent = false; f.wave = 0; if (f.m > 0.5) { f.tr = { st: 'hop', t: 0 }; s.ph = 'toShip'; s.pt = 0; } else { f.tt = 0; afterWin(s, now); } }
-    } else if (ph === 'cta') {
-      var tg = ctaTarget(); s.tgEl = tg; if (!tg) { s.ph = 'roam'; s.pt = 0; s.roamEnd = 20000; s.tgEl = null; return; }
-      if (s.pt > 32000) { s.ph = 'roam'; s.pt = 0; s.roamEnd = 20000; s.tgEl = null; return; }
-      var tr = tg.getBoundingClientRect(), px = tr.left + tr.width / 2, py = Math.max(140, tr.top - 56) + Math.sin(s.clk / 650) * 6, dd = flyTo(f, px, py, dt, 280, 0.004);
-      if (dd < 50) { f.ang += angDiff(f.ang, Math.atan2(tr.top + tr.height / 2 - f.y, tr.left + tr.width / 2 - f.x)) * Math.min(1, dt * 0.01); f.vx *= 0.9; f.vy *= 0.9; }
-      if (dd < 70 && now > s.nextSay) { var CL = ['Open to junior pentest roles.', 'The email is right here. One click.', 'Say hello. I will be here.', 'Web and API security is my focus.']; sayAs('f', CL[(s.ctaSay++) % CL.length], 3200); s.nextSay = now + 6500; }
-      if (now - s.born > 150000) { s.ph = 'sleep'; s.pt = 0; s.tgEl = null; }
     } else if (ph === 'sleep') {
       f.al = Math.max(0, 1 - s.pt / 1600); flyTo(f, innerWidth - 60, innerHeight - 60, dt, 220, 0.003);
       if (s.pt > 1700) { finishStory(true); }
@@ -1116,8 +1110,8 @@
     if (!ST) return;
     var f = s.f, e = s.e, T = s.T;
     function trailOf(u, col, a0) { if (u && u.alive && u.trail.length > 2 && u.m < 0.5) { for (var i = 1; i < u.trail.length; i++) { var q = i / u.trail.length; ctx.strokeStyle = 'rgba(' + col + ',' + (q * a0).toFixed(3) + ')'; ctx.lineWidth = q * 2.6; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(u.trail[i - 1].x, u.trail[i - 1].y); ctx.lineTo(u.trail[i].x, u.trail[i].y); ctx.stroke(); } } }
-    if (s.ph !== 'patrol' && s.ph !== 'roam') trailOf(f, P.link, 0.42); else if (f.trail.length > 2 && f.m < 0.5) trailOf(f, P.link, 0.4);
-    trailOf(e, P.hot, 0.38);
+    if (s.ph !== 'patrol' && s.ph !== 'roam') trailOf(f, P.hot, 0.42); else if (f.trail.length > 2 && f.m < 0.5) trailOf(f, P.hot, 0.4);
+    trailOf(e, P.link, 0.38);
     /* our asteroid wakes up: steel glow, cracks spread, then it bursts into shards and the ship unfolds */
     if (s.ph === 'morph' && s.pt < 650) { var mp = s.pt / 650, jx = (Math.random() - 0.5) * 5 * mp, jy = (Math.random() - 0.5) * 5 * mp; drawGlow(ctx, f.x, f.y, 70 + mp * 40, P.link, 0.4 + mp * 0.6); drawAst(ctx, P, s.A0, f.x + jx, f.y + jy, 1, 1, true); drawCracks(ctx, s.A0, f.x + jx, f.y + jy, 1, mp, P.link); }
     /* the enemy rock: red warning, shaking, cracks, then it splits in two */
@@ -1128,7 +1122,6 @@
     }
     if (T && T.halves) { var ha = 1 - (s.clk - T.splitAt) / 3800; if (ha > 0) T.halves.forEach(function (h) { drawHalf(ctx, P, T, h, ha); }); }
     if (e && e.alive) { drawShipU(ctx, P, e, now); drawMechU(ctx, P, e, now); }
-    if (s.ph === 'cta' && s.tgEl) { var tb = s.tgEl.getBoundingClientRect(), pu = (now % 1600) / 1600; ctx.save(); ctx.strokeStyle = 'rgba(' + P.hot + ',' + ((1 - pu) * 0.8).toFixed(2) + ')'; ctx.lineWidth = 2; ctx.strokeRect(tb.left - 6 - pu * 12, tb.top - 6 - pu * 12, tb.width + 12 + pu * 24, tb.height + 12 + pu * 24); ctx.restore(); }
     drawShipU(ctx, P, f, now); drawMechU(ctx, P, f, now);
     drawLasers(ctx, P); drawBombs(ctx, P); drawParts(ctx, P);
     if (s.stamp) { var ag = (s.clk - s.stamp.t0) / 3400; if (ag < 1) { var a2 = ag < 0.1 ? ag / 0.1 : (1 - ag) / 0.9, sx2 = clampV(s.stamp.x, 90, innerWidth - 90), sy3 = clampV(s.stamp.y - 34 - ag * 20, 110, innerHeight - 80); ctx.save(); ctx.translate(sx2, sy3); ctx.rotate(-0.1); ctx.globalAlpha = a2; ctx.font = '700 13px "JetBrains Mono",ui-monospace,monospace'; ctx.textAlign = 'center'; var tw = ctx.measureText('FINDING CLOSED').width; ctx.fillStyle = 'rgba(13,17,23,.7)'; ctx.fillRect(-tw / 2 - 10, -17, tw + 20, 26); ctx.strokeStyle = 'rgba(' + P.hot + ',.95)'; ctx.lineWidth = 2; ctx.strokeRect(-tw / 2 - 10, -17, tw + 20, 26); ctx.fillStyle = 'rgba(' + P.node + ',.98)'; ctx.fillText('FINDING CLOSED', 0, 1); ctx.restore(); } else s.stamp = null; }
@@ -1392,12 +1385,13 @@
     'VMware': 'Your tab is also idling inside a virtual machine, probably.'
   };
   var SECQ = {
-    hero: [['$ whoami', 'A person waiting for you to scroll. Take your time.'], ['CPENT', 'Certified in penetration testing. Currently pen-testing your patience.'], ['Terminal', 'That lab session keeps running whether you read it or not.']],
+    hero: [['$ whoami', 'A person waiting for you to scroll. Take your time.'], ['CPENT', 'Certified in penetration testing. Currently pen-testing your patience.'], ['Terminal', 'Do you understand what that nmap output means? Obviously not, because only a pro hacker can know this. *giggles*']],
     about: [['About', 'Three cards. Each one is readable, and none of them bite.'], ['About', 'Fun fact: reading is not a vulnerability. You may proceed.']],
-    proof: [['Writeups', 'I wrote 37 of these so you could stare at one. Make it count.'], ['Mr Robot CTF', 'I cut a wordlist from 858,160 entries to 11,451. You can cut this staring.'], ['Cap', 'Even the IDOR in this box was less forgotten than this tab.'], ['Archetype', 'Credentials in plaintext history are a finding. Your idle tab is a pattern.'], ['Watcher', 'Six hops from www-data to root. You are one scroll from the next section.']],
+    proof: [['Writeups', 'I wrote 37 of these so you could stare at one. Make it count.'], ['Mr Robot CTF', 'I cut a wordlist from 858,160 entries to 11,451. You can cut this staring.'], ['Cap', 'Even the IDOR in this box was less forgotten than this tab.'], ['Archetype', 'Credentials in plaintext history are a finding. Your idle tab is a pattern.'], ['Watcher', 'Six hops from www-data to root. You are one scroll from the next section.'], ['Writeups', "If you've read even a couple of these, you already know this guy doesn't just show up. Hire him."]],
+    projects: [['reconkit', 'Threaded port scan, header probing, subdomain brute force. Stdlib only. Go on, open it.'], ['apicheck', 'Finds the CORS and cookie mistakes most APIs ship with. Including, possibly, yours.'], ['lab-reports', "This is what a real finding writeup looks like: evidence, risk rating, fix. Hire the person who writes these."], ['Virtual-env manager', '1,800 lines because pip alone was not going to cut it.']],
     sky: [['Contributions', 'I am 72 contributions tall. Staring at me will not make it 73.'], ['Skyline', 'The tallest bar is 10 commits. Your attention span is shorter than that.']],
     live: [['TryHackMe', 'These numbers update live. You, on the other hand, do not.'], ['TryHackMe', 'Rank, rooms, writeups. All moving. Unlike you.']],
-    contact: [['LinkedIn', 'It is a button. Pressing it is free and surprisingly painless.'], ['GitHub', 'git push your courage.'], ['Contact', 'I do not bite, and I do not spam. Probably. Say hi.']],
+    contact: [['LinkedIn', 'It is a button. Pressing it is free and surprisingly painless.'], ['GitHub', 'git push your courage.'], ['Contact', 'I do not bite, and I do not spam. Probably. Say hi.'], ['Contact', "You read this far. That's basically a reference check. Open to junior pentest roles, one click away."]],
     tools: [['Tools', 'Eleven seconds is a long time to stare at a toolbox.']]
   };
   var MORE = ['Seriously, are you still there?', 'I can do this all day. Can you?', 'Okay, I am going to assume you went for coffee.', 'Last one, I promise. Scroll, click, anything.'];
@@ -1405,6 +1399,7 @@
     hero: ['Curious who is behind the terminal? Start with the About section.', 'This whole page is one portfolio. Want the tour?'],
     about: ['Liked the intro? The tools section shows how it gets done.', 'Three cards down, a whole toolbox to go.'],
     tools: ['Tools are only half the story. The writeups show them in action.', 'Plenty of tools here. Want to see them used?'],
+    projects: ['These are not labs, they are shipped repos with tests. The journey shows how they got built.', 'Three real tools, source included. Worth a star, or at least a read.'],
     proof: ['Found one you like? Open it, or tell the author.', 'These writeups are real. So is the person behind them.'],
     sky: ['Those bars are real commits. The live stats have more.', 'Want the numbers behind the skyline?'],
     live: ['Numbers are cute. The profile behind them is better.', 'All of this is live. Want to check the source?'],
@@ -1423,6 +1418,7 @@
     about: ['Fact', 'This page uses no frameworks, only hand-written HTML, CSS and JavaScript.', 'See the tools', 'tools'],
     tools: ['Fact', 'There are 32 tools in the columns below, grouped by the phase of a test they belong to.', 'Read the writeups', 'proof'],
     proof: ['Fact', '37 writeups so far: 32 from TryHackMe and 5 from Hack The Box.', 'Open the repo', 'https://github.com/thecyberfarhan/CTF-Writeups'],
+    projects: ['Fact', 'reconkit and apicheck are both stdlib-only Python with tests, no dependency bloat.', 'Open reconkit', 'https://github.com/thecyberfarhan/reconkit'],
     sky: ['Fact', 'The best single day of the last year had 10 contributions.', 'My journey', 'journey'],
     live: ['Fact', 'TryHackMe puts this profile in the top 3 percent, with 100+ rooms completed.', 'Open TryHackMe', 'https://tryhackme.com/p/farhan.hussain'],
     contact: ['Fact', 'The terminal under the links cycles through a few commands, then starts over.', 'See the writeups', 'proof']
@@ -1431,6 +1427,7 @@
     hero: ['Question', 'Short on time? Pick one and I will take you there.', [['Tools', 'tools'], ['Writeups', 'proof'], ['Contact', 'contact']]],
     about: ['Question', 'Want the toolbox first, or the proof?', [['Toolbox', 'tools'], ['Proof', 'proof']]],
     tools: ['Question', 'Looking for something specific?', [['Writeups', 'proof'], ['Journey', 'journey'], ['Contact', 'contact']]],
+    projects: ['Question', 'Read the code, or hear it from the person who wrote it?', [['Open reconkit', 'https://github.com/thecyberfarhan/reconkit'], ['Contact', 'contact']]],
     proof: ['Question', 'Read one, or hear from the author directly?', [['All writeups', 'https://github.com/thecyberfarhan/CTF-Writeups'], ['Contact', 'contact']]],
     sky: ['Question', 'Curious about the bigger picture?', [['Journey', 'journey'], ['Writeups', 'proof']]],
     live: ['Question', 'Want to see the work behind these numbers?', [['Writeups', 'proof'], ['GitHub', 'https://github.com/thecyberfarhan']]],
@@ -1441,13 +1438,16 @@
     if (sec === 'hero') return [G('about', 'About me'), G('tools', 'See my tools')];
     if (sec === 'about') return [G('tools', 'See my tools'), G('proof', 'Read my writeups')];
     if (sec === 'tools') return [G('proof', 'Read my writeups'), G('journey', 'My journey')];
+    if (sec === 'projects') { var pl = el && el.tagName === 'A' ? el.href : null; return pl ? [U(pl, 'Open this repo'), G('contact', 'Contact me')] : [G('journey', 'My journey'), G('contact', 'Contact me')]; }
     if (sec === 'proof') { var h = el && el.tagName === 'A' ? el.href : null; return h ? [U(h, 'Open this writeup'), G('contact', 'Contact me')] : [U('https://github.com/thecyberfarhan/CTF-Writeups', 'All writeups'), G('contact', 'Contact me')]; }
     if (sec === 'sky') return [G('journey', 'My journey'), G('contact', 'Contact me')];
     if (sec === 'live') return [U('https://tryhackme.com/p/farhan.hussain', 'Open TryHackMe'), G('contact', 'Contact me')];
     if (sec === 'contact') { var c = el && el.tagName === 'A' ? el.href : null; return c ? [U(c, 'Open this'), G('proof', 'Read my writeups')] : [U('https://www.linkedin.com/in/cyber-farhan-hussain/', 'Open LinkedIn'), G('proof', 'Read my writeups')]; }
     return [G('contact', 'Contact me')];
   }
-  var THEMES = ['steel', 'amber', 'ember'], ANIMS = ['pop', 'slide', 'glitch'];
+  var ANIMS = ['pop', 'slide', 'glitch'];
+  /* each section keeps its own notification color instead of a random one, so the page reads as elements with their own personality: tools run warm amber, findings/proof run the accent "finding" red, contact stays urgent too */
+  var SECTHEME = { hero: 'steel', about: 'steel', tools: 'amber', proof: 'ember', projects: 'amber', sky: 'steel', live: 'amber', journey: 'steel', play: 'amber', arch: 'ember', contact: 'ember' };
   var nEl = document.createElement('div'); nEl.className = 'nudge'; nEl.setAttribute('role', 'status');
   nEl.innerHTML = '<div class="nrow"><span class="tile"></span><div><b></b><p></p></div></div><small></small><div class="nbtns"></div><button type="button" class="x" aria-label="Dismiss">&times;</button><i class="tail"></i>';
   document.body.appendChild(nEl);
@@ -1489,18 +1489,18 @@
   function inView(el) { var r = el.getBoundingClientRect(); return r.top > 90 && r.bottom < innerHeight - 40 && r.left >= 0 && r.right <= innerWidth; }
   function sectionNow() {
     var sky = $('.sky'); if (sky) { var r = sky.getBoundingClientRect(); if (r.top < innerHeight * 0.6 && r.bottom > innerHeight * 0.4) return 'sky'; }
-    var cur = 'hero', ids = ['hero', 'proof', 'about', 'tools', 'journey', 'play', 'arch', 'contact'];
+    var cur = 'hero', ids = ['hero', 'proof', 'about', 'tools', 'projects', 'journey', 'play', 'arch', 'contact'];
     ids.forEach(function (id) { var s = document.getElementById(id); if (s && s.getBoundingClientRect().top < innerHeight * 0.5) cur = id; });
     return cur;
   }
-  function nameOf(el) { var b = el.querySelector('b'), h = el.querySelector('h3'), l = el.querySelector('.tl'); return (b && b.textContent) || (h && h.textContent) || (l && l.textContent) || el.getAttribute('data-nudge') || ''; }
+  function nameOf(el) { var b = el.querySelector('b'), h = el.querySelector('h3'), l = el.querySelector('.tl'), lt = el.querySelector('.l-title'); return (b && b.textContent) || (h && h.textContent) || (l && l.textContent) || (lt && lt.textContent) || el.getAttribute('data-nudge') || ''; }
   function visibleBig(el) { var r = el.getBoundingClientRect(), vis = Math.min(r.bottom, innerHeight - 50) - Math.max(r.top, 100); return r.left >= 0 && r.right <= innerWidth && vis >= Math.min(r.height * 0.8, 150) && r.width >= 200; }
   function pickSpeaker(sec) {
-    var sel = sec === 'tools' ? '.tool-col' : sec === 'proof' ? '.big-stats, .sky' : sec === 'about' ? '.about-l, .method' : sec === 'journey' ? '.rail' : sec === 'play' ? '.game' : sec === 'arch' ? '.nf, .pm, .arch-c' : sec === 'sky' ? '.sky' : sec === 'contact' ? '.c-l, .cterm' : sec === 'hero' ? '.medal-stage, .termcard' : '';
+    var sel = sec === 'tools' ? '.tool-col' : sec === 'proof' ? '.big-stats, .sky' : sec === 'about' ? '.about-l, .method' : sec === 'projects' ? '.lrow' : sec === 'journey' ? '.rail' : sec === 'play' ? '.game' : sec === 'arch' ? '.nf, .pm, .arch-c' : sec === 'sky' ? '.sky' : sec === 'contact' ? '.c-l, .link-rows' : sec === 'hero' ? '.medal-stage, .termcard' : '';
     if (!sel) return null; var list = $$(sel).filter(visibleBig); return list.length ? list[Math.floor(Math.random() * list.length)] : null;
   }
   /* a notification never sits on top of other content: it picks the free spot with the least overlap */
-  var BLK = '.card,.wcard,.chip-tile,.tool-col,.stat,.lc-stat,.big-stats>div,.lrow,.statement,.defs,.method li,.rn,.big-line,.mail-big,.prefs,.link-rows a,.who,.ccard,.termcard,.cterm,.live-card,.btn,.title,.sub,.pills,.lead,.hero-copy h1,.role,.medal-stage,.sky,.eyebrow,.arch-q,.jt-b,.open-card,.steps li,.nf,.pm,.game,.tech li,.thm-badge,.hud,.prompt';
+  var BLK = '.card,.wcard,.chip-tile,.tool-col,.stat,.lc-stat,.big-stats>div,.lrow,.statement,.defs,.method li,.rn,.big-line,.mail-big,.prefs,.link-rows a,.who,.ccard,.termcard,.live-card,.btn,.title,.sub,.pills,.lead,.hero-copy h1,.role,.medal-stage,.sky,.eyebrow,.arch-q,.jt-b,.open-card,.steps li,.nf,.pm,.game,.tech li,.thm-badge,.hud,.prompt';
   var pmKey = null, pmAt = 0, freeNudge = false, lastOv = 0;
   function blockers(skip) {
     var out = [];
@@ -1570,7 +1570,7 @@
     if (kind === 'sarcasm') {
       name = el ? nameOf(el) : '';
       if (TOOLQ[name]) msg = TOOLQ[name];
-      else if (el && sec === 'proof' && name) { var one = SECQ.proof.filter(function (p) { return p[0] === name; })[0]; msg = one ? one[1] : 'Read me or keep staring. Both are valid, only one is useful.'; }
+      else if (el && (sec === 'proof' || sec === 'hero' || sec === 'projects') && name) { var one = (SECQ[sec] || []).filter(function (p) { return p[0] === name; })[0]; if (one) msg = one[1]; }
       else { var pool = SECQ[sec] || SECQ.tools, hit = pool[Math.floor(Math.random() * pool.length)]; if (hit) { name = hit[0]; msg = hit[1]; } }
       if (!msg || msg === lastPick) { var p2 = SECQ[sec] || SECQ.tools, h2 = p2[Math.floor(Math.random() * p2.length)]; name = h2[0]; msg = h2[1]; }
       if (Math.random() < 0.5) { var ls = LEADS[sec] || LEADS.hero; lead = ls[Math.floor(Math.random() * ls.length)]; }
@@ -1584,7 +1584,7 @@
     }
     if (msg === lastPick) return;
     lastPick = msg; lastKind = kind;
-    var theme = other(THEMES, lastTheme), anim = other(ANIMS, lastAnim); lastTheme = theme; lastAnim = anim;
+    var theme = SECTHEME[sec] || 'steel', anim = other(ANIMS, lastAnim); lastTheme = theme; lastAnim = anim;
     var src = el && el.querySelector('svg.ic'); nTile.innerHTML = src ? src.outerHTML : '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>';
     nName.textContent = name; nMsg.textContent = msg; nLead.textContent = lead; nLead.style.display = lead ? '' : 'none';
     nBtns.innerHTML = ''; acts.forEach(function (a2) { var bt = document.createElement('button'); bt.type = 'button'; bt.textContent = a2.label; if (a2.url) bt.setAttribute('data-url', a2.url); else if (a2.id) bt.setAttribute('data-id', a2.id); else bt.setAttribute('data-close', '1'); nBtns.appendChild(bt); });
@@ -1626,6 +1626,14 @@
     sheet.addEventListener('touchend', function () { if (!dragging) return; dragging = false; sheet.classList.remove('drag'); if (dY > 90) closeSheet(); else sheet.style.transform = ''; });
   }
   $$('.tabbar a, .share, .theme').forEach(function (el) { el.addEventListener('pointerdown', function () { if (navigator.vibrate && IS_TOUCH) navigator.vibrate(8); }); });
+
+  /* the brand mark has its own tiny easter egg: it talks back once per visit, then goes quiet */
+  (function brandSpeaks() {
+    var brand = $('.brand'); if (!brand) return;
+    var said = false, LINES = ["That's the F. Not for Farhan, obviously. Okay, fine, it's for Farhan.", 'Click me and we go back to the top. Thrilling, I know.'];
+    function speak() { if (said) return; said = true; say(LINES[Math.floor(Math.random() * LINES.length)]); }
+    brand.addEventListener('mouseenter', speak); brand.addEventListener('focus', speak); brand.addEventListener('touchstart', speak, { passive: true });
+  })();
 
   /* ---------- command palette (Enter) + mini TryHackMe-style room ---------- */
   var tm = $('#tm'), tmOut = $('#tm-out'), tmIn = $('#tm-input'), tmBtn = $('#tm-btn');
