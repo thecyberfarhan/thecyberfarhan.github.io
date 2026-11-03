@@ -188,7 +188,7 @@
       ['hashcat -m 0 hash.txt rockyou.txt', ['5f4dcc3b5aa765d61d8327deb882cf99:password', '[+] 1/1 hashes cracked']]
     ], 7, 2200);
     termLoop($('.cterm-body'), [
-      ['./contact.sh --open', ['[+] availability: immediate', '[+] location: remote preferred', '[+] status: open to conversations']],
+      ['./contact.sh --open', ['[+] availability: immediate', '[+] location: remote, on-site or relocation', '[+] status: open to conversations']],
       ['cat ~/.plan', ['1. read the sample report', '2. skim a writeup or two', '3. send me a message']],
       ['whoami && id', ['farhan', 'uid=1000(farhan) gid=1000(pentester)', '[+] certified: CPENT']],
       ['./say_hi.sh', ['[*] waiting for your message...', '[+] email is the fastest route']],
