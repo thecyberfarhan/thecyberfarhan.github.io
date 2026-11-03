@@ -615,16 +615,19 @@
   }
   /* speech bubbles for both pilots */
   var sayF = document.createElement('div'), sayE = document.createElement('div');
-  sayF.className = 'rsay'; sayE.className = 'rsay foe'; [sayF, sayE].forEach(function (b) { b.setAttribute('aria-hidden', 'true'); document.body.appendChild(b); });
+  sayF.className = 'rsay'; sayE.className = 'rsay foe';
+  [sayF, sayE].forEach(function (b) { b.setAttribute('aria-hidden', 'true'); b.innerHTML = '<span class="rbody"><span class="rtxt"></span><i class="tail"></i></span>'; document.body.appendChild(b); });
   var sayUntil = { f: 0, e: 0 };
-  function sayAs(side, text, ms) { var b = side === 'f' ? sayF : sayE; b.textContent = text; b.classList.add('on'); sayUntil[side] = performance.now() + (ms || 2600); }
+  function sayAs(side, text, ms) { var b = side === 'f' ? sayF : sayE; b.querySelector('.rtxt').textContent = text; b.classList.add('on'); sayUntil[side] = performance.now() + (ms || 2600); }
   function hideSay() { sayF.classList.remove('on'); sayE.classList.remove('on'); sayUntil.f = sayUntil.e = 0; }
   function posSay(now) {
+    /* the bubble is centered over whoever is speaking, with a tail that slides to keep pointing at them even when the bubble is clamped to the screen edge */
     [['f', sayF], ['e', sayE]].forEach(function (p) {
       var side = p[0], b = p[1], u = ST && (side === 'f' ? ST.f : ST.e); if (!b.classList.contains('on')) return;
       if (now > sayUntil[side] || !u || !u.alive) { b.classList.remove('on'); return; }
-      var up = u.m > 0.5 ? 70 : 44, w = b.offsetWidth, h = b.offsetHeight, bx = side === 'f' ? u.x - w + 24 : u.x - 24;
-      b.style.transform = 'translate3d(' + clampV(bx, 8, innerWidth - w - 8).toFixed(1) + 'px,' + Math.max(8, u.y - up - h).toFixed(1) + 'px,0)';
+      var up = u.m > 0.5 ? 80 : 42, w = b.offsetWidth, h = b.offsetHeight, cx = u.x, bx = clampV(cx - w / 2, 8, innerWidth - w - 8), by = Math.max(8, u.y - up - h);
+      b.style.transform = 'translate3d(' + bx.toFixed(1) + 'px,' + by.toFixed(1) + 'px,0)';
+      b.style.setProperty('--tx', Math.max(18, Math.min(cx - bx, w - 18)).toFixed(1) + 'px');
     });
   }
   var PATROL = ['Scanning the sector...', 'All quiet. Too quiet.', 'No contacts. Staying sharp.', 'Radar looks clear.', 'Patrolling sector About.', 'Nothing here but rocks.'];
@@ -658,6 +661,7 @@
   /* the story */
   function startRoam() {
     if (!deskOK() || needMove) return;
+    hideNudge();
     var P0 = pal(), vis = visAst(null, 0, 0, 0), a, q;
     if (vis.length) { a = vis[Math.floor(Math.random() * vis.length)]; q = astXY(a); a.px = q.x; a.py = q.y; } else { a = tmpAsteroid(rnd(160, innerWidth - 160), rnd(160, innerHeight - 160)); }
     a.hide = true;
@@ -821,9 +825,14 @@
     if (due() && al < 0.5) { use(); fireShip(u, v, true, dmg()); u.cool = rnd(520, 820); jinkShip(v, 0.35); }
     else if (!due() && al < 0.22) { fireShip(u, v, false, 0); u.cool = rnd(430, 720); jinkShip(v, 1); }
   }
+  /* named maneuvers, so a dogfight is not always one ship glued behind the other */
+  function pickMove(s, dist) {
+    var r = Math.random();
+    return (r < 0.28 && dist > 380) ? 'merge' : r < 0.5 ? 'scissor' : r < 0.72 ? 'boost' : 'barrel';
+  }
   function dogAI(s, dt) {
     var f = s.f, e = s.e, clk = s.clk;
-    s.swapIn -= dt; s.boost = Math.max(0, s.boost - dt);
+    s.swapIn -= dt; s.boost = Math.max(0, s.boost - dt); s.moveIn -= dt;
     s.dwF = dueE(s) && s.chaser !== 'f' ? (s.dwF || 0) + dt : 0; s.dwE = dueF(s) && s.chaser !== 'e' ? (s.dwE || 0) + dt : 0;
     if (s.swapIn <= 0 || s.dwF > 2800 || s.dwE > 3200) {
       var want = s.dwF > 2800 ? 'f' : s.dwE > 3200 ? 'e' : (s.chaser === 'f' ? 'e' : 'f');
@@ -832,15 +841,51 @@
     }
     var ch = s.chaser === 'f' ? f : e, ev = ch === f ? e : f, dx = ev.x - ch.x, dy = ev.y - ch.y, dist = Math.hypot(dx, dy) || 1;
     ch.jink = Math.max(0, ch.jink - dt); ev.jink = Math.max(0, ev.jink - dt);
-    var wantC = Math.atan2(ev.y + ev.vy * 0.4 - ch.y, ev.x + ev.vx * 0.4 - ch.x), spC = dist > 340 ? 400 : dist > 240 ? 310 : dist > 160 ? 240 : 190;
-    if (dist < 135) { wantC = ch.ang + (ch.bank >= 0 ? 1 : -1) * 0.9; spC = 330; }
-    var away = Math.atan2(ev.y - ch.y, ev.x - ch.x), wantE = away + Math.sin(clk * 0.0042 + ev.seed) * 0.6 + (ev.jink > 0 ? ev.jdir * 1.2 : 0), spE = ev.jink > 0 ? 410 : 320;
-    if (dist < 135) wantE = away + (ev.bank >= 0 ? 0.7 : -0.7);
-    steerShip(ch, wallBias(ch, withSep(ch, wantC, ev, 200, 3.2)), dist < 190 ? Math.min(spC, 170) : spC, 3.0 + (s.boost > 0 ? 3 : 0), dt); steerShip(ev, wallBias(ev, withSep(ev, wantE, ch, 260, 3)), spE, ev.jink > 0 ? 5.2 : 3.4, dt);
-    if (dist < 120) { var push = (120 - dist) * 0.5; ch.x -= dx / dist * push; ch.y -= dy / dist * push; ev.x += dx / dist * push; ev.y += dy / dist * push; }
+
+    if (s.move === 'chase' && s.moveIn <= 0 && dist > 130) {
+      s.move = pickMove(s, dist); s.moveT = 0; s.passed = false;
+      if (s.move === 'merge') sayAs(Math.random() < 0.5 ? 'f' : 'e', 'Merging!', 1300);
+      else if (s.move === 'boost') sayAs(ev.side, 'Falling back!', 1300);
+      else if (s.move === 'scissor') sayAs(Math.random() < 0.5 ? 'f' : 'e', 'Scissors!', 1300);
+      else sayAs(ev.side, 'Watch this.', 1300);
+    } else if (s.move !== 'chase') s.moveT += dt;
+
+    var wantC, wantE, spC, spE;
+    if (s.move === 'merge') {
+      var toEv = Math.atan2(dy, dx);
+      if (!s.passed && dist < 100) { s.passed = true; ringFx((ch.x + ev.x) / 2, (ch.y + ev.y) / 2, '255,255,255', 26); }
+      if (!s.passed) { wantC = toEv; wantE = toEv + Math.PI; spC = 460; spE = 440; }
+      else { wantC = ch.ang + (ch.bank >= 0 ? 1 : -1) * 1.5; wantE = ev.ang + (ev.bank >= 0 ? -1 : 1) * 1.5; spC = 380; spE = 380; }
+      if (s.moveT > 2200) { s.move = 'chase'; s.moveIn = rnd(4500, 7200); }
+    } else if (s.move === 'scissor') {
+      var base = Math.atan2(dy, dx), weave = Math.sin(clk * 0.0045) * 1.15;
+      wantC = base + weave; wantE = base + Math.PI - weave; spC = 260; spE = 260;
+      if (s.moveT > 1900) { s.move = 'chase'; s.moveIn = rnd(4500, 7200); }
+    } else if (s.move === 'boost') {
+      var away0 = Math.atan2(-dy, -dx);
+      wantE = away0 + Math.sin(clk * 0.003 + ev.seed) * 0.4; spE = 480;
+      wantC = Math.atan2(dy, dx); spC = 330;
+      if (s.moveT > 1300) { s.move = 'chase'; s.moveIn = rnd(4500, 7200); }
+    } else if (s.move === 'barrel') {
+      if (ev.roll <= 0) ev.roll = 0.01;
+      wantE = Math.atan2(ev.y - ch.y, ev.x - ch.x) + Math.sin(clk * 0.009) * 2.1; spE = 360;
+      wantC = Math.atan2(dy, dx); spC = 300;
+      if (s.moveT > 1300) { s.move = 'chase'; s.moveIn = rnd(4500, 7200); }
+    } else {
+      wantC = Math.atan2(ev.y + ev.vy * 0.4 - ch.y, ev.x + ev.vx * 0.4 - ch.x); spC = dist > 340 ? 400 : dist > 240 ? 310 : dist > 160 ? 240 : 190;
+      if (dist < 135) { wantC = ch.ang + (ch.bank >= 0 ? 1 : -1) * 0.9; spC = 330; }
+      var away = Math.atan2(ev.y - ch.y, ev.x - ch.x); wantE = away + Math.sin(clk * 0.0042 + ev.seed) * 0.6 + (ev.jink > 0 ? ev.jdir * 1.2 : 0); spE = ev.jink > 0 ? 410 : 320;
+      if (dist < 135) wantE = away + (ev.bank >= 0 ? 0.7 : -0.7);
+    }
+    var extraTurn = s.move === 'chase' ? 0 : 1.2;
+    steerShip(ch, wallBias(ch, withSep(ch, wantC, ev, 200, 3.2)), s.move === 'chase' && dist < 190 ? Math.min(spC, 170) : spC, 3.0 + (s.boost > 0 ? 3 : 0) + extraTurn, dt);
+    steerShip(ev, wallBias(ev, withSep(ev, wantE, ch, 260, 3)), spE, (ev.jink > 0 ? 5.2 : 3.4) + extraTurn, dt);
+    if (dist < 120 && s.move !== 'merge') { var push = (120 - dist) * 0.5; ch.x -= dx / dist * push; ch.y -= dy / dist * push; ev.x += dx / dist * push; ev.y += dy / dist * push; }
     keepIn(f); keepIn(e);
-    tryFire(s, f, e, dt, function () { return dueE(s); }, function () { s.plan.ei++; }, function () { return hitDmgE(s); });
-    tryFire(s, e, f, dt, function () { return dueF(s); }, function () { s.plan.fi++; }, function () { return s.plan.fdmg; });
+    if (!(s.move === 'merge' && !s.passed)) {
+      tryFire(s, f, e, dt, function () { return dueE(s); }, function () { s.plan.ei++; }, function () { return hitDmgE(s); });
+      tryFire(s, e, f, dt, function () { return dueF(s); }, function () { s.plan.fi++; }, function () { return s.plan.fdmg; });
+    }
   }
   function withSep(u, want, o, range, k) { var d = Math.hypot(u.x - o.x, u.y - o.y) || 1, rep = Math.max(0, (range - d) / range), vx = Math.cos(want) + (u.x - o.x) / d * rep * k, vy = Math.sin(want) + (u.y - o.y) / d * rep * k; return Math.atan2(vy, vx); }
   function stepHalves(dt) {
@@ -898,7 +943,7 @@
         steerShip(en, wallBias(en, Math.atan2(s.wp.y - en.y, s.wp.x - en.x)), 330 + 250 * Math.max(0, 1 - (s.pt - 1100) / 1000), 3.3, dt);
         steerShip(f, wallBias(f, Math.atan2(en.y - f.y, en.x - f.x)), 150, 3.4, dt);
       } else { f.vx *= 0.96; f.vy *= 0.96; f.x += f.vx * dt / 1000; f.y += f.vy * dt / 1000; f.ang += angDiff(f.ang, Math.atan2(T2.py - f.y, T2.px - f.x)) * Math.min(1, dt * 0.01); f.spd = Math.hypot(f.vx, f.vy); }
-      if (s.sf && ((s.pt > 3000 && Math.hypot(en.x - f.x, en.y - f.y) > 190) || s.pt > 4800)) { s.ph = 'dog'; s.pt = 0; s.round = 1; planRound(false); s.chaser = Math.random() < 0.5 ? 'f' : 'e'; s.swapIn = rnd(3500, 5000); s.boost = 0; s.dwF = s.dwE = 0; }
+      if (s.sf && ((s.pt > 3000 && Math.hypot(en.x - f.x, en.y - f.y) > 190) || s.pt > 4800)) { s.ph = 'dog'; s.pt = 0; s.round = 1; planRound(false); s.chaser = Math.random() < 0.5 ? 'f' : 'e'; s.swapIn = rnd(3500, 5000); s.boost = 0; s.dwF = s.dwE = 0; s.move = 'chase'; s.moveT = 0; s.moveIn = rnd(3200, 5200); }
     } else if (ph === 'dog') {
       if (!e) return;
       s.rt += dt; dogAI(s, dt);
@@ -926,7 +971,7 @@
       if (d3 && d4) {
         f.tr = null; if (e) e.tr = null; f.spd = Math.max(200, Math.hypot(f.vx, f.vy)); f.ang = -1.5708; f.aim = f.atk = 0; if (e) { e.spd = Math.max(200, Math.hypot(e.vx, e.vy)); e.ang = -1.5708; e.aim = e.atk = 0; }
         if (s.killed || !e || !e.alive) { f.tt = 0; afterWin(s, now); }
-        else { s.ph = 'dog'; s.pt = 0; s.round++; planRound(false); s.chaser = Math.random() < 0.5 ? 'f' : 'e'; s.swapIn = rnd(3500, 5000); s.boost = 0; sayAs('e', 'Back to the air!', 1600); }
+        else { s.ph = 'dog'; s.pt = 0; s.round++; planRound(false); s.chaser = Math.random() < 0.5 ? 'f' : 'e'; s.swapIn = rnd(3500, 5000); s.boost = 0; s.move = 'chase'; s.moveT = 0; s.moveIn = rnd(3200, 5200); sayAs('e', 'Back to the air!', 1600); }
       }
     } else if (ph === 'victory') {
       s.vt += dt;
@@ -961,11 +1006,12 @@
   function abortMech(P) { var s = ST; s.lasers.length = 0; [s.f, s.e].forEach(function (u) { if (u && u.alive) { u.tr = u.m > 0.3 ? { st: 'hop', t: 0 } : null; if (!u.tr) { u.m = 0; } } }); s.ph = 'toShip'; s.pt = 0; }
   function finishStory(sleep) {
     restoreAst(); ST = null; roam = null; root.classList.remove('roaming'); hideSay(); hideCap(); rx = mx; ry = my;
+    lastN = performance.now(); /* give the page a moment of quiet before the next idle nudge */
     if (sleep) needMove = true; else ringPop();
   }
 
   if (QS.get('debug')) window.__adv = function (ms) { if (!ST || !roam) return; var n = Math.ceil(ms / 40), P = pal(), i; for (i = 0; i < n && ST; i++) stepStory(roam, 40, performance.now(), P); };
-  if (QS.get('debug')) window.__st = function () { return ST && { ph: ST.ph, round: ST.round, win: ST.win, pt: Math.round(ST.pt), rt: Math.round(ST.rt), ehp: ST.e && Math.round(ST.e.hp), fhp: Math.round(ST.f.hp), em: ST.e && +ST.e.m.toFixed(2), fm: +ST.f.m.toFixed(2), ftr: ST.f.tr && ST.f.tr.st, etr: ST.e && ST.e.tr && ST.e.tr.st, fy: Math.round(ST.f.y), ey: ST.e && Math.round(ST.e.y), fx: Math.round(ST.f.x), ex: ST.e && Math.round(ST.e.x), top: ST.pl && Math.round(ST.pl.getBoundingClientRect().top), fmode: ST.f.mode, emode: ST.e && ST.e.mode, fh: ST.f.hitNext, eh: ST.e && ST.e.hitNext, fafter: ST.f.after, fwant: Math.round(ST.f.want), burst: ST.f.burst, mt: Math.round(ST.f.mt), eair: ST.e && ST.e.air, fstag: Math.round(ST.f.stag), ns: ST.ns, nsp: ST.nsp, nclash: ST.nclash, nup: ST.nup, slow: ST.slow, nsd: ST.nsd, nsa: ST.nsa, cap: ST.capKey, quiet: ST.quiet, nfire: ST.nfire, nhit: ST.nhit, ei: ST.plan && ST.plan.ei, en: ST.plan && ST.plan.e.length, killed: ST.killed, lasers: ST.lasers.length, parts: ST.parts.length, ast: AST.length, hidden: AST.filter(function (a) { return a.hide; }).length }; };
+  if (QS.get('debug')) window.__st = function () { return ST && { ph: ST.ph, round: ST.round, win: ST.win, pt: Math.round(ST.pt), rt: Math.round(ST.rt), ehp: ST.e && Math.round(ST.e.hp), fhp: Math.round(ST.f.hp), em: ST.e && +ST.e.m.toFixed(2), fm: +ST.f.m.toFixed(2), ftr: ST.f.tr && ST.f.tr.st, etr: ST.e && ST.e.tr && ST.e.tr.st, fy: Math.round(ST.f.y), ey: ST.e && Math.round(ST.e.y), fx: Math.round(ST.f.x), ex: ST.e && Math.round(ST.e.x), top: ST.pl && Math.round(ST.pl.getBoundingClientRect().top), fmode: ST.f.mode, emode: ST.e && ST.e.mode, fh: ST.f.hitNext, eh: ST.e && ST.e.hitNext, fafter: ST.f.after, fwant: Math.round(ST.f.want), burst: ST.f.burst, mt: Math.round(ST.f.mt), eair: ST.e && ST.e.air, fstag: Math.round(ST.f.stag), ns: ST.ns, nsp: ST.nsp, nclash: ST.nclash, nup: ST.nup, slow: ST.slow, nsd: ST.nsd, nsa: ST.nsa, move: ST.move, cap: ST.capKey, quiet: ST.quiet, nfire: ST.nfire, nhit: ST.nhit, ei: ST.plan && ST.plan.ei, en: ST.plan && ST.plan.e.length, killed: ST.killed, lasers: ST.lasers.length, parts: ST.parts.length, ast: AST.length, hidden: AST.filter(function (a) { return a.hide; }).length }; };
   function drawRoam(ctx, P, dt, now) {
     var r = roam, s = ST; if (!s) { roam = null; root.classList.remove('roaming'); return; }
     if (r.back) {
@@ -1455,7 +1501,7 @@
   }
   nBtns.addEventListener('click', function (e) { var bt = e.target.closest && e.target.closest('button'); if (bt && bt.hasAttribute('data-close')) hideNudge(); });
   setInterval(function () {
-    if (document.hidden || !root.classList.contains('done') || !motion) return;
+    if (document.hidden || !root.classList.contains('done') || !motion || roam) return;
     var now = performance.now(), idle = now - lastAct, gap = +QS.get('nudgegap') || Math.min(150000 + nCount * 60000, 420000);
     if (idle > (+QS.get('nudgeidle') || 50000) && now - lastN > gap) showNudge();
   }, 1000);

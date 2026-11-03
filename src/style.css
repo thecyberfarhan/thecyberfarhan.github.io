@@ -725,8 +725,14 @@ html.has-cursor .cursor-ring.txt{opacity:0}
 /* decluttered background: only the globe and the network remain */
 .aurora,.floor{display:none!important}
 /* roamer speech */
-.rsay{position:fixed;left:0;top:0;z-index:9990;max-width:min(260px,70vw);padding:8px 12px;border-radius:12px;background:var(--surface);border:1px solid var(--border);color:var(--text);font:600 12.5px/1.4 var(--sans);box-shadow:0 10px 30px var(--shadow);pointer-events:none;opacity:0;transition:opacity .25s}
+.rsay{--nbg:color-mix(in srgb,var(--steel) 16%,var(--surface));--nbg2:color-mix(in srgb,var(--steel) 36%,var(--surface));--nbd:color-mix(in srgb,var(--steel) 58%,var(--border));--nac:var(--steel);position:fixed;left:0;top:0;z-index:9990;max-width:min(240px,70vw);pointer-events:none;opacity:0;transition:opacity .2s}
 .rsay.on{opacity:1}
+.rsay.foe{--nbg:color-mix(in srgb,var(--accent) 14%,var(--surface));--nbg2:color-mix(in srgb,var(--accent) 34%,var(--surface));--nbd:color-mix(in srgb,var(--accent) 58%,var(--border));--nac:var(--accent)}
+.rsay .rbody{position:relative;display:block;padding:8px 13px;border-radius:13px;background:linear-gradient(150deg,var(--nbg2),var(--nbg));border:1px solid var(--nbd);color:var(--text);font:600 12.5px/1.4 var(--sans);box-shadow:0 14px 32px -12px var(--shadow),0 0 18px -5px color-mix(in srgb,var(--nac) 55%,transparent);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);transform:scale(.78) translateY(7px);transform-origin:var(--tx,50%) 100%;transition:transform .28s cubic-bezier(.34,1.56,.64,1)}
+.rsay.on .rbody{transform:scale(1) translateY(0)}
+.rsay .rtxt{position:relative}
+.rsay .rtxt::before{content:'';position:absolute;left:-13px;top:-8px;width:5px;height:5px;border-radius:50%;background:var(--nac);box-shadow:0 0 6px 1px var(--nac)}
+.rsay .tail{position:absolute;width:11px;height:11px;left:var(--tx,50%);margin-left:-5.5px;bottom:-4.5px;background:var(--nbg);border:1px solid var(--nbd);border-width:0 1px 1px 0;transform:rotate(45deg)}
 html.quick #loader{transition:opacity .3s 0s!important}html.quick .ld-ui{transition-duration:.2s!important}
 
 /* how I test */
@@ -751,7 +757,7 @@ html.quick #loader{transition:opacity .3s 0s!important}html.quick .ld-ui{transit
 
 #about .more{display:flex;flex-wrap:wrap;gap:12px}
 
-.rsay.foe{border-color:color-mix(in srgb,var(--accent) 70%,var(--border));background:color-mix(in srgb,var(--accent) 12%,var(--surface))}
+
 
 .nudge.side-l .tail{left:-8px;bottom:auto;top:var(--ty,50%);margin:-7px 0 0;border-width:0 0 1px 1px}.nudge.side-r .tail{left:auto;right:-8px;bottom:auto;top:var(--ty,50%);margin:-7px 0 0;border-width:1px 1px 0 0}
 
