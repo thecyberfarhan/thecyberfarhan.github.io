@@ -287,44 +287,8 @@
     requestAnimationFrame(plx);
   })();
 
-  /* ---------- section transitions: scan sweep ---------- */
-  var scan = $('#scan'), sctx = scan && scan.getContext('2d'), busy = false;
-  function runScan(label, mid, done) {
-    var W = innerWidth, H = innerHeight, CS = 44, cols = Math.ceil(W / CS), rows = Math.ceil(H / CS), cell = [], i, bg = getComputedStyle(root).getPropertyValue('--bg').trim() || '#0d1117';
-    scan.width = W; scan.height = H; scan.classList.add('on');
-    for (i = 0; i < cols * rows; i++) cell.push({ j: Math.random(), f: Math.random() });
-    var A = 460, HOLD = 70, B = 620, tStart = performance.now(), midDone = false;
-    function ease(x) { return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2; }
-    function frame(now) {
-      var t = now - tStart, y, phase;
-      sctx.clearRect(0, 0, W, H);
-      if (t < A) { phase = 1; y = ease(t / A) * (H + 120); }
-      else if (t < A + HOLD) { phase = 2; y = H + 120; }
-      else { phase = 3; y = ease(Math.min((t - A - HOLD) / B, 1)) * (H + 320); }
-      if (t >= A && !midDone) { midDone = true; mid(); }
-      for (var r = 0; r < rows; r++) for (var c2 = 0; c2 < cols; c2++) {
-        var k = cell[r * cols + c2], cy = r * CS, a;
-        if (phase === 1) { if (cy > y) continue; a = Math.min(1, (y - cy) / 90) * (k.f > 0.93 && Math.random() < 0.5 ? 0.35 : 0.97); }
-        else if (phase === 2) a = 1;
-        else { var rel = y - cy - k.j * 180; a = rel < 0 ? 1 : Math.max(0, 1 - rel / 160); if (a < 0.6 && k.f > 0.85 && Math.random() < 0.3) a = 0.9; }
-        if (a <= 0.01) continue;
-        sctx.globalAlpha = a; sctx.fillStyle = bg; sctx.fillRect(c2 * CS, cy, CS + 1, CS + 1);
-        if (phase !== 2 && k.f > 0.9 && a < 0.95) { sctx.globalAlpha = 0.28; sctx.fillStyle = '#B4232C'; sctx.fillRect(c2 * CS, cy, CS - 2, CS - 2); }
-      }
-      sctx.globalAlpha = 1;
-      if (phase !== 2) {
-        var ly = Math.min(y, H);
-        var g = sctx.createLinearGradient(0, ly - 70, 0, ly); g.addColorStop(0, 'rgba(180,35,44,0)'); g.addColorStop(1, 'rgba(180,35,44,.32)');
-        sctx.fillStyle = g; sctx.fillRect(0, ly - 70, W, 70);
-        sctx.fillStyle = '#B4232C'; sctx.shadowColor = '#B4232C'; sctx.shadowBlur = 16; sctx.fillRect(0, ly - 1, W, 2); sctx.shadowBlur = 0;
-        sctx.font = '700 12px "JetBrains Mono","Fira Code",ui-monospace,monospace'; sctx.fillStyle = '#E5A0A4'; sctx.fillText('> scan /' + label.toLowerCase() + '  [' + Math.min(99, Math.round(ly / H * 100)) + '%]', 24, Math.max(ly - 14, 22));
-      } else {
-        sctx.font = '700 clamp(20px,4vw,38px) sans-serif'; sctx.font = '800 36px "Inter","Segoe UI",sans-serif'; sctx.fillStyle = getComputedStyle(root).getPropertyValue('--text').trim(); sctx.textAlign = 'center'; sctx.fillText(label, W / 2, H / 2); sctx.textAlign = 'left';
-      }
-      if (t < A + HOLD + B + 200) requestAnimationFrame(frame); else { sctx.clearRect(0, 0, W, H); scan.classList.remove('on'); done(); }
-    }
-    requestAnimationFrame(frame);
-  }
+  /* ---------- section transitions: a quick, quiet scroll ---------- */
+  var busy = false;
   function go(id, label) {
     var target = id === 'top' ? document.body : document.getElementById(id); if (!target) return;
     var y = id === 'top' ? 0 : Math.round(target.getBoundingClientRect().top + window.scrollY);
@@ -338,24 +302,17 @@
       try { history.replaceState(null, '', id === 'top' ? location.pathname : '#' + id); } catch (e) {}
     });
   }
-  /* quick, quiet transition: an eased glide with a thin scanner line crossing the screen */
   function glide(y, done) {
-    var y0 = window.scrollY, d = y - y0, dur = Math.min(850, Math.max(420, 300 + Math.abs(d) * 0.15)), t0 = performance.now(), W = innerWidth, H = innerHeight, down = d >= 0;
+    var y0 = window.scrollY, d = y - y0, dur = Math.min(850, Math.max(420, 300 + Math.abs(d) * 0.15)), t0 = performance.now();
     var finished = false;
-    function finish() { if (finished) return; finished = true; clearTimeout(guard); sctx.clearRect(0, 0, W, H); scan.classList.remove('on'); window.scrollTo(0, y); done(); }
+    function finish() { if (finished) return; finished = true; clearTimeout(guard); window.scrollTo(0, y); done(); }
     var guard = setTimeout(finish, dur + 700);
     if (document.hidden) { finish(); return; }
-    scan.width = W; scan.height = H; scan.classList.add('on');
     function ease(x) { return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; }
     (function frame(now) {
       if (finished) return;
       var p = Math.min((now - t0) / dur, 1), e = ease(p);
       window.scrollTo(0, y0 + d * e);
-      sctx.clearRect(0, 0, W, H);
-      var ly = (down ? e : 1 - e) * H, a = Math.sin(Math.PI * p), dir = down ? -1 : 1;
-      var g = sctx.createLinearGradient(0, ly, 0, ly + dir * 90); g.addColorStop(0, 'rgba(180,35,44,' + (0.22 * a).toFixed(3) + ')'); g.addColorStop(1, 'rgba(180,35,44,0)');
-      sctx.fillStyle = g; sctx.fillRect(0, Math.min(ly, ly + dir * 90), W, 90);
-      sctx.fillStyle = 'rgba(180,35,44,' + (0.85 * a).toFixed(3) + ')'; sctx.fillRect(0, ly - 1, W, 2);
       if (p < 1) requestAnimationFrame(frame); else finish();
     })(t0);
   }
@@ -421,7 +378,7 @@
   function easeIO(t) { t = clampV(t, 0, 1); return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
   function angDiff(a, b) { var d = b - a; while (d > Math.PI) d -= 6.2832; while (d < -Math.PI) d += 6.2832; return d; }
   var AST = [], ST = null, needMove = false, FEET = 23, fought = false;
-  function COLS(P, side) { return side === 'f' ? { s: P.node, f: P.link, h: P.hot, fl: P.hot } : { s: P.hot, f: P.hot, h: P.node, fl: P.wire }; }
+  function COLS(P, side) { return side === 'f' ? { s: P.node, f: P.link, h: P.node, fl: P.link } : { s: P.hot, f: P.hot, h: P.wireHot, fl: P.hot }; }
 
   /* background asteroids */
   function mkAsteroid(rad) {
