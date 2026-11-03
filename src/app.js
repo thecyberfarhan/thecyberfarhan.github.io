@@ -655,7 +655,7 @@
     var cg = ctx.createRadialGradient(0, -15, 0, 0, -15, 5.5); cg.addColorStop(0, 'rgba(' + c.h + ',' + pulse.toFixed(2) + ')'); cg.addColorStop(1, 'rgba(' + c.h + ',0)'); ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(0, -15, 5.5, 0, 6.283); ctx.fill();
     ctx.fillStyle = hot; poly([[0, -17.4], [2, -16.2], [2, -13.8], [0, -12.6], [-2, -13.8], [-2, -16.2]]); ctx.fill();
     ctx.fillStyle = plate; ctx.lineWidth = 1.5; poly([[-15, -29], [-6, -30], [-6, -19], [-14, -20]]); ctx.fill(); ctx.stroke(); poly([[15, -29], [6, -30], [6, -19], [14, -20]]); ctx.fill(); ctx.stroke();
-    ctx.strokeStyle = 'rgba(' + c.h + ',.5)'; ctx.lineWidth = 1; poly([[-14, -28], [-7.5, -28.8], [-7.5, -20.5], [-13, -21.3]]); ctx.stroke(); poly([[14, -28], [7.5, -28.8], [7.5, -20.5], [13, -21.3]]); ctx.stroke(); ctx.strokeStyle = line;
+    ctx.strokeStyle = 'rgba(' + c.h + ',.8)'; ctx.lineWidth = 1.1; poly([[-14, -28], [-7.5, -28.8], [-7.5, -20.5], [-13, -21.3]]); ctx.stroke(); poly([[14, -28], [7.5, -28.8], [7.5, -20.5], [13, -21.3]]); ctx.stroke(); ctx.strokeStyle = line;
     ctx.fillStyle = 'rgba(' + c.h + ',.22)'; poly([[-6, -24], [0, -14], [6, -24]]); ctx.fill(); ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(0, -23); ctx.lineTo(0, -11.5); ctx.stroke();
     ctx.fillStyle = plate; poly([[-7, -10], [-3, -10], [-4, -5], [-7.5, -6]]); ctx.fill(); ctx.stroke(); poly([[-2, -10], [2, -10], [2, -4], [-2, -4]]); ctx.fill(); ctx.stroke(); poly([[7, -10], [3, -10], [4, -5], [7.5, -6]]); ctx.fill(); ctx.stroke();
     ctx.fillStyle = plate; ctx.lineWidth = 1.1; poly([[-13.5, -24.5], [-9.5, -24.8], [-9.5, -19.5], [-13.5, -19.5]]); ctx.fill(); ctx.stroke();
@@ -681,7 +681,7 @@
     ctx.fillStyle = plate; poly([[-5.5, -40], [5.5, -40], [6.4, -37.5], [-6.4, -37.5]]); ctx.fill();
     ctx.fillStyle = 'rgba(' + c.h + ',.25)'; ctx.fillRect(-6.5, -35, 13, 5.6);
     ctx.fillStyle = flick ? 'rgba(255,255,255,.95)' : hot; ctx.fillRect(-5.8, -33.4, 11.6, 2.4);
-    ctx.fillStyle = plate; ctx.lineWidth = 1.4; poly([[-1.3, -40], [1.3, -40], [0, -47.5]]); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = hot; ctx.lineWidth = 1.4; poly([[-1.3, -40], [1.3, -40], [0, -47.5]]); ctx.fill(); ctx.stroke();
     ctx.fillStyle = plate; poly([[-8, -33], [-6, -33], [-6, -29], [-8.6, -30.2]]); ctx.fill(); ctx.stroke(); poly([[8, -33], [6, -33], [6, -29], [8.6, -30.2]]); ctx.fill(); ctx.stroke();
     if (foe) { ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(-5, -39); ctx.lineTo(-9, -45); ctx.moveTo(5, -39); ctx.lineTo(9, -45); ctx.stroke(); }
     if (u.flash > 0) { ctx.fillStyle = 'rgba(255,255,255,' + (u.flash * 0.6).toFixed(2) + ')'; poly([[-8, -40], [8, -40], [8, -10], [-8, -10]]); ctx.fill(); }
