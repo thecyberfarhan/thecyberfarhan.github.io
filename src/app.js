@@ -733,7 +733,7 @@
   /* mech AI */
   function canDodge(u) { return u.alive && !u.air && u.mode !== 'melee' && !(u.stag > 0); }
   function mechPick(u, v, s, due) {
-    var dist = Math.abs(v.x - u.x), r = Math.random(), wide = (ST.bw || 400) > 330; u.hitNext = false; u.after = ''; u.mt = rnd(500, 1000); u.burst = 0; u.jump = null; u.charge = 0; u.guard = 0; u.dive = 0; u.up = false; u.bombThrown = false; u.blockedHit = false;
+    var dist = Math.abs(v.x - u.x), wide = (ST.bw || 400) > 330; u.hitNext = false; u.after = ''; u.mt = rnd(500, 1000); u.burst = 0; u.jump = null; u.charge = 0; u.guard = 0; u.dive = 0; u.up = false; u.bombThrown = false; u.blockedHit = false;
     if (due) {
       u.hitNext = true;
       if (dist > 170 && Math.random() < 0.22) { u.mode = 'barrage'; u.mt = 160; u.burst = 7; sayAs(u.side, u.side === 'f' ? 'Full auto!' : 'Suppressing fire!', 1300); return; }
@@ -742,15 +742,24 @@
       if (dist > 110 && wide && Math.random() < 0.3) { u.mode = 'dive'; return; }
       if (dist > 120) { u.want = rnd(130, 210); u.after = 'shoot'; } else { u.want = 46; u.after = 'melee'; } u.mode = 'walk'; return;
     }
-    if (r < 0.1) { u.want = rnd(150, 240); u.after = 'shoot'; u.mode = 'walk'; }
-    else if (r < 0.18 && dist > 170) { u.mode = 'barrage'; u.mt = 160; u.burst = 7; sayAs(u.side, u.side === 'f' ? 'Hold still!' : 'Take this!', 1300); }
-    else if (r < 0.25 && dist > 150) { u.mode = 'bomb'; u.mt = 480; sayAs(u.side, u.side === 'f' ? 'Incoming!' : 'Dodge this.', 1300); }
-    else if (r < 0.37 && dist > 150) { u.mode = 'charge'; }
-    else if (r < 0.49 && wide) { u.mode = 'leap'; }
-    else if (r < 0.59 && wide && dist > 110) { u.mode = 'dive'; }
-    else if (r < 0.72) { u.want = rnd(44, 60); u.after = 'melee'; u.mode = 'walk'; u.dash = true; }
-    else if (r < 0.84) { u.mode = 'strafe'; u.mt = rnd(600, 950); }
-    else if (r < 0.92 && (v.mode === 'melee' || v.mode === 'charge' || v.mode === 'shoot')) { u.mode = 'guard'; u.mt = rnd(650, 900); }
+    /* weighted pick over only the moves that are actually eligible right now, instead of a fixed dice-range chain -- the old chain let a gated move's slice (barrage/bomb/charge needing range, leap/dive needing a wide platform) silently fall through to whatever came next whenever its distance/width condition failed, which on a close or narrow fight collapsed most of the roll into melee ("all they do is hit and jump"). Weighting means a blocked move's share goes to every other eligible move instead of just the next one in line. */
+    var cands = [
+      ['shoot', 10, true], ['barrage', 8, dist > 170], ['bomb', 7, dist > 150], ['charge', 12, dist > 150],
+      ['leap', 12, wide], ['dive', 10, wide && dist > 110], ['melee', 13, true], ['strafe', 12, true],
+      ['guard', 8, v.mode === 'melee' || v.mode === 'charge' || v.mode === 'shoot'], ['jump', 8, true]
+    ].filter(function (c) { return c[2]; });
+    var total = 0; for (var i = 0; i < cands.length; i++) total += cands[i][1];
+    var roll = Math.random() * total, acc = 0, pick = cands[cands.length - 1][0];
+    for (var ci = 0; ci < cands.length; ci++) { acc += cands[ci][1]; if (roll < acc) { pick = cands[ci][0]; break; } }
+    if (pick === 'shoot') { u.want = rnd(150, 240); u.after = 'shoot'; u.mode = 'walk'; }
+    else if (pick === 'barrage') { u.mode = 'barrage'; u.mt = 160; u.burst = 7; sayAs(u.side, u.side === 'f' ? 'Hold still!' : 'Take this!', 1300); }
+    else if (pick === 'bomb') { u.mode = 'bomb'; u.mt = 480; sayAs(u.side, u.side === 'f' ? 'Incoming!' : 'Dodge this.', 1300); }
+    else if (pick === 'charge') { u.mode = 'charge'; }
+    else if (pick === 'leap') { u.mode = 'leap'; }
+    else if (pick === 'dive') { u.mode = 'dive'; }
+    else if (pick === 'melee') { u.want = rnd(44, 60); u.after = 'melee'; u.mode = 'walk'; u.dash = true; }
+    else if (pick === 'strafe') { u.mode = 'strafe'; u.mt = rnd(600, 950); }
+    else if (pick === 'guard') { u.mode = 'guard'; u.mt = rnd(650, 900); }
     else { u.mode = 'jump'; }
   }
   function mechStep(u, v, dt, s, due, dueUse, bounds, P) {
