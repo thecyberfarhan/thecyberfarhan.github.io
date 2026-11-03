@@ -752,3 +752,5 @@ html.quick #loader{transition:opacity .3s 0s!important}html.quick .ld-ui{transit
 #about .more{display:flex;flex-wrap:wrap;gap:12px}
 
 .rsay.foe{border-color:color-mix(in srgb,var(--accent) 70%,var(--border));background:color-mix(in srgb,var(--accent) 12%,var(--surface))}
+
+.nudge.side-l .tail{left:-8px;bottom:auto;top:var(--ty,50%);margin:-7px 0 0;border-width:0 0 1px 1px}.nudge.side-r .tail{left:auto;right:-8px;bottom:auto;top:var(--ty,50%);margin:-7px 0 0;border-width:1px 1px 0 0}

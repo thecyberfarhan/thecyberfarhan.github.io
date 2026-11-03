@@ -1284,9 +1284,10 @@
     return cur;
   }
   function nameOf(el) { var b = el.querySelector('b'), h = el.querySelector('h3'), l = el.querySelector('.tl'); return (b && b.textContent) || (h && h.textContent) || (l && l.textContent) || el.getAttribute('data-nudge') || ''; }
+  function visibleBig(el) { var r = el.getBoundingClientRect(), vis = Math.min(r.bottom, innerHeight - 50) - Math.max(r.top, 100); return r.left >= 0 && r.right <= innerWidth && vis >= Math.min(r.height * 0.8, 150) && r.width >= 200; }
   function pickSpeaker(sec) {
-    var sel = sec === 'tools' ? '.chip-tile, .tool-col li' : sec === 'proof' ? '.wcard, .stat' : sec === 'about' ? '.card' : sec === 'sky' ? '.sky' : sec === 'live' ? '.lc-stat, .live-card' : sec === 'contact' ? '.ccard, .cterm' : sec === 'hero' ? '.medal-stage, .termcard' : '';
-    if (!sel) return null; var list = $$(sel).filter(inView); return list.length ? list[Math.floor(Math.random() * list.length)] : null;
+    var sel = sec === 'tools' ? '.tool-col' : sec === 'proof' ? '.wcard' : sec === 'about' ? '.card, .steps li' : sec === 'journey' ? '.jt-b, .open-card' : sec === 'play' ? '.game' : sec === 'arch' ? '.nf, .pm, .arch-c' : sec === 'sky' ? '.sky' : sec === 'live' ? '.live-card' : sec === 'contact' ? '.cterm, .ccard' : sec === 'hero' ? '.medal-stage, .termcard' : '';
+    if (!sel) return null; var list = $$(sel).filter(visibleBig); return list.length ? list[Math.floor(Math.random() * list.length)] : null;
   }
   /* a notification never sits on top of other content: it picks the free spot with the least overlap */
   var BLK = '.card,.wcard,.chip-tile,.tool-col,.stat,.lc-stat,.ccard,.termcard,.cterm,.live-card,.btn,.title,.sub,.pills,.lead,.hero-copy h1,.role,.medal-stage,.sky,.eyebrow,.arch-q,.jt-b,.open-card,.steps li,.nf,.pm,.game,.tech li,.thm-badge,.hud,.prompt';
@@ -1309,28 +1310,43 @@
       var cx = r.left + r.width / 2, ax = clampN(cx - w / 2, 12, innerWidth - w - 12), ry = clampN(r.top + r.height / 2 - h / 2, 76, maxY);
       if (r.top - h - 16 >= 76) list.push({ k: 'above', x: ax, y: r.top - h - 16, pen: 0, tail: true, cx: cx });
       if (r.bottom + 16 <= maxY) list.push({ k: 'below', x: ax, y: r.bottom + 16, pen: 0, tail: true, below: true, cx: cx });
-      if (r.right + 14 + w <= innerWidth - 12) list.push({ k: 'right', x: r.right + 14, y: ry, pen: 2500 });
-      if (r.left - 14 - w >= 12) list.push({ k: 'left', x: r.left - 14 - w, y: ry, pen: 2500 });
-    }
-    list.push({ k: 'bl', x: 16, y: maxY, pen: 5000 }, { k: 'br', x: innerWidth - w - 16, y: maxY, pen: 5000 }, { k: 'tl', x: 16, y: 84, pen: 5000 }, { k: 'tr', x: innerWidth - w - 16, y: 84, pen: 5000 });
+      var cyy = r.top + r.height / 2;
+      if (r.right + 16 + w <= innerWidth - 12) list.push({ k: 'right', x: r.right + 16, y: ry, pen: 900, tail: true, side: 'side-l', cy: cyy });
+      if (r.left - 16 - w >= 12) list.push({ k: 'left', x: r.left - 16 - w, y: ry, pen: 900, tail: true, side: 'side-r', cy: cyy });
+    } else list.push({ k: 'bl', x: 16, y: maxY, pen: 5000 }, { k: 'br', x: innerWidth - w - 16, y: maxY, pen: 5000 });
     return list;
+  }
+  /* the notification grows out of the element that is speaking and sits on top of that element, so it never covers anything else */
+  var overDim = null;
+  function overXY(r, d) { var v0 = Math.max(r.top, 100), v1 = Math.min(r.bottom, innerHeight - (innerWidth <= 820 ? 90 : 50)); if (v1 - v0 < d.h + 8) return null; return { x: r.left + (r.width - d.w) / 2, y: v0 + (v1 - v0 - d.h) / 2 }; }
+  function measureOver(r) {
+    var res = null; if (r.width >= 200 && r.height >= 96) { var ow = clampN(r.width - 12, 190, 320); nEl.style.width = ow + 'px'; var oh = nEl.offsetHeight; if (overXY(r, { w: ow, h: oh })) res = { w: ow, h: oh }; }
+    nEl.style.width = ''; return res;
   }
   function place() {
     if (!anchor && !freeNudge) return;
     var r = anchor ? anchor.getBoundingClientRect() : null;
     if (r && (r.bottom < 50 || r.top > innerHeight - 30)) { hideNudge(); return; }
-    var w = nEl.offsetWidth, h = nEl.offsetHeight, now = performance.now(), cs = candidates(r, w, h), c;
+    var now = performance.now(), c, w, h, cs;
     if (!pmKey || now - pmAt > 350) {
+      nEl.style.width = ''; var w0 = nEl.offsetWidth, h0 = nEl.offsetHeight; overDim = r ? measureOver(r) : null;
+      cs = candidates(r, w0, h0); if (overDim) { var op = overXY(r, overDim); cs.push({ k: 'over', x: op.x, y: op.y, pen: -300, tail: false, over: true }); }
       var bl = blockers(anchor), best = null;
-      cs.forEach(function (q) { q.sc = overlap(q.x, q.y, w, h, bl) + q.pen; if (!best || q.sc < best.sc) best = q; });
+      cs.forEach(function (q) { var qw = q.over ? overDim.w : w0, qh = q.over ? overDim.h : h0; q.sc = overlap(q.x, q.y, qw, qh, bl) + q.pen; if (!best || q.sc < best.sc) best = q; });
+      if (!best) { lastOv = 1e9; pmKey = null; pmAt = now; if (nEl.classList.contains('on')) hideNudge(); return; }
       pmKey = best.k; pmAt = now; lastOv = best.sc - best.pen;
+      nEl.style.width = best.over ? overDim.w + 'px' : '';
       if (nEl.classList.contains('on') && lastOv > 3000) { hideNudge(); return; }
     }
+    w = nEl.offsetWidth; h = nEl.offsetHeight; cs = candidates(r, w, h);
+    if (pmKey === 'over' && overDim && r) { var op2 = overXY(r, overDim); if (op2) cs.push({ k: 'over', x: op2.x, y: op2.y, pen: 0, tail: false, over: true }); }
     c = cs.filter(function (q) { return q.k === pmKey; })[0] || cs[cs.length - 1];
-    nEl.classList.toggle('below', !!c.below); nEl.classList.toggle('free', !c.tail);
+    nEl.classList.toggle('below', !!c.below); nEl.classList.toggle('free', !c.tail); nEl.classList.toggle('over', !!c.over); nEl.classList.toggle('side-l', c.side === 'side-l'); nEl.classList.toggle('side-r', c.side === 'side-r');
+    if (c.side) nEl.style.setProperty('--ty', clampN(c.cy - c.y, 22, h - 22).toFixed(1) + 'px');
     nEl.style.transform = 'translate3d(' + c.x.toFixed(1) + 'px,' + c.y.toFixed(1) + 'px,0)';
     if (c.tail) nEl.style.setProperty('--tx', Math.max(24, Math.min(c.cx - c.x, w - 24)).toFixed(1) + 'px');
   }
+  if (QS.get('debug')) window.__nd = function () { return { pmKey: pmKey, lastOv: lastOv, overDim: overDim, anchor: anchor && String(anchor.className).slice(0, 24) }; };
   (function nloop() { if (anchor || freeNudge) place(); requestAnimationFrame(nloop); })();
   function other(list, last) { var pool = list.filter(function (x) { return x !== last; }); return pool[Math.floor(Math.random() * pool.length)]; }
   function pickKind() {
@@ -1338,7 +1354,7 @@
     if (k === lastKind) k = other(['sarcasm', 'tip', 'fact', 'ask'], lastKind);
     return k;
   }
-  function showNudge() {
+  function showNudge(tries) {
     var prevPick = lastPick, prevKind = lastKind;
     var sec = sectionNow(), el = pickSpeaker(sec), name = '', msg = '', lead = '', acts = [], kind = nCount >= 3 ? 'final' : pickKind();
     if (kind === 'sarcasm') {
@@ -1355,7 +1371,7 @@
       var f = FACTS[sec] || FACTS.hero; name = f[0]; msg = f[1]; acts = [f[3].indexOf('http') === 0 ? { label: f[2], url: f[3] } : { label: f[2], id: f[3] }];
     } else if (kind === 'ask') {
       var q = ASKS[sec] || ASKS.hero; name = q[0]; msg = q[1]; acts = q[2].map(function (b) { return b[1].indexOf('http') === 0 ? { label: b[0], url: b[1] } : { label: b[0], id: b[1] }; });
-    } else { name = 'Website'; msg = MORE2[Math.min(nCount - 3, MORE2.length - 1)]; el = null; acts = [{ label: 'Contact me', id: 'contact' }, { label: 'Back to top', id: 'top' }]; }
+    } else { name = 'Website'; msg = MORE2[Math.min(nCount - 3, MORE2.length - 1)]; el = pickSpeaker(sec) || $('.brand'); acts = [{ label: 'Contact me', id: 'contact' }, { label: 'Back to top', id: 'top' }]; }
     if (msg === lastPick) return;
     lastPick = msg; lastKind = kind;
     var theme = other(THEMES, lastTheme), anim = other(ANIMS, lastAnim); lastTheme = theme; lastAnim = anim;
@@ -1365,7 +1381,7 @@
     if (spoke) spoke.classList.remove('speak'); spoke = el; if (el) { el.classList.remove('speak'); void el.offsetWidth; el.classList.add('speak'); }
     anchor = el; freeNudge = !el; pmKey = null; nEl.className = 'nudge t-' + theme + ' a-' + anim + (el ? '' : ' free'); void nEl.offsetWidth;
     place();
-    if (lastOv > 1800) { if (spoke) { spoke.classList.remove('speak'); spoke = null; } anchor = null; freeNudge = false; lastPick = prevPick; lastKind = prevKind; return; }
+    if (lastOv > 1800) {  if (spoke) { spoke.classList.remove('speak'); spoke = null; } anchor = null; freeNudge = false; lastPick = prevPick; lastKind = prevKind; if ((tries || 0) < 5) showNudge((tries || 0) + 1); return; }
     nEl.classList.add('on'); hiding = false;
     if (el && nEl.animate) { var kind = anim === 'drop' ? 'drop' : anim; nEl.animate(frames(el, kind, 'in'), { duration: kind === 'glitch' ? 460 : 620, easing: kind === 'glitch' ? 'steps(7,end)' : 'cubic-bezier(.2,.9,.25,1)' }); }
     lastN = performance.now(); nCount++;
