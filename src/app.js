@@ -1644,6 +1644,19 @@
     brand.addEventListener('mouseenter', speak); brand.addEventListener('focus', speak); brand.addEventListener('touchstart', speak, { passive: true });
   })();
 
+  /* Projects section: category filter tabs (All / Built, Not Borrowed / Forked & Fixed / Field Notes) */
+  (function projFilter() {
+    var tabs = $$('.pj-tab'), items = $$('.proj-grid > li'); if (!tabs.length) return;
+    tabs.forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        tabs.forEach(function (t) { t.classList.remove('on'); t.setAttribute('aria-selected', 'false'); });
+        tab.classList.add('on'); tab.setAttribute('aria-selected', 'true');
+        var cat = tab.getAttribute('data-cat');
+        items.forEach(function (li) { li.hidden = !(cat === 'all' || li.getAttribute('data-cat') === cat); });
+      });
+    });
+  })();
+
   /* ---------- command palette (Enter) + mini TryHackMe-style room ---------- */
   var tm = $('#tm'), tmOut = $('#tm-out'), tmIn = $('#tm-input'), tmBtn = $('#tm-btn');
   var tmHist = [], tmHi = 0, tmBooted = false;
