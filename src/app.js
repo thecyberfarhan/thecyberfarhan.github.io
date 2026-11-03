@@ -525,7 +525,7 @@
   function applyHit(u, dmg, P, big) {
     if (!u.alive) return; if (u.guard > 0.3) { ringFx(u.x + u.dir * 16, u.y + FEET - 22, '255,255,255', 40); burst(u.x + u.dir * 16, u.y + FEET - 22, 10, 'shard', P.hot, 0.35, 500); } u.guard = 0; u.charge = 0; ST.nhit = (ST.nhit || 0) + 1; u.hp = Math.max(u.side === 'f' ? 35 : 0, u.hp - dmg); u.flash = 1; u.kx += (u.side === 'f' ? -1 : 1) * 40; if (u.m > 0.5) { u.stag = 260; u.kx += (u.side === 'f' ? -1 : 1) * 60; } burst(u.x, u.y, big ? 16 : 8, 'spark', P.hot, big ? 0.55 : 0.4, 420);
     if (big) ST.slow = Math.max(ST.slow || 0, 110);
-    if (u.side === 'e' && u.hp <= 0) { ST.killed = true; if (u.m > 0.5) ST.slow = 700; }
+    if (u.side === 'e' && u.hp <= 0) ST.killed = true;
   }
   function stepLasers(dt, P) {
     var ls = ST.lasers, i, l;
@@ -595,6 +595,7 @@
       ctx.beginPath(); ctx.moveTo(8, sd * 4); ctx.lineTo(-6, sd * 18 * wf); ctx.lineTo(-13, sd * 18 * wf); ctx.lineTo(-10, sd * 5); ctx.closePath(); ctx.fill(); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(-3, sd * 14 * wf); ctx.lineTo(10, sd * 14 * wf); ctx.stroke();
       ctx.fillStyle = blink === (sd > 0) ? 'rgba(' + c.h + ',1)' : 'rgba(' + c.f + ',.7)'; ctx.beginPath(); ctx.arc(-12, sd * 18 * wf, 1.7, 0, 6.283); ctx.fill(); ctx.fillStyle = 'rgba(' + c.f + ',.34)';
+      ctx.strokeStyle = 'rgba(' + c.s + ',.9)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(-8, sd * 15 * wf); ctx.lineTo(-1, sd * 13.5 * wf); ctx.stroke(); ctx.fillStyle = 'rgba(' + c.h + ',.85)'; ctx.beginPath(); ctx.arc(-1, sd * 13.5 * wf, 0.9, 0, 6.283); ctx.fill();
     });
     ctx.beginPath(); ctx.moveTo(24, 0); ctx.lineTo(14, -4); ctx.lineTo(-6, -6.5); ctx.lineTo(-13, -4); ctx.lineTo(-13, 4); ctx.lineTo(-6, 6.5); ctx.lineTo(14, 4); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.globalAlpha = al * 0.45; ctx.beginPath(); ctx.moveTo(16, 0); ctx.lineTo(-11, 0); ctx.moveTo(-2, -6); ctx.lineTo(-2, 6); ctx.stroke(); ctx.globalAlpha = al;
@@ -625,6 +626,8 @@
     var cg = ctx.createRadialGradient(0, -15, 0, 0, -15, 5.5); cg.addColorStop(0, 'rgba(' + c.h + ',' + pulse.toFixed(2) + ')'); cg.addColorStop(1, 'rgba(' + c.h + ',0)'); ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(0, -15, 5.5, 0, 6.283); ctx.fill();
     ctx.fillStyle = hot; poly([[0, -17.4], [2, -16.2], [2, -13.8], [0, -12.6], [-2, -13.8], [-2, -16.2]]); ctx.fill();
     ctx.fillStyle = plate; ctx.lineWidth = 1.5; poly([[-13, -27], [-7, -28], [-7, -20], [-12, -21]]); ctx.fill(); ctx.stroke(); poly([[13, -27], [7, -28], [7, -20], [12, -21]]); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = plate; ctx.lineWidth = 1.1; poly([[-13.5, -24.5], [-9.5, -24.8], [-9.5, -19.5], [-13.5, -19.5]]); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = hot; [0, 1, 2].forEach(function (k) { ctx.beginPath(); ctx.arc(-12.8 + k * 1.5, -22, 0.55, 0, 6.283); ctx.fill(); });
     var aim = u.aim, bash = u.atk, hx2 = 11 + aim * 3, hy2 = -15 - aim * 6, ga = 0.5 * (1 - aim);
     if (bash > 0.02 || bash < -0.02) { var bp = bash > 0 ? bash : bash * 0.9; hx2 = 12 + bp * 6; hy2 = -26 + (bp + 0.8) * 9; ga = -1.25 + (bp + 0.8) * 1.45; }
     else if (u.wave > 0) { hx2 = 10; hy2 = -33 + Math.sin(now / 90) * 1.5; ga = -1.4; }
@@ -1052,9 +1055,11 @@
       }
     } else if (ph === 'victory') {
       s.vt += dt;
-      if (f.m > 0.5) { f.wave = 1; f.aim = 0; f.atk = 0; } else { if (s.vt > 200 && !s.vroll) { s.vroll = true; f.roll = 0.01; } flyTo(f, f.x, f.y, dt, 100, 0.002); }
+      /* a short stand-down beat before heading off, instead of cutting straight from the kill to the next phase */
+      if (f.m > 0.5) { f.wave = 1; f.aim = 0; f.atk = 0; if (s.vt > 1300 && !s.vvent) { s.vvent = true; burst(f.x, f.y + FEET, 10, 'smoke', P.link, 0.12, 700); ringFx(f.x, f.y + FEET - 10, P.link, 28); } }
+      else { if (s.vt > 200 && !s.vroll) { s.vroll = true; f.roll = 0.01; } flyTo(f, f.x, f.y, dt, 100, 0.002); }
       if (s.vt > 600 && !s.vsaid) { s.vsaid = true; sayAs('f', 'Threat neutralised.', 2200); }
-      if (s.vt > 2200) { s.vsaid = false; s.vroll = false; f.wave = 0; if (f.m > 0.5) { f.tr = { st: 'hop', t: 0 }; s.ph = 'toShip'; s.pt = 0; } else { f.tt = 0; afterWin(s, now); } }
+      if (s.vt > 2600) { s.vsaid = false; s.vroll = false; s.vvent = false; f.wave = 0; if (f.m > 0.5) { f.tr = { st: 'hop', t: 0 }; s.ph = 'toShip'; s.pt = 0; } else { f.tt = 0; afterWin(s, now); } }
     } else if (ph === 'cta') {
       var tg = ctaTarget(); s.tgEl = tg; if (!tg) { s.ph = 'roam'; s.pt = 0; s.roamEnd = 20000; s.tgEl = null; return; }
       if (s.pt > 32000) { s.ph = 'roam'; s.pt = 0; s.roamEnd = 20000; s.tgEl = null; return; }
@@ -1068,8 +1073,10 @@
     }
   }
   function killFoe(P) {
-    var s = ST, e = s.e; if (!e.alive) return; e.alive = false; e.al = 0; s.lasers.length = 0; s.bombs.length = 0; boom(e.x, e.y + (e.m > 0.5 ? FEET - 14 : 0), true, P); ringFx(e.x, e.y, P.hot, 110); sayAs('e', 'Impossible...', 1200);
+    var s = ST, e = s.e; if (!e.alive) return; var kx = e.x, ky = e.y + (e.m > 0.5 ? FEET - 14 : 0);
+    e.alive = false; e.al = 0; s.lasers.length = 0; s.bombs.length = 0; boom(kx, ky, true, P); ringFx(e.x, e.y, P.hot, 110); sayAs('e', 'Impossible...', 1200);
     s.ph = 'victory'; s.vt = 0; s.vsaid = false; s.killed = true; s.stamp = { x: e.x, y: e.y, t0: s.clk };
+    s.slow = Math.max(s.slow || 0, 650); s.killCam = { t0: s.clk, dur: 900, x: kx, y: ky };
     fought = true;
   }
   function startNext(P) {
@@ -1122,6 +1129,16 @@
     if (s.stamp) { var ag = (s.clk - s.stamp.t0) / 3400; if (ag < 1) { var a2 = ag < 0.1 ? ag / 0.1 : (1 - ag) / 0.9, sx2 = clampV(s.stamp.x, 90, innerWidth - 90), sy3 = clampV(s.stamp.y - 34 - ag * 20, 110, innerHeight - 80); ctx.save(); ctx.translate(sx2, sy3); ctx.rotate(-0.1); ctx.globalAlpha = a2; ctx.font = '700 13px "JetBrains Mono",ui-monospace,monospace'; ctx.textAlign = 'center'; var tw = ctx.measureText('FINDING CLOSED').width; ctx.fillStyle = 'rgba(13,17,23,.7)'; ctx.fillRect(-tw / 2 - 10, -17, tw + 20, 26); ctx.strokeStyle = 'rgba(' + P.hot + ',.95)'; ctx.lineWidth = 2; ctx.strokeRect(-tw / 2 - 10, -17, tw + 20, 26); ctx.fillStyle = 'rgba(' + P.node + ',.98)'; ctx.fillText('FINDING CLOSED', 0, 1); ctx.restore(); } else s.stamp = null; }
     if (e && e.alive && ['dog', 'duel', 'toMech', 'toShip'].indexOf(s.ph) >= 0) drawBar(ctx, P, e, e.m > 0.5 ? 74 : 38);
     if (f.al > 0.5 && ['dog', 'duel', 'toMech', 'toShip', 'victory'].indexOf(s.ph) >= 0) drawBar(ctx, P, f, f.m > 0.5 ? 74 : 38);
+    /* the finishing blow gets a brief cinematic beat: the edges darken in on the kill point, then ease back out */
+    if (s.killCam) {
+      var kt = s.clk - s.killCam.t0, kp = clampV(kt / s.killCam.dur, 0, 1);
+      if (kp < 1) {
+        var kv = (kp < 0.25 ? kp / 0.25 : 1 - (kp - 0.25) / 0.75) * 0.6;
+        var vg = ctx.createRadialGradient(s.killCam.x, s.killCam.y, 30, s.killCam.x, s.killCam.y, Math.max(innerWidth, innerHeight) * 0.68);
+        vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,' + kv.toFixed(2) + ')');
+        ctx.save(); ctx.fillStyle = vg; ctx.fillRect(0, 0, innerWidth, innerHeight); ctx.restore();
+      } else s.killCam = null;
+    }
     posSay(now);
   }
 
@@ -1414,7 +1431,6 @@
     live: ['Question', 'Want to see the work behind these numbers?', [['Writeups', 'proof'], ['GitHub', 'https://github.com/thecyberfarhan']]],
     contact: ['Question', 'Which door do you want to knock on?', [['LinkedIn', 'https://www.linkedin.com/in/cyber-farhan-hussain/'], ['GitHub', 'https://github.com/thecyberfarhan']]]
   };
-  var MORE2 = ['Seriously, are you still there?', 'I can do this all day. Can you?', 'Okay, I will assume you went for coffee. Come back when you are ready.'];
   function actionsFor(sec, el) {
     var G = function (id, label) { return { label: label, id: id }; }, U = function (url, label) { return { label: label, url: url }; };
     if (sec === 'hero') return [G('about', 'About me'), G('tools', 'See my tools')];
@@ -1426,7 +1442,7 @@
     if (sec === 'contact') { var c = el && el.tagName === 'A' ? el.href : null; return c ? [U(c, 'Open this'), G('proof', 'Read my writeups')] : [U('https://www.linkedin.com/in/cyber-farhan-hussain/', 'Open LinkedIn'), G('proof', 'Read my writeups')]; }
     return [G('contact', 'Contact me')];
   }
-  var THEMES = ['steel', 'amber', 'violet', 'ink', 'ember'], ANIMS = ['pop', 'flip', 'drop', 'glitch', 'slide'];
+  var THEMES = ['steel', 'amber', 'ember'], ANIMS = ['pop', 'slide', 'glitch'];
   var nEl = document.createElement('div'); nEl.className = 'nudge'; nEl.setAttribute('role', 'status');
   nEl.innerHTML = '<div class="nrow"><span class="tile"></span><div><b></b><p></p></div></div><small></small><div class="nbtns"></div><button type="button" class="x" aria-label="Dismiss">&times;</button><i class="tail"></i>';
   document.body.appendChild(nEl);
@@ -1545,7 +1561,7 @@
   }
   function showNudge(tries) {
     var prevPick = lastPick, prevKind = lastKind;
-    var sec = sectionNow(), el = pickSpeaker(sec), name = '', msg = '', lead = '', acts = [], kind = nCount >= 3 ? 'final' : pickKind();
+    var sec = sectionNow(), el = pickSpeaker(sec), name = '', msg = '', lead = '', acts = [], kind = pickKind();
     if (kind === 'sarcasm') {
       name = el ? nameOf(el) : '';
       if (TOOLQ[name]) msg = TOOLQ[name];
@@ -1560,7 +1576,7 @@
       var f = FACTS[sec] || FACTS.hero; name = f[0]; msg = f[1]; acts = [f[3].indexOf('http') === 0 ? { label: f[2], url: f[3] } : { label: f[2], id: f[3] }];
     } else if (kind === 'ask') {
       var q = ASKS[sec] || ASKS.hero; name = q[0]; msg = q[1]; acts = q[2].map(function (b) { return b[1].indexOf('http') === 0 ? { label: b[0], url: b[1] } : { label: b[0], id: b[1] }; });
-    } else { name = 'Website'; msg = MORE2[Math.min(nCount - 3, MORE2.length - 1)]; el = pickSpeaker(sec) || $('.brand'); acts = [{ label: 'Contact me', id: 'contact' }, { label: 'Back to top', id: 'top' }]; }
+    }
     if (msg === lastPick) return;
     lastPick = msg; lastKind = kind;
     var theme = other(THEMES, lastTheme), anim = other(ANIMS, lastAnim); lastTheme = theme; lastAnim = anim;
@@ -1579,7 +1595,7 @@
   }
   nBtns.addEventListener('click', function (e) { var bt = e.target.closest && e.target.closest('button'); if (bt && bt.hasAttribute('data-close')) hideNudge(); });
   setInterval(function () {
-    if (document.hidden || !root.classList.contains('done') || !motion || roam) return;
+    if (document.hidden || !root.classList.contains('done') || !motion || roam || nCount >= 3) return;
     var now = performance.now(), idle = now - lastAct, gap = +QS.get('nudgegap') || Math.min(150000 + nCount * 60000, 420000);
     if (idle > (+QS.get('nudgeidle') || 50000) && now - lastN > gap) showNudge();
   }, 1000);
