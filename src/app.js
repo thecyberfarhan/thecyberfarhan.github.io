@@ -420,7 +420,7 @@
   function clampV(v, a, b) { return Math.max(a, Math.min(b, v)); }
   function easeIO(t) { t = clampV(t, 0, 1); return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
   function angDiff(a, b) { var d = b - a; while (d > Math.PI) d -= 6.2832; while (d < -Math.PI) d += 6.2832; return d; }
-  var AST = [], ST = null, needMove = false, FEET = 23;
+  var AST = [], ST = null, needMove = false, FEET = 23, fought = false;
   function COLS(P, side) { return side === 'f' ? { s: P.node, f: P.link, h: P.hot, fl: P.hot } : { s: P.hot, f: P.hot, h: P.node, fl: P.wire }; }
 
   /* background asteroids */
@@ -649,10 +649,10 @@
     if (ph === 'cta') return [4, 'Report', 'open to work'];
     return [4, 'Report', 'all clear'];
   }
-  function FOUGHT() { try { return sessionStorage.getItem('fought') === '1'; } catch (e) { return false; } }
+  function FOUGHT() { return fought; }
   function ctaTarget() {
-    var c = [$('.mail-big'), $('.cta a[download]'), $('.link-rows a[download]'), $('#navlinks a[data-nav="contact"]')], i, r;
-    for (i = 0; i < c.length; i++) { if (!c[i]) continue; r = c[i].getBoundingClientRect(); if (r.width > 0 && r.top >= (i === 3 ? 0 : 90) && r.bottom <= innerHeight - 40 && r.left >= 0 && r.right <= innerWidth) return c[i]; }
+    var c = [$('.mail-big'), $('.cta a[download]'), $('.link-rows a[download]')], i, r;
+    for (i = 0; i < c.length; i++) { if (!c[i]) continue; r = c[i].getBoundingClientRect(); if (r.width > 0 && r.top >= 90 && r.bottom <= innerHeight - 40 && r.left >= 0 && r.right <= innerWidth) return c[i]; }
     return null;
   }
   function toCta(s, now) { if (ctaTarget()) { s.ph = 'cta'; s.pt = 0; s.ctaSay = 0; s.nextSay = now + 3500; } else { s.ph = 'roam'; s.pt = 0; s.roamEnd = 20000; s.nextSay = now + 1500; } }
@@ -980,7 +980,8 @@
       if (s.vt > 2200) { s.vsaid = false; s.vroll = false; f.wave = 0; if (f.m > 0.5) { f.tr = { st: 'hop', t: 0 }; s.ph = 'toShip'; s.pt = 0; } else { f.tt = 0; afterWin(s, now); } }
     } else if (ph === 'cta') {
       var tg = ctaTarget(); s.tgEl = tg; if (!tg) { s.ph = 'roam'; s.pt = 0; s.roamEnd = 20000; s.tgEl = null; return; }
-      var tr = tg.getBoundingClientRect(), above = tr.top > 190, px = tr.left + tr.width / 2, py = (above ? tr.top - 56 : tr.bottom + 52) + Math.sin(s.clk / 650) * 6, dd = flyTo(f, px, py, dt, 280, 0.004);
+      if (s.pt > 32000) { s.ph = 'roam'; s.pt = 0; s.roamEnd = 20000; s.tgEl = null; return; }
+      var tr = tg.getBoundingClientRect(), px = tr.left + tr.width / 2, py = Math.max(140, tr.top - 56) + Math.sin(s.clk / 650) * 6, dd = flyTo(f, px, py, dt, 280, 0.004);
       if (dd < 50) { f.ang += angDiff(f.ang, Math.atan2(tr.top + tr.height / 2 - f.y, tr.left + tr.width / 2 - f.x)) * Math.min(1, dt * 0.01); f.vx *= 0.9; f.vy *= 0.9; }
       if (dd < 70 && now > s.nextSay) { var CL = ['Open to junior pentest roles.', 'The email is right here. One click.', 'Say hello. I will be here.', 'Web and API security is my focus.']; sayAs('f', CL[(s.ctaSay++) % CL.length], 3200); s.nextSay = now + 6500; }
       if (now - s.born > 150000) { s.ph = 'sleep'; s.pt = 0; s.tgEl = null; }
@@ -992,7 +993,7 @@
   function killFoe(P) {
     var s = ST, e = s.e; if (!e.alive) return; e.alive = false; e.al = 0; s.lasers.length = 0; boom(e.x, e.y + (e.m > 0.5 ? FEET - 14 : 0), true, P); ringFx(e.x, e.y, P.hot, 110); sayAs('e', 'Impossible...', 1200);
     s.ph = 'victory'; s.vt = 0; s.vsaid = false; s.killed = true; s.stamp = { x: e.x, y: e.y, t0: s.clk };
-    try { sessionStorage.setItem('fought', '1'); } catch (x) {}
+    fought = true;
   }
   function startNext(P) {
     var s = ST, f = s.f, e = s.e; s.lasers.length = 0;
