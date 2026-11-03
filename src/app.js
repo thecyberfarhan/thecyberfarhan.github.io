@@ -243,7 +243,7 @@
   window.addEventListener('resize', function () { moveInd(active); });
   $('#burger').addEventListener('click', function () { var o = pill.classList.toggle('open'); this.setAttribute('aria-expanded', o); });
 
-  var TITLES = { about: 'About', journey: 'Journey', arch: 'Arch', tools: 'Tools', proof: 'Proof of work', live: 'Live stats', contact: 'Contact' }, appTitle = $('#apptitle'), curTitle = 'Farhan';
+  var TITLES = { about: 'About', journey: 'Journey', arch: 'Arch', tools: 'Tools', projects: 'Projects', proof: 'Proof of work', live: 'Live stats', contact: 'Contact' }, appTitle = $('#apptitle'), curTitle = 'Farhan';
   function setTitle(id) {
     var t = TITLES[id] || 'Farhan'; if (!appTitle || t === curTitle) return; curTitle = t;
     var b = document.createElement('b'); b.textContent = t; appTitle.innerHTML = ''; appTitle.appendChild(b);
@@ -1503,8 +1503,8 @@
     tm.classList.remove('on'); setTimeout(function () { tm.hidden = true; }, 220);
     try { tmIn.blur(); } catch (e) {}
   }
-  var SECS = ['proof', 'about', 'tools', 'journey', 'play', 'arch', 'contact'];
-  var FILES = ['proof/', 'about/', 'tools/', 'journey/', 'play/', 'arch/', 'contact/', 'resume.pdf'];
+  var SECS = ['proof', 'about', 'tools', 'projects', 'journey', 'play', 'arch', 'contact'];
+  var FILES = ['proof/', 'about/', 'tools/', 'projects/', 'journey/', 'play/', 'arch/', 'contact/', 'resume.pdf'];
   var CMDS = {
     help: function (o) {
       ['Commands:', '  ls, cd, pwd, cat, tree   browse like a real shell (try: cd tools, cat core.txt)', '  ls              list sections', '  goto <section>  jump there (about, journey, tools, proof, live, play, contact)', '  whoami          who am I', '  skills          what I work with', '  certs           certifications', '  writeups        featured writeups', '  projects        things I built', '  education       school', '  contact         where to reach me', '  resume          download my resume', '  play            open the mini TryHackMe-style room', '  theme           toggle day / night', '  clear, exit     tidy up', 'Not everything is listed. Poke around.'].forEach(function (l) { pr(o, l, l.charAt(0) === ' ' ? '' : 'c'); });
@@ -1519,7 +1519,7 @@
     certs: function (o) { pr(o, 'CPENT, EC-Council, 2026. Practical, hands-on penetration testing.', 'ok'); pr(o, 'TryHackMe top 3%, 100+ rooms.', 'm'); },
     certifications: function (o) { CMDS.certs(o); },
     writeups: function (o) { pr(o, '37 published on GitHub. Featured:'); ['Mr Robot CTF', 'Mustacchio', 'Archetype', 'Cap', 'Overpass', 'Silver Platter', 'Watcher', 'tomghost'].forEach(function (w) { pr(o, '  - ' + w, 'a'); }); prLink(o, 'github.com/thecyberfarhan/CTF-Writeups', 'https://github.com/thecyberfarhan/CTF-Writeups'); },
-    projects: function (o) { pr(o, 'Python Virtual-Environment Manager, ~1,800 LOC (Rich, InquirerPy)'); pr(o, 'Personal Automation Scripts (Python / Bash)'); pr(o, 'This site, hand-built with no frameworks'); },
+    projects: function (o) { pr(o, 'reconkit        recon automation: ports, HTTP headers, subdomains'); pr(o, 'apicheck        web/API misconfiguration checker'); pr(o, 'lab-reports     DVWA pentest report (SQLi, RCE, XSS)'); pr(o, 'vm-manager      Python virtual-env manager, ~1,800 LOC (Rich, InquirerPy)'); pr(o, 'This site       hand-built with no frameworks'); pr(o, 'type "goto projects" or cd projects'); },
     education: function (o) { pr(o, 'Intermediate (HSSC), ICS, Al-Hayat College, 2023 to 2025, 87%.'); },
     journey: function (o) { pr(o, 'Opening the journey section...', 'm'); go('journey'); },
     contact: function (o) { prLink(o, 'LinkedIn  in/cyber-farhan-hussain', 'https://www.linkedin.com/in/cyber-farhan-hussain/'); prLink(o, 'GitHub    @thecyberfarhan', 'https://github.com/thecyberfarhan'); prLink(o, 'TryHackMe farhan.hussain', 'https://tryhackme.com/p/farhan.hussain'); prLink(o, 'Email     farhan736hussain@gmail.com', 'mailto:farhan736hussain@gmail.com'); },
