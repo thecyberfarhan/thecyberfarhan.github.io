@@ -7,7 +7,7 @@
   var $ = function (s, c) { return (c || document).querySelector(s); };
   var $$ = function (s, c) { return Array.prototype.slice.call((c || document).querySelectorAll(s)); };
   var motion = true;
-  var PAL = { dark: { node: '201,209,217', link: '127,168,204', hot: '180,35,44', wire: '127,168,204', wireHot: '194,104,108' }, light: { node: '31,35,40', link: '63,110,154', hot: '176,74,79', wire: '63,110,154', wireHot: '176,74,79' } };
+  var PAL = { dark: { node: '201,209,217', link: '127,168,204', hot: '180,35,44', wire: '127,168,204', wireHot: '194,104,108', halo: '13,17,23' }, light: { node: '31,35,40', link: '63,110,154', hot: '176,74,79', wire: '63,110,154', wireHot: '176,74,79', halo: '250,251,253' } };
   function pal() { return PAL[root.getAttribute('data-theme') === 'light' ? 'light' : 'dark']; }
 
   /* ---------- day / night mode ---------- */
@@ -473,7 +473,7 @@
   function restoreAst() { AST.forEach(function (a) { a.hide = false; }); }
 
   /* units */
-  function mkUnit(side, x, y, ang) { return { side: side, x: x, y: y, vx: 0, vy: 0, tx: x, ty: y, tt: 0, ang: ang, spd: 0, bank: 0, jink: 0, jdir: 1, seed: Math.random() * 6, dodgeAt: 0, stag: 0, yo: 0, hp: 100, hpS: 100, m: 0, dir: side === 'f' ? 1 : -1, ph: 0, flash: 0, atk: 0, aim: 0, air: false, vyy: 0, sq: 0, sc: 1, al: 1, alive: true, trail: [], cool: rnd(500, 900), roll: 0, kx: 0, mode: 'walk', mt: 0, want: 150, after: '', hitNext: false, tr: null, jump: null, wave: 0, burst: 0, atkT: 0, struck: false }; }
+  function mkUnit(side, x, y, ang) { return { side: side, x: x, y: y, vx: 0, vy: 0, tx: x, ty: y, tt: 0, ang: ang, spd: 0, bank: 0, jink: 0, jdir: 1, seed: Math.random() * 6, dodgeAt: 0, stag: 0, yo: 0, hp: 100, hpS: 100, m: 0, dir: side === 'f' ? 1 : -1, ph: 0, flash: 0, atk: 0, aim: 0, air: false, vyy: 0, sq: 0, sc: 1, al: 1, alive: true, trail: [], cool: rnd(500, 900), roll: 0, kx: 0, mode: 'walk', mt: 0, want: 150, after: '', hitNext: false, tr: null, jump: null, wave: 0, burst: 0, atkT: 0, struck: false, charge: 0, guard: 0, dive: 0, up: false }; }
   function flyTo(u, tx, ty, dt, maxSp, k) {
     var dx = tx - u.x, dy = ty - u.y, d = Math.hypot(dx, dy) || 1, sp = Math.min(maxSp, d * 1.8), f = Math.min(1, dt * (k || 0.0035));
     u.vx += (dx / d * sp - u.vx) * f; u.vy += (dy / d * sp - u.vy) * f; u.x += u.vx * dt / 1000; u.y += u.vy * dt / 1000;
@@ -513,16 +513,17 @@
     burst(ox, oy, 3, 'spark', '255,255,255', 0.2, 180);
   }
   function jinkShip(u, p) { if (Math.random() < p && u.jink <= 0) { u.jink = 560; u.jdir = Math.random() < 0.5 ? -1 : 1; if (u.roll <= 0) u.roll = 0.01; } }
-  function mechFire(s, u, v, hit, dmg) {
+  function mechFire(s, u, v, hit, dmg, big) {
     var sc = 1.05, mx = u.x + u.dir * 29 * sc, my = u.y + FEET - 22 * sc, ty = v.y + FEET - 22, dist = Math.max(40, Math.abs(v.x - u.x));
     if (hit) ST.nfire = (ST.nfire || 0) + 1;
-    ST.lasers.push({ x: mx, y: my, vx: u.dir * 0.95, vy: hit ? (ty - my) / (dist / 0.95) : 0, side: u.side, hit: hit, dmg: dmg, tgt: v, home: false, life: 1600, mech: true });
+    ST.lasers.push({ x: mx, y: my, vx: u.dir * 0.95, vy: hit ? (ty - my) / (dist / 0.95) : 0, side: u.side, hit: hit, dmg: dmg, tgt: v, home: false, life: 1600, mech: true, big: !!big });
+    if (big) { burst(mx, my, 10, 'spark', '255,255,255', 0.4, 300); ringFx(mx, my, '255,255,255', 30); }
     burst(mx, my, 4, 'spark', '255,255,255', 0.25, 170); ringFx(mx, my, u.side === 'f' ? '127,168,204' : '180,35,44', 12); u.x -= u.dir * 2;
     if (!hit) v.dodgeAt = s.clk + Math.max(0, dist / 0.95 - 230);
   }
   function applyHit(u, dmg, P) {
-    if (!u.alive) return; ST.nhit = (ST.nhit || 0) + 1; u.hp = Math.max(u.side === 'f' ? 35 : 0, u.hp - dmg); u.flash = 1; u.kx += (u.side === 'f' ? -1 : 1) * 40; if (u.m > 0.5) { u.stag = 260; u.kx += (u.side === 'f' ? -1 : 1) * 60; } burst(u.x, u.y, 8, 'spark', P.hot, 0.4, 420);
-    if (u.side === 'e' && u.hp <= 0) ST.killed = true;
+    if (!u.alive) return; if (u.guard > 0.3) { ringFx(u.x + u.dir * 16, u.y + FEET - 22, '255,255,255', 40); burst(u.x + u.dir * 16, u.y + FEET - 22, 10, 'shard', P.hot, 0.35, 500); } u.guard = 0; u.charge = 0; ST.nhit = (ST.nhit || 0) + 1; u.hp = Math.max(u.side === 'f' ? 35 : 0, u.hp - dmg); u.flash = 1; u.kx += (u.side === 'f' ? -1 : 1) * 40; if (u.m > 0.5) { u.stag = 260; u.kx += (u.side === 'f' ? -1 : 1) * 60; } burst(u.x, u.y, 8, 'spark', P.hot, 0.4, 420);
+    if (u.side === 'e' && u.hp <= 0) { ST.killed = true; if (u.m > 0.5) ST.slow = 700; }
   }
   function stepLasers(dt, P) {
     var ls = ST.lasers, i, l;
@@ -541,8 +542,8 @@
   function drawLasers(ctx, P) {
     ST.lasers.forEach(function (l) {
       var c = l.side === 'f' ? P.link : P.hot, len = 22, m = Math.hypot(l.vx, l.vy) || 1;
-      ctx.lineCap = 'round'; ctx.strokeStyle = 'rgba(' + c + ',.25)'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(l.x, l.y); ctx.lineTo(l.x - l.vx / m * len, l.y - l.vy / m * len); ctx.stroke();
-      ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(l.x, l.y); ctx.lineTo(l.x - l.vx / m * len, l.y - l.vy / m * len); ctx.stroke();
+      ctx.lineCap = 'round'; ctx.strokeStyle = 'rgba(' + c + ',.25)'; ctx.lineWidth = l.big ? 12 : 6; if (l.big) len = 48; ctx.beginPath(); ctx.moveTo(l.x, l.y); ctx.lineTo(l.x - l.vx / m * len, l.y - l.vy / m * len); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = l.big ? 3.6 : 2; ctx.beginPath(); ctx.moveTo(l.x, l.y); ctx.lineTo(l.x - l.vx / m * len, l.y - l.vy / m * len); ctx.stroke();
     });
   }
 
@@ -555,14 +556,15 @@
     var al = u.al * (1 - u.m); if (al <= 0.02) return;
     var c = COLS(P, u.side), blink = (now % 900) < 450, spd = Math.min(1, Math.hypot(u.vx, u.vy) / 260), fl = 9 + Math.random() * 9, sc = u.sc * 1.25;
     ctx.save(); ctx.globalAlpha = al; ctx.translate(u.x, u.y); ctx.rotate(u.ang); ctx.scale(sc * (1 - u.m * 0.5), sc * (1 + u.m * 0.2) * Math.cos(u.roll) * (1 - Math.abs(u.bank) * 0.16)); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    var wf = 1 - u.m * 0.7, hg = ctx.createRadialGradient(0, 0, 4, 0, 0, 34); hg.addColorStop(0, 'rgba(' + P.halo + ',.78)'); hg.addColorStop(0.6, 'rgba(' + P.halo + ',.4)'); hg.addColorStop(1, 'rgba(' + P.halo + ',0)'); ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(0, 0, 34, 0, 6.283); ctx.fill();
     var gr = ctx.createRadialGradient(-14, 0, 1, -14, 0, 20); gr.addColorStop(0, 'rgba(' + c.fl + ',' + (0.35 + spd * 0.3).toFixed(2) + ')'); gr.addColorStop(1, 'rgba(' + c.fl + ',0)'); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(-14, 0, 20, 0, 6.283); ctx.fill();
     ctx.fillStyle = 'rgba(' + c.fl + ',.9)'; ctx.beginPath(); ctx.moveTo(-13, -2.6); ctx.lineTo(-13 - fl * (0.6 + spd * 0.6), 0); ctx.lineTo(-13, 2.6); ctx.closePath(); ctx.fill();
     ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.beginPath(); ctx.moveTo(-13, -1.2); ctx.lineTo(-13 - fl * 0.38 * (0.6 + spd * 0.6), 0); ctx.lineTo(-13, 1.2); ctx.closePath(); ctx.fill();
-    ctx.strokeStyle = 'rgba(' + c.s + ',.95)'; ctx.lineWidth = 1.5; ctx.fillStyle = 'rgba(' + c.f + ',.2)';
+    ctx.strokeStyle = 'rgba(' + c.s + ',.95)'; ctx.lineWidth = 1.5; ctx.fillStyle = 'rgba(' + c.f + ',.34)';
     [-1, 1].forEach(function (sd) {
-      ctx.beginPath(); ctx.moveTo(8, sd * 4); ctx.lineTo(-6, sd * 18); ctx.lineTo(-13, sd * 18); ctx.lineTo(-10, sd * 5); ctx.closePath(); ctx.fill(); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(-3, sd * 14); ctx.lineTo(10, sd * 14); ctx.stroke();
-      ctx.fillStyle = blink === (sd > 0) ? 'rgba(' + c.h + ',1)' : 'rgba(' + c.f + ',.7)'; ctx.beginPath(); ctx.arc(-12, sd * 18, 1.7, 0, 6.283); ctx.fill(); ctx.fillStyle = 'rgba(' + c.f + ',.2)';
+      ctx.beginPath(); ctx.moveTo(8, sd * 4); ctx.lineTo(-6, sd * 18 * wf); ctx.lineTo(-13, sd * 18 * wf); ctx.lineTo(-10, sd * 5); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-3, sd * 14 * wf); ctx.lineTo(10, sd * 14 * wf); ctx.stroke();
+      ctx.fillStyle = blink === (sd > 0) ? 'rgba(' + c.h + ',1)' : 'rgba(' + c.f + ',.7)'; ctx.beginPath(); ctx.arc(-12, sd * 18 * wf, 1.7, 0, 6.283); ctx.fill(); ctx.fillStyle = 'rgba(' + c.f + ',.34)';
     });
     ctx.beginPath(); ctx.moveTo(24, 0); ctx.lineTo(14, -4); ctx.lineTo(-6, -6.5); ctx.lineTo(-13, -4); ctx.lineTo(-13, 4); ctx.lineTo(-6, 6.5); ctx.lineTo(14, 4); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.globalAlpha = al * 0.45; ctx.beginPath(); ctx.moveTo(16, 0); ctx.lineTo(-11, 0); ctx.moveTo(-2, -6); ctx.lineTo(-2, 6); ctx.stroke(); ctx.globalAlpha = al;
@@ -574,9 +576,11 @@
   function drawMechU(ctx, P, u, now) {
     var al = u.al * u.m; if (al <= 0.02) return;
     var c = COLS(P, u.side), s = 1.1 * u.sc * (0.5 + 0.5 * u.m), sq = 1 - u.sq * 0.12, walk = !u.air && (u.mode === 'walk' || u.mode === 'strafe'), pulse = 0.55 + Math.sin(now / 260) * 0.35, flick = (now % 4200) < 90, ph = u.ph, dir = u.dir, foe = u.side === 'e';
-    var body = 'rgba(' + c.f + ',.24)', plate = 'rgba(' + c.f + ',.38)', hot = 'rgba(' + c.h + ',.95)', line = 'rgba(' + c.s + ',.95)';
+    var body = 'rgba(' + c.f + ',.36)', plate = 'rgba(' + c.f + ',.5)', hot = 'rgba(' + c.h + ',.95)', line = 'rgba(' + c.s + ',.95)';
     function poly(pts) { ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (var k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]); ctx.closePath(); }
-    ctx.save(); ctx.globalAlpha = al; ctx.translate(u.x, u.y + FEET); ctx.scale(s * dir, s * sq); ctx.lineJoin = 'miter'; ctx.lineCap = 'square'; ctx.lineWidth = 1.5; ctx.strokeStyle = line;
+    ctx.save(); ctx.globalAlpha = al; ctx.translate(u.x, u.y + FEET); if (u.dive) ctx.rotate(-dir * 0.55 * u.dive); ctx.scale(s * dir, s * sq);
+    var hg = ctx.createRadialGradient(0, -22, 6, 0, -22, 46); hg.addColorStop(0, 'rgba(' + P.halo + ',.8)'); hg.addColorStop(0.6, 'rgba(' + P.halo + ',.42)'); hg.addColorStop(1, 'rgba(' + P.halo + ',0)'); ctx.fillStyle = hg; ctx.beginPath(); ctx.arc(0, -22, 46, 0, 6.283); ctx.fill();
+    ctx.lineJoin = 'miter'; ctx.lineCap = 'square'; ctx.lineWidth = 1.5; ctx.strokeStyle = line;
     if (!u.air && u.m > 0.9) { ctx.fillStyle = 'rgba(' + c.f + ',.14)'; ctx.beginPath(); ctx.ellipse(0, 1, 10, 2, 0, 0, 6.283); ctx.fill(); }
     [-1, 1].forEach(function (side) {
       var pp = ph + (side > 0 ? Math.PI : 0), swg = u.air ? 0 : Math.sin(pp) * 5 * (walk ? 1 : 0), lift = u.air ? 5 : Math.max(0, Math.cos(pp)) * 3 * (walk ? 1 : 0), hx = side * 4, fx2 = hx + swg;
@@ -604,6 +608,9 @@
     ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(0, -40); ctx.lineTo(0, -45); ctx.stroke();
     if (foe) { ctx.beginPath(); ctx.moveTo(-5, -39); ctx.lineTo(-9, -45); ctx.moveTo(5, -39); ctx.lineTo(9, -45); ctx.stroke(); }
     if (u.flash > 0) { ctx.fillStyle = 'rgba(255,255,255,' + (u.flash * 0.6).toFixed(2) + ')'; poly([[-8, -40], [8, -40], [8, -10], [-8, -10]]); ctx.fill(); }
+    if (u.charge > 0.02) { var cx2 = 14 + aim * 2, cy2 = -15 - aim * 6, cr = 3 + u.charge * 9, cgl = ctx.createRadialGradient(cx2 + 10, cy2, 0, cx2 + 10, cy2, cr); cgl.addColorStop(0, 'rgba(255,255,255,.95)'); cgl.addColorStop(0.4, 'rgba(' + c.h + ',.8)'); cgl.addColorStop(1, 'rgba(' + c.h + ',0)'); ctx.fillStyle = cgl; ctx.beginPath(); ctx.arc(cx2 + 10, cy2, cr, 0, 6.283); ctx.fill(); }
+    if (u.guard > 0.02) { ctx.globalAlpha = al * u.guard; ctx.lineWidth = 2.4; ctx.strokeStyle = 'rgba(' + c.h + ',.95)'; ctx.fillStyle = 'rgba(' + c.h + ',.2)'; ctx.beginPath(); ctx.arc(8, -22, 17, -1.2, 1.2); ctx.stroke(); ctx.beginPath(); ctx.moveTo(8, -22); ctx.arc(8, -22, 17, -1.2, 1.2); ctx.closePath(); ctx.fill(); ctx.globalAlpha = al; }
+    if (u.m < 0.97 && u.m > 0.03) { var sy4 = -46 * u.m; ctx.lineWidth = 1.4; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.beginPath(); ctx.moveTo(-16, sy4); ctx.lineTo(16, sy4); ctx.stroke(); ctx.strokeStyle = 'rgba(' + c.h + ',.8)'; [[-15, -2], [15, -2]].forEach(function (b) { ctx.beginPath(); ctx.moveTo(b[0], -48); ctx.lineTo(b[0] + b[0] / 15 * -4, -48); ctx.moveTo(b[0], -48); ctx.lineTo(b[0], -43); ctx.moveTo(b[0], -2); ctx.lineTo(b[0] + b[0] / 15 * -4, -2); ctx.moveTo(b[0], -2); ctx.lineTo(b[0], -7); ctx.stroke(); }); }
     ctx.restore();
   }
   /* speech bubbles for both pilots */
@@ -629,9 +636,12 @@
   function stageFor(ph, st) {
     if (ph === 'morph' || ph === 'patrol') return [1, 'Recon', 'scanning the page'];
     if (ph === 'detect') return [1, 'Recon', 'threat located'];
-    if (ph === 'ambush' || ph === 'dog') return [2, 'Exploit', 'engaging the threat'];
+    if (ph === 'ambush') return [2, 'Exploit', 'engaging the threat'];
+    if (ph === 'dog') return [2, 'Exploit', 'engaging the threat' + (st && st.win > 1 ? ' | round ' + st.round + '/' + st.win : '')];
     if (ph === 'toShip' && st && st.killed) return [4, 'Report', 'finding closed'];
-    if (ph === 'toMech' || ph === 'duel' || ph === 'toShip') return [3, 'Escalate', 'taking it hand to hand'];
+    if (ph === 'duel' && st && st.rdur) { var q = st.rt / st.rdur, rn = st.win > 1 ? ' | round ' + st.round + '/' + st.win : ''; return [3, 'Escalate', (q < 0.3 ? 'foothold: closing in' : q < 0.62 ? 'lateral movement: trading blows' : 'privilege escalation: finishing move') + rn]; }
+    if (ph === 'toMech') return [3, 'Escalate', 'pivoting to the host: transforming'];
+    if (ph === 'toShip') return [3, 'Escalate', 'pulling out'];
     if (ph === 'victory') return [4, 'Report', 'finding closed'];
     if (ph === 'cta') return [4, 'Report', 'open to work'];
     return [4, 'Report', 'all clear'];
@@ -651,7 +661,7 @@
     var P0 = pal(), vis = visAst(null, 0, 0, 0), a, q;
     if (vis.length) { a = vis[Math.floor(Math.random() * vis.length)]; q = astXY(a); a.px = q.x; a.py = q.y; } else { a = tmpAsteroid(rnd(160, innerWidth - 160), rnd(160, innerHeight - 160)); }
     a.hide = true;
-    var win = +QS.get('win') || (function () { var r = Math.random(); return r < 0.25 ? 1 : r < 0.65 ? 2 : 3; })(), f = mkUnit('f', a.px || q.x, a.py || q.y, -1.5708);
+    var win = +QS.get('win') || (function () { var r = Math.random(); return r < 0.15 ? 1 : r < 0.4 ? 2 : r < 0.72 ? 3 : 4; })(), f = mkUnit('f', a.px || q.x, a.py || q.y, -1.5708);
     f.m = 0; f.sc = 0.2; f.al = 0;
     ST = { ph: 'morph', pt: 0, win: win, round: 1, f: f, e: null, A0: a, T: null, parts: [], lasers: [], plan: null, rt: 0, rdur: 0, cx: 0, cy: 0, th: 0, om: 0.002, born: performance.now(), clk: 0, quiet: !QS.get('win') && FOUGHT(), capKey: '', pl: null, killed: false, nextSay: 0, tgt: { x: f.x, y: f.y, t: 0 }, abort: 0, vt: 0 };
     roam = { kind: 'story', x: f.x, y: f.y, back: false, bt: 0, bx: 0, by: 0 };
@@ -660,11 +670,11 @@
   }
   function endRoam() { hideSay(); hideCap(); if (roam && !roam.back) { roam.back = true; roam.bt = performance.now(); roam.bx = roam.x; roam.by = roam.y; if (ST) ST.abort = performance.now(); } }
   function planRound(isMech) {
-    var s = ST, R = s.win - s.round + 1, hp0 = s.e.hp, target = R > 1 ? Math.max(18, hp0 * (R - 1) / R) : 0, n = R === 1 ? 7 : 5, i, e = [], f = [];
-    s.rt = 0; s.rdur = isMech ? rnd(15000, 19000) : (R === 1 ? rnd(13000, 17000) : rnd(14000, 19000));
+    var s = ST, R = s.win - s.round + 1, hp0 = s.e.hp, target = R > 1 ? Math.max(18, hp0 * (R - 1) / R) : 0, n = isMech ? (R === 1 ? 9 : 7) : (R === 1 ? 7 : 5), i, e = [], f = [];
+    s.rt = 0; s.rdur = isMech ? rnd(19000, 24000) : (R === 1 ? rnd(13000, 17000) : rnd(14000, 19000));
     for (i = 1; i <= n; i++) e.push(s.rdur * (0.1 + 0.78 * (i - rnd(0.15, 0.85)) / n + (R === 1 ? 0.04 : 0)));
     e.sort(function (a, b) { return a - b; }); if (R === 1) e[n - 1] = Math.max(e[n - 1], s.rdur * 0.82);
-    f.push(s.rdur * rnd(0.2, 0.3), s.rdur * rnd(0.45, 0.58), s.rdur * rnd(0.72, 0.86));
+    f.push(s.rdur * rnd(0.2, 0.3), s.rdur * rnd(0.45, 0.58), s.rdur * rnd(0.72, 0.86)); if (isMech) f.push(s.rdur * rnd(0.32, 0.4), s.rdur * rnd(0.6, 0.68)); f.sort(function (a, b) { return a - b; });
     s.plan = { e: e, f: f, ei: 0, fi: 0, edmg: (hp0 - target) / n, fdmg: 7, mech: !!isMech };
   }
   function dueE(s) { return s.plan.ei < s.plan.e.length && (s.rt >= s.plan.e[s.plan.ei] || s.rt > s.rdur + 1500); }
@@ -684,18 +694,26 @@
   /* mech AI */
   function canDodge(u) { return u.alive && !u.air && u.mode !== 'melee' && !(u.stag > 0); }
   function mechPick(u, v, s, due) {
-    var dist = Math.abs(v.x - u.x), r = Math.random(), wide = (ST.bw || 400) > 330; u.hitNext = false; u.after = ''; u.mt = rnd(500, 1000); u.burst = 0; u.jump = null;
-    if (due) { u.hitNext = true; if (dist > 120) { u.want = rnd(130, 210); u.after = 'shoot'; } else { u.want = 46; u.after = 'melee'; } u.mode = 'walk'; return; }
-    if (r < 0.26) { u.want = rnd(150, 240); u.after = 'shoot'; u.mode = 'walk'; }
-    else if (r < 0.44 && wide) { u.mode = 'leap'; }
-    else if (r < 0.62) { u.want = rnd(44, 60); u.after = 'melee'; u.mode = 'walk'; u.dash = true; }
-    else if (r < 0.8) { u.mode = 'strafe'; u.mt = rnd(600, 950); }
+    var dist = Math.abs(v.x - u.x), r = Math.random(), wide = (ST.bw || 400) > 330; u.hitNext = false; u.after = ''; u.mt = rnd(500, 1000); u.burst = 0; u.jump = null; u.charge = 0; u.guard = 0; u.dive = 0; u.up = false;
+    if (due) {
+      u.hitNext = true;
+      if (dist > 150 && Math.random() < 0.4) { u.mode = 'charge'; u.mt = 0; return; }
+      if (dist > 110 && wide && Math.random() < 0.3) { u.mode = 'dive'; return; }
+      if (dist > 120) { u.want = rnd(130, 210); u.after = 'shoot'; } else { u.want = 46; u.after = 'melee'; } u.mode = 'walk'; return;
+    }
+    if (r < 0.16) { u.want = rnd(150, 240); u.after = 'shoot'; u.mode = 'walk'; }
+    else if (r < 0.28 && dist > 150) { u.mode = 'charge'; }
+    else if (r < 0.4 && wide) { u.mode = 'leap'; }
+    else if (r < 0.5 && wide && dist > 110) { u.mode = 'dive'; }
+    else if (r < 0.64) { u.want = rnd(44, 60); u.after = 'melee'; u.mode = 'walk'; u.dash = true; }
+    else if (r < 0.78) { u.mode = 'strafe'; u.mt = rnd(600, 950); }
+    else if (r < 0.88 && (v.mode === 'melee' || v.mode === 'charge' || v.mode === 'shoot')) { u.mode = 'guard'; u.mt = rnd(650, 900); }
     else { u.mode = 'jump'; }
   }
   function mechStep(u, v, dt, s, due, dueUse, bounds, P) {
     if (!u.alive) return;
     u.dir = v.x >= u.x ? 1 : -1; var dist = Math.abs(v.x - u.x), lo = bounds.x1, hi = bounds.x2, clk = s.clk, hitD = u.side === 'f' ? function () { return hitDmgE(s); } : function () { return s.plan.fdmg; };
-    u.mt -= dt; u.flash = Math.max(0, u.flash - dt / 260); u.sq = Math.max(0, u.sq - dt / 260); u.stag = Math.max(0, u.stag - dt);
+    u.mt -= dt; u.flash = Math.max(0, u.flash - dt / 260); u.sq = Math.max(0, u.sq - dt / 260); u.stag = Math.max(0, u.stag - dt); if (u.mode !== 'guard') u.guard = Math.max(0, u.guard - dt / 160); if (u.mode !== 'charge') u.charge = Math.max(0, u.charge - dt / 200);
     u.x += u.kx * dt / 1000; u.kx *= Math.pow(0.002, dt / 1000);
     if (u.dodgeAt && clk >= u.dodgeAt && !u.air && u.mode !== 'melee' && !(u.stag > 0)) { u.dodgeAt = 0; u.mode = 'dodge'; u.jump = null; u.atk = 0; }
     if (u.stag > 0 && u.mode !== 'dodge') { u.aim = Math.max(0, u.aim - dt / 150); u.x = clampV(u.x, lo, hi); return; }
@@ -716,6 +734,15 @@
           else { if (hit) dueUse(); mechFire(s, u, v, hit, hit ? hitD() : 0); u.burst--; u.mt = u.burst > 0 ? 170 : 380; }
         } else mechPick(u, v, s, due());
       }
+    } else if (m === 'charge') {
+      u.aim = Math.min(1, u.aim + dt / 140); u.charge = Math.min(1, u.charge + dt / 850); if (Math.random() < 0.5) burst(u.x + u.dir * 30, u.y + FEET - 30 + rnd(-8, 8), 1, 'spark', '255,255,255', 0.12, 260);
+      if (u.charge >= 1) {
+        var chit = u.hitNext; if (chit && v.air) { u.charge = 1; return; }
+        if (!chit && !canDodge(v)) { u.charge = 0; mechPick(u, v, s, due()); }
+        else { if (chit) dueUse(); mechFire(s, u, v, chit, chit ? hitD() : 0, true); u.charge = 0; u.mt = 420; u.mode = 'shoot'; u.burst = 0; }
+      }
+    } else if (m === 'guard') {
+      u.guard = Math.min(1, u.guard + dt / 120); u.aim = 0; if (u.mt <= 0 || due()) { mechPick(u, v, s, due()); }
     } else if (m === 'melee') {
       u.atkT += dt; var t = u.atkT, plannedStrike = u.hitNext ? 2 : 0;
       if (u.hitNext && dist > 56) u.x += u.dir * 0.2 * dt;
@@ -724,25 +751,32 @@
       if (!u.struck && t >= 280) { u.struck = 1; mechStrike(u, v, s, P, plannedStrike === 1, hitD, dueUse); }
       if (u.struck === 1 && t >= 660) { u.struck = 2; mechStrike(u, v, s, P, plannedStrike === 2, hitD, dueUse); }
       if (t > 900) { u.atk = 0; mechPick(u, v, s, due()); }
-    } else if (m === 'jump' || m === 'leap' || m === 'dodge') {
+    } else if (m === 'jump' || m === 'leap' || m === 'dodge' || m === 'dive') {
       if (!u.jump) {
         var nx, h, dur;
         if (m === 'leap') { nx = clampV(v.x + u.dir * rnd(64, 90), lo, hi); h = 78; dur = 760; }
+        else if (m === 'dive') { nx = clampV(v.x - u.dir * 46, lo, hi); h = 104; dur = 860; }
         else if (m === 'dodge') { nx = clampV(u.x - u.dir * 14, lo, hi); h = 54; dur = 540; }
         else { nx = clampV(u.x + (Math.random() < 0.5 ? -1 : 1) * rnd(60, 110), lo, hi); h = 40; dur = 520; }
         u.jump = { x0: u.x, x1: nx, t: 0, dur: dur, h: h }; u.air = true; u.aim = 0.4;
       }
-      var J = u.jump; J.t += dt; var p = Math.min(1, J.t / J.dur); u.x = J.x0 + (J.x1 - J.x0) * easeIO(p); u.yo = -Math.sin(Math.PI * p) * J.h;
+      var J = u.jump; J.t += dt; var p = Math.min(1, J.t / J.dur); u.x = J.x0 + (J.x1 - J.x0) * easeIO(p); u.yo = -Math.sin(Math.PI * p) * J.h; if (m === 'dive') u.dive = p > 0.45 ? Math.min(1, (p - 0.45) / 0.2) : 0;
       if (m === 'leap' && p > 0.45 && p < 0.55 && !u.leapShot && canDodge(v) && false) { u.leapShot = true; }
-      if (p >= 1) { u.air = false; u.yo = 0; u.jump = null; u.sq = 1; burst(u.x, u.y + FEET, 4, 'smoke', P.link, 0.1, 500); mechPick(u, v, s, due()); }
+      if (p >= 1) {
+        u.air = false; u.yo = 0; u.jump = null; u.sq = 1; burst(u.x, u.y + FEET, 4, 'smoke', P.link, 0.1, 500);
+        if (m === 'dive') { u.dive = 0; u.dir = v.x >= u.x ? 1 : -1; ringFx(u.x, u.y + FEET, P.node, 54); ringFx(u.x, u.y + FEET, P.link, 30); burst(u.x, u.y + FEET, 12, 'smoke', P.link, 0.18, 650); burst(u.x, u.y + FEET - 2, 8, 'spark', '255,255,255', 0.3, 380); mechStrike(u, v, s, P, u.hitNext && !v.air, hitD, dueUse); }
+        mechPick(u, v, s, due());
+      }
     }
     u.x = clampV(u.x, lo, hi);
     if (Math.abs(u.x - v.x) < 38 && !u.air) { u.x = clampV(u.x + (38 - Math.abs(u.x - v.x)) * 0.5 * (u.x < v.x ? -1 : 1), lo, hi); }
   }
   function mechStrike(u, v, s, P, planned, hitD, dueUse) {
-    var dist = Math.abs(v.x - u.x); ST.ns = (ST.ns || 0) + 1; if (planned) ST.nsp = (ST.nsp || 0) + 1; if (dist < 70) ST.nsd = (ST.nsd || 0) + 1; if (v.air) ST.nsa = (ST.nsa || 0) + 1; ringFx(u.x + u.dir * 24, u.y + FEET - 22, u.side === 'f' ? P.link : P.hot, 18);
+    var dist = Math.abs(v.x - u.x); ST.ns = (ST.ns || 0) + 1;
+    if (!planned && v.mode === 'melee' && v.alive && dist < 80 && !v.air && !u.air) { var mxx = (u.x + v.x) / 2, myy = u.y + FEET - 24; ringFx(mxx, myy, '255,255,255', 46); ringFx(mxx, myy, P.hot, 26); burst(mxx, myy, 16, 'spark', '255,255,255', 0.5, 450); u.kx -= u.dir * 70; v.kx += u.dir * 70; ST.nclash = (ST.nclash || 0) + 1; return; } if (planned) ST.nsp = (ST.nsp || 0) + 1; if (dist < 70) ST.nsd = (ST.nsd || 0) + 1; if (v.air) ST.nsa = (ST.nsa || 0) + 1; ringFx(u.x + u.dir * 24, u.y + FEET - 22, u.side === 'f' ? P.link : P.hot, 18);
     if (dist < 70 && !v.air) {
-      if (planned) { dueUse(); applyHit(v, hitD(), P); ringFx(v.x, v.y + FEET - 22, '255,255,255', 36); burst(v.x, v.y + FEET - 22, 8, 'spark', P.hot, 0.45, 420); }
+      if (planned) { dueUse(); applyHit(v, hitD(), P); ringFx(v.x, v.y + FEET - 22, '255,255,255', 36); burst(v.x, v.y + FEET - 22, 8, 'spark', P.hot, 0.45, 420);
+        if (u.struck === 2 && v.alive && !v.air) { v.stag = 0; v.mode = 'jump'; v.jump = { x0: v.x, x1: v.x + u.dir * 70, t: 0, dur: 760, h: 92 }; v.air = true; v.aim = 0.2; ST.nup = (ST.nup || 0) + 1; ringFx(v.x, v.y + FEET - 6, P.link, 30); } }
       else { burst(v.x - u.dir * 8, v.y + FEET - 22, 6, 'spark', P.link, 0.32, 300); v.kx += u.dir * 26; v.aim = 0; }
     }
   }
@@ -750,15 +784,15 @@
   function trToMech(u, dt, s, P, platTop) {
     var t = u.tr; if (!t) return true; t.t += dt;
     if (t.st === 'fly') { if (t.delay > 0) { t.delay -= dt; u.vx *= 0.96; u.vy *= 0.96; u.x += u.vx * dt / 1000; u.y += u.vy * dt / 1000; return false; } var d = flyTo(u, t.tx, t.ty, dt, 380, 0.005); if (d < 16 || t.t > 3400) { t.st = 'morph'; t.t = 0; u.vx = u.vy = 0; ringFx(u.x, u.y, P.node, 46); burst(u.x, u.y, 10, 'spark', P.link, 0.35, 420); } }
-    else if (t.st === 'morph') { u.ang += angDiff(u.ang, -1.5708) * Math.min(1, dt * 0.01); u.m = easeIO(t.t / 650); if (t.t >= 650) { u.m = 1; t.st = 'fall'; t.t = 0; u.vyy = 0; u.air = true; } }
-    else if (t.st === 'fall') { u.vyy += 1900 * dt / 1000; u.y += u.vyy * dt / 1000; var ty = platTop - FEET; if (u.y >= ty) { u.y = ty; u.air = false; u.sq = 1; u.vyy = 0; t.st = 'done'; burst(u.x, u.y + FEET, 8, 'smoke', P.link, 0.14, 600); } }
+    else if (t.st === 'morph') { u.ang += angDiff(u.ang, -1.5708) * Math.min(1, dt * 0.01); u.m = easeIO(t.t / 1000); if (Math.random() < 0.45) burst(u.x + rnd(-14, 14), u.y + rnd(-14, 14), 1, 'spark', P.link, 0.25, 300); if (!t.r1 && t.t > 330) { t.r1 = 1; ringFx(u.x, u.y, P.link, 38); } if (!t.r2 && t.t > 660) { t.r2 = 1; ringFx(u.x, u.y, P.node, 54); burst(u.x, u.y, 8, 'debris', P.node, 0.3, 700); } if (t.t >= 1000) { u.m = 1; t.st = 'fall'; t.t = 0; u.vyy = 0; u.air = true; } }
+    else if (t.st === 'fall') { u.vyy += 1900 * dt / 1000; u.y += u.vyy * dt / 1000; var ty = platTop - FEET; if (u.y >= ty) { u.y = ty; u.air = false; u.sq = 1; u.vyy = 0; t.st = 'done'; burst(u.x, u.y + FEET, 16, 'smoke', P.link, 0.2, 700); burst(u.x, u.y + FEET - 2, 8, 'spark', '255,255,255', 0.3, 400); ringFx(u.x, u.y + FEET, P.node, 60); ringFx(u.x, u.y + FEET, P.link, 34); } }
     else if (t.st === 'done') { u.y = platTop - FEET; return true; }
     return false;
   }
   function trToShip(u, dt, s, P) {
     var t = u.tr; if (!t) return true; t.t += dt;
     if (t.st === 'hop') { if (t.t < 16) u.vyy = -480; u.vyy += 1500 * dt / 1000; u.y += u.vyy * dt / 1000; u.air = true; if (u.vyy > 0 && t.t > 240) { t.st = 'morph'; t.t = 0; u.vx = 0; u.vy = 0; ringFx(u.x, u.y, P.node, 46); } }
-    else if (t.st === 'morph') { u.m = 1 - easeIO(t.t / 650); u.y -= 0.02 * dt; if (t.t >= 650) { u.m = 0; u.air = false; t.st = 'rise'; t.t = 0; u.ang = -1.5708; u.vy = -60; } }
+    else if (t.st === 'morph') { u.m = 1 - easeIO(t.t / 900); u.y -= 0.02 * dt; if (Math.random() < 0.4) burst(u.x + rnd(-14, 14), u.y + rnd(-26, 0), 1, 'spark', P.link, 0.25, 300); if (t.t >= 900) { u.m = 0; u.air = false; t.st = 'rise'; t.t = 0; u.ang = -1.5708; u.vy = -60; } }
     else if (t.st === 'rise') { if (t.t > 700) { t.st = 'done'; } }
     else if (t.st === 'done') return true;
     return false;
@@ -817,11 +851,11 @@
     var s = ST, f = s.f, vis = visAst(s.A0, f.x, f.y, 300), a, q;
     if (vis.length) { a = vis[Math.floor(Math.random() * vis.length)]; q = astXY(a); a.px = q.x; a.py = q.y; }
     else { var ang = rnd(0, 6.28), tries = 0, px, py; do { ang = rnd(0, 6.28); px = f.x + Math.cos(ang) * 340; py = f.y + Math.sin(ang) * 260; tries++; } while ((px < 140 || px > innerWidth - 140 || py < 150 || py > innerHeight - 150) && tries < 30); a = tmpAsteroid(clampV(px, 140, innerWidth - 140), clampV(py, 150, innerHeight - 150)); }
-    a.hide = true; f.hp = 100; f.hpS = 100; s.T = a; s.ph = 'detect'; s.pt = 0; s.killed = false; s.round = 1; s.e = null; s.vroll = false; s.sf = false; s.win = +QS.get('win') || (function () { var r = Math.random(); return r < 0.25 ? 1 : r < 0.65 ? 2 : 3; })();
+    a.hide = true; f.hp = 100; f.hpS = 100; s.T = a; s.ph = 'detect'; s.pt = 0; s.killed = false; s.round = 1; s.e = null; s.vroll = false; s.sf = false; s.win = +QS.get('win') || (function () { var r = Math.random(); return r < 0.15 ? 1 : r < 0.4 ? 2 : r < 0.72 ? 3 : 4; })();
     sayAs('f', 'Contact! Something is hiding in that rock.', 3200);
   }
   function stepStory(r, dt, now, P) {
-    var s = ST, f = s.f, e = s.e; s.pt += dt; s.clk += dt;
+    var s = ST, f = s.f, e = s.e; if (s.slow > 0) { s.slow -= dt; dt *= 0.22; } s.pt += dt; s.clk += dt;
     stepParts(dt); stepLasers(dt, P); stepHalves(dt);
     [f, e].forEach(function (u) { if (u) { u.flash = Math.max(0, u.flash - dt / 260); u.roll = u.roll > 0 ? u.roll + dt * 0.011 : 0; if (u.roll > 6.28) u.roll = 0; u.bank *= Math.pow(0.5, dt / 250); } });
     r.x = f.x; r.y = f.y;
@@ -918,8 +952,8 @@
   function startNext(P) {
     var s = ST, f = s.f, e = s.e; s.lasers.length = 0;
     if (f.m > 0.5) { f.tr = { st: 'hop', t: 0 }; e.tr = { st: 'hop', t: 0 }; s.ph = 'toShip'; s.pt = 0; sayAs('e', 'Back to the air!', 1600); return; }
-    var pl = (s.round === 1 && s.win >= 2) ? pickPlat() : null;
-    if (!pl) { s.round++; planRound(false); s.rt = 0; s.dirT = 0; sayAs('e', 'Round two? Fine.', 1500); return; }
+    var pl = ((s.round === 1 && s.win >= 2) || (s.round === 3 && s.win >= 4)) ? pickPlat() : null;
+    if (!pl) { s.round++; planRound(false); s.rt = 0; s.dirT = 0; sayAs('e', ['', 'Round two? Fine.', 'Round three!', 'One more round.'][Math.min(3, s.round - 1)] || 'Again!', 1500); return; }
     s.pl = pl; var pr = platRect(s), efirst = Math.random() < 0.5; var exx = pr.x2 - 50, fxx = pr.x1 + 50;
     e.tr = { st: 'fly', t: 0, tx: exx, ty: pr.top - 90, delay: 0 }; f.tr = { st: 'fly', t: 0, tx: fxx, ty: pr.top - 90, delay: 650 };
     s.ph = 'toMech'; s.pt = 0; sayAs('e', "Let's settle this on foot.", 2200); setTimeout(function () { if (ST === s) sayAs('f', 'Fine. Transforming!', 1800); }, 1100);
@@ -931,7 +965,7 @@
   }
 
   if (QS.get('debug')) window.__adv = function (ms) { if (!ST || !roam) return; var n = Math.ceil(ms / 40), P = pal(), i; for (i = 0; i < n && ST; i++) stepStory(roam, 40, performance.now(), P); };
-  if (QS.get('debug')) window.__st = function () { return ST && { ph: ST.ph, round: ST.round, win: ST.win, pt: Math.round(ST.pt), rt: Math.round(ST.rt), ehp: ST.e && Math.round(ST.e.hp), fhp: Math.round(ST.f.hp), em: ST.e && +ST.e.m.toFixed(2), fm: +ST.f.m.toFixed(2), ftr: ST.f.tr && ST.f.tr.st, etr: ST.e && ST.e.tr && ST.e.tr.st, fy: Math.round(ST.f.y), ey: ST.e && Math.round(ST.e.y), fx: Math.round(ST.f.x), ex: ST.e && Math.round(ST.e.x), top: ST.pl && Math.round(ST.pl.getBoundingClientRect().top), fmode: ST.f.mode, emode: ST.e && ST.e.mode, fh: ST.f.hitNext, eh: ST.e && ST.e.hitNext, fafter: ST.f.after, fwant: Math.round(ST.f.want), burst: ST.f.burst, mt: Math.round(ST.f.mt), eair: ST.e && ST.e.air, fstag: Math.round(ST.f.stag), ns: ST.ns, nsp: ST.nsp, nsd: ST.nsd, nsa: ST.nsa, cap: ST.capKey, quiet: ST.quiet, nfire: ST.nfire, nhit: ST.nhit, ei: ST.plan && ST.plan.ei, en: ST.plan && ST.plan.e.length, killed: ST.killed, lasers: ST.lasers.length, parts: ST.parts.length, ast: AST.length, hidden: AST.filter(function (a) { return a.hide; }).length }; };
+  if (QS.get('debug')) window.__st = function () { return ST && { ph: ST.ph, round: ST.round, win: ST.win, pt: Math.round(ST.pt), rt: Math.round(ST.rt), ehp: ST.e && Math.round(ST.e.hp), fhp: Math.round(ST.f.hp), em: ST.e && +ST.e.m.toFixed(2), fm: +ST.f.m.toFixed(2), ftr: ST.f.tr && ST.f.tr.st, etr: ST.e && ST.e.tr && ST.e.tr.st, fy: Math.round(ST.f.y), ey: ST.e && Math.round(ST.e.y), fx: Math.round(ST.f.x), ex: ST.e && Math.round(ST.e.x), top: ST.pl && Math.round(ST.pl.getBoundingClientRect().top), fmode: ST.f.mode, emode: ST.e && ST.e.mode, fh: ST.f.hitNext, eh: ST.e && ST.e.hitNext, fafter: ST.f.after, fwant: Math.round(ST.f.want), burst: ST.f.burst, mt: Math.round(ST.f.mt), eair: ST.e && ST.e.air, fstag: Math.round(ST.f.stag), ns: ST.ns, nsp: ST.nsp, nclash: ST.nclash, nup: ST.nup, slow: ST.slow, nsd: ST.nsd, nsa: ST.nsa, cap: ST.capKey, quiet: ST.quiet, nfire: ST.nfire, nhit: ST.nhit, ei: ST.plan && ST.plan.ei, en: ST.plan && ST.plan.e.length, killed: ST.killed, lasers: ST.lasers.length, parts: ST.parts.length, ast: AST.length, hidden: AST.filter(function (a) { return a.hide; }).length }; };
   function drawRoam(ctx, P, dt, now) {
     var r = roam, s = ST; if (!s) { roam = null; root.classList.remove('roaming'); return; }
     if (r.back) {
