@@ -507,9 +507,10 @@
       ctx.restore();
     });
   }
-  function fireShip(u, v, hit, dmg) {
-    var a0 = u.ang, side = (u.fs = -(u.fs || 1)), ang = a0 + (hit ? 0 : (Math.random() < 0.5 ? -1 : 1) * rnd(0.2, 0.34)), ox = u.x + Math.cos(a0) * 12 - Math.sin(a0) * side * 15, oy = u.y + Math.sin(a0) * 12 + Math.cos(a0) * side * 15, sp = 0.82;
-    ST.lasers.push({ x: ox, y: oy, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, side: u.side, hit: hit, dmg: dmg, tgt: v, home: hit, life: 2300 });
+  function fireShip(u, v, hit, dmg, big) {
+    var a0 = u.ang, side = (u.fs = -(u.fs || 1)), ang = a0 + (hit ? 0 : (Math.random() < 0.5 ? -1 : 1) * rnd(0.2, 0.34)), ox = u.x + Math.cos(a0) * 12 - Math.sin(a0) * side * 15, oy = u.y + Math.sin(a0) * 12 + Math.cos(a0) * side * 15, sp = big ? 1.05 : 0.82;
+    ST.lasers.push({ x: ox, y: oy, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, side: u.side, hit: hit, dmg: dmg, tgt: v, home: hit, life: 2300, big: !!big });
+    if (big) { burst(ox, oy, 10, 'spark', '255,255,255', 0.4, 300); ringFx(ox, oy, u.side === 'f' ? '127,168,204' : '180,35,44', 26); }
     burst(ox, oy, 3, 'spark', '255,255,255', 0.2, 180);
   }
   function jinkShip(u, p) { if (Math.random() < p && u.jink <= 0) { u.jink = 560; u.jdir = Math.random() < 0.5 ? -1 : 1; if (u.roll <= 0) u.roll = 0.01; } }
@@ -521,8 +522,9 @@
     burst(mx, my, 4, 'spark', '255,255,255', 0.25, 170); ringFx(mx, my, u.side === 'f' ? '127,168,204' : '180,35,44', 12); u.x -= u.dir * 2;
     if (!hit) v.dodgeAt = s.clk + Math.max(0, dist / 0.95 - 230);
   }
-  function applyHit(u, dmg, P) {
-    if (!u.alive) return; if (u.guard > 0.3) { ringFx(u.x + u.dir * 16, u.y + FEET - 22, '255,255,255', 40); burst(u.x + u.dir * 16, u.y + FEET - 22, 10, 'shard', P.hot, 0.35, 500); } u.guard = 0; u.charge = 0; ST.nhit = (ST.nhit || 0) + 1; u.hp = Math.max(u.side === 'f' ? 35 : 0, u.hp - dmg); u.flash = 1; u.kx += (u.side === 'f' ? -1 : 1) * 40; if (u.m > 0.5) { u.stag = 260; u.kx += (u.side === 'f' ? -1 : 1) * 60; } burst(u.x, u.y, 8, 'spark', P.hot, 0.4, 420);
+  function applyHit(u, dmg, P, big) {
+    if (!u.alive) return; if (u.guard > 0.3) { ringFx(u.x + u.dir * 16, u.y + FEET - 22, '255,255,255', 40); burst(u.x + u.dir * 16, u.y + FEET - 22, 10, 'shard', P.hot, 0.35, 500); } u.guard = 0; u.charge = 0; ST.nhit = (ST.nhit || 0) + 1; u.hp = Math.max(u.side === 'f' ? 35 : 0, u.hp - dmg); u.flash = 1; u.kx += (u.side === 'f' ? -1 : 1) * 40; if (u.m > 0.5) { u.stag = 260; u.kx += (u.side === 'f' ? -1 : 1) * 60; } burst(u.x, u.y, big ? 16 : 8, 'spark', P.hot, big ? 0.55 : 0.4, 420);
+    if (big) ST.slow = Math.max(ST.slow || 0, 170);
     if (u.side === 'e' && u.hp <= 0) { ST.killed = true; if (u.m > 0.5) ST.slow = 700; }
   }
   function stepLasers(dt, P) {
@@ -534,7 +536,7 @@
       if (l.hit && l.tgt.alive) {
         var ty = l.mech ? l.tgt.y + FEET - 22 : l.tgt.y;
         var sx = l.x - l.vx * dt, sy2 = l.y - l.vy * dt, vx = l.x - sx, vy = l.y - sy2, ll = vx * vx + vy * vy || 1, tt = clampV(((l.tgt.x - sx) * vx + (ty - sy2) * vy) / ll, 0, 1);
-        if (Math.hypot(sx + vx * tt - l.tgt.x, sy2 + vy * tt - ty) < (l.mech ? 14 : 17)) { applyHit(l.tgt, l.dmg, P); ls.splice(i, 1); continue; }
+        if (Math.hypot(sx + vx * tt - l.tgt.x, sy2 + vy * tt - ty) < (l.mech ? 14 : 17)) { applyHit(l.tgt, l.dmg, P, l.big); ls.splice(i, 1); continue; }
       }
       if (l.life <= 0 || l.x < -40 || l.x > innerWidth + 40 || l.y < -40 || l.y > innerHeight + 40) { if (l.hit && ST.plan && l.tgt.alive) { if (l.side === 'f') ST.plan.ei = Math.max(0, ST.plan.ei - 1); else ST.plan.fi = Math.max(0, ST.plan.fi - 1); } ls.splice(i, 1); }
     }
@@ -544,6 +546,33 @@
       var c = l.side === 'f' ? P.link : P.hot, len = 22, m = Math.hypot(l.vx, l.vy) || 1;
       ctx.lineCap = 'round'; ctx.strokeStyle = 'rgba(' + c + ',.25)'; ctx.lineWidth = l.big ? 12 : 6; if (l.big) len = 48; ctx.beginPath(); ctx.moveTo(l.x, l.y); ctx.lineTo(l.x - l.vx / m * len, l.y - l.vy / m * len); ctx.stroke();
       ctx.strokeStyle = 'rgba(255,255,255,.95)'; ctx.lineWidth = l.big ? 3.6 : 2; ctx.beginPath(); ctx.moveTo(l.x, l.y); ctx.lineTo(l.x - l.vx / m * len, l.y - l.vy / m * len); ctx.stroke();
+    });
+  }
+  /* a lobbed explosive: a slower, dodgeable finisher with real weight when it lands */
+  function mechBomb(s, u, v, hit, dmg) {
+    var sc = 1.05, mx = u.x + u.dir * 26 * sc, my = u.y + FEET - 32 * sc, tx = hit ? v.x : v.x + (Math.random() < 0.5 ? -1 : 1) * rnd(55, 95), ty = v.y + FEET - 22;
+    ST.bombs.push({ x: mx, y: my, x0: mx, y0: my, tx: tx, ty: ty, t: 0, dur: 820, side: u.side, hit: hit, dmg: dmg, tgt: v });
+    if (!hit) v.dodgeAt = s.clk + 560;
+    burst(mx, my, 4, 'smoke', u.side === 'f' ? '127,168,204' : '180,35,44', 0.14, 320);
+  }
+  function stepBombs(dt, P) {
+    var bs = ST.bombs, i, b;
+    for (i = bs.length - 1; i >= 0; i--) {
+      b = bs[i]; b.t += dt; var p = Math.min(1, b.t / b.dur);
+      b.x = b.x0 + (b.tx - b.x0) * p; b.y = b.y0 + (b.ty - b.y0) * p - Math.sin(Math.PI * p) * 95;
+      if (Math.random() < 0.45) burst(b.x, b.y, 1, 'smoke', '201,209,217', 0.04, 280);
+      if (p >= 1) {
+        boom(b.x, b.y, true, P); ringFx(b.x, b.y, P.hot, 64);
+        if (b.hit && b.tgt.alive) applyHit(b.tgt, b.dmg, P, true);
+        bs.splice(i, 1);
+      }
+    }
+  }
+  function drawBombs(ctx, P) {
+    ST.bombs.forEach(function (b) {
+      var c = b.side === 'f' ? P.link : P.hot, pulse = 0.6 + Math.sin(b.t / 60) * 0.4;
+      ctx.save(); ctx.fillStyle = 'rgba(' + c + ',' + (0.55 + pulse * 0.4).toFixed(2) + ')'; ctx.beginPath(); ctx.arc(b.x, b.y, 5.5, 0, 6.283); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.lineWidth = 1.4; ctx.stroke(); ctx.restore();
     });
   }
 
@@ -667,7 +696,7 @@
     a.hide = true;
     var win = +QS.get('win') || (function () { var r = Math.random(); return r < 0.15 ? 1 : r < 0.4 ? 2 : r < 0.72 ? 3 : 4; })(), f = mkUnit('f', a.px || q.x, a.py || q.y, -1.5708);
     f.m = 0; f.sc = 0.2; f.al = 0;
-    ST = { ph: 'morph', pt: 0, win: win, round: 1, f: f, e: null, A0: a, T: null, parts: [], lasers: [], plan: null, rt: 0, rdur: 0, cx: 0, cy: 0, th: 0, om: 0.002, born: performance.now(), clk: 0, quiet: !QS.get('win') && FOUGHT(), capKey: '', pl: null, killed: false, nextSay: 0, tgt: { x: f.x, y: f.y, t: 0 }, abort: 0, vt: 0 };
+    ST = { ph: 'morph', pt: 0, win: win, round: 1, f: f, e: null, A0: a, T: null, parts: [], lasers: [], bombs: [], plan: null, rt: 0, rdur: 0, cx: 0, cy: 0, th: 0, om: 0.002, born: performance.now(), clk: 0, quiet: !QS.get('win') && FOUGHT(), capKey: '', pl: null, killed: false, nextSay: 0, tgt: { x: f.x, y: f.y, t: 0 }, abort: 0, vt: 0 };
     roam = { kind: 'story', x: f.x, y: f.y, back: false, bt: 0, bx: 0, by: 0 };
     root.classList.add('roaming'); setLock(null); trail = [];
     burst(f.x, f.y, 14, 'debris', P0.node, 0.3, 900); ringFx(f.x, f.y, P0.node, 50);
@@ -698,20 +727,24 @@
   /* mech AI */
   function canDodge(u) { return u.alive && !u.air && u.mode !== 'melee' && !(u.stag > 0); }
   function mechPick(u, v, s, due) {
-    var dist = Math.abs(v.x - u.x), r = Math.random(), wide = (ST.bw || 400) > 330; u.hitNext = false; u.after = ''; u.mt = rnd(500, 1000); u.burst = 0; u.jump = null; u.charge = 0; u.guard = 0; u.dive = 0; u.up = false;
+    var dist = Math.abs(v.x - u.x), r = Math.random(), wide = (ST.bw || 400) > 330; u.hitNext = false; u.after = ''; u.mt = rnd(500, 1000); u.burst = 0; u.jump = null; u.charge = 0; u.guard = 0; u.dive = 0; u.up = false; u.bombThrown = false;
     if (due) {
       u.hitNext = true;
-      if (dist > 150 && Math.random() < 0.4) { u.mode = 'charge'; u.mt = 0; return; }
+      if (dist > 170 && Math.random() < 0.22) { u.mode = 'barrage'; u.mt = 160; u.burst = 7; sayAs(u.side, u.side === 'f' ? 'Full auto!' : 'Suppressing fire!', 1300); return; }
+      if (dist > 150 && Math.random() < 0.2) { u.mode = 'bomb'; u.mt = 480; sayAs(u.side, u.side === 'f' ? 'Fire in the hole!' : 'Catch!', 1300); return; }
+      if (dist > 150 && Math.random() < 0.3) { u.mode = 'charge'; u.mt = 0; return; }
       if (dist > 110 && wide && Math.random() < 0.3) { u.mode = 'dive'; return; }
       if (dist > 120) { u.want = rnd(130, 210); u.after = 'shoot'; } else { u.want = 46; u.after = 'melee'; } u.mode = 'walk'; return;
     }
-    if (r < 0.16) { u.want = rnd(150, 240); u.after = 'shoot'; u.mode = 'walk'; }
-    else if (r < 0.28 && dist > 150) { u.mode = 'charge'; }
-    else if (r < 0.4 && wide) { u.mode = 'leap'; }
-    else if (r < 0.5 && wide && dist > 110) { u.mode = 'dive'; }
-    else if (r < 0.64) { u.want = rnd(44, 60); u.after = 'melee'; u.mode = 'walk'; u.dash = true; }
-    else if (r < 0.78) { u.mode = 'strafe'; u.mt = rnd(600, 950); }
-    else if (r < 0.88 && (v.mode === 'melee' || v.mode === 'charge' || v.mode === 'shoot')) { u.mode = 'guard'; u.mt = rnd(650, 900); }
+    if (r < 0.1) { u.want = rnd(150, 240); u.after = 'shoot'; u.mode = 'walk'; }
+    else if (r < 0.18 && dist > 170) { u.mode = 'barrage'; u.mt = 160; u.burst = 7; sayAs(u.side, u.side === 'f' ? 'Hold still!' : 'Take this!', 1300); }
+    else if (r < 0.25 && dist > 150) { u.mode = 'bomb'; u.mt = 480; sayAs(u.side, u.side === 'f' ? 'Incoming!' : 'Dodge this.', 1300); }
+    else if (r < 0.37 && dist > 150) { u.mode = 'charge'; }
+    else if (r < 0.49 && wide) { u.mode = 'leap'; }
+    else if (r < 0.59 && wide && dist > 110) { u.mode = 'dive'; }
+    else if (r < 0.72) { u.want = rnd(44, 60); u.after = 'melee'; u.mode = 'walk'; u.dash = true; }
+    else if (r < 0.84) { u.mode = 'strafe'; u.mt = rnd(600, 950); }
+    else if (r < 0.92 && (v.mode === 'melee' || v.mode === 'charge' || v.mode === 'shoot')) { u.mode = 'guard'; u.mt = rnd(650, 900); }
     else { u.mode = 'jump'; }
   }
   function mechStep(u, v, dt, s, due, dueUse, bounds, P) {
@@ -747,6 +780,19 @@
       }
     } else if (m === 'guard') {
       u.guard = Math.min(1, u.guard + dt / 120); u.aim = 0; if (u.mt <= 0 || due()) { mechPick(u, v, s, due()); }
+    } else if (m === 'barrage') {
+      u.aim = Math.min(1, u.aim + dt / 110);
+      if (u.mt <= 0) {
+        if (u.burst > 0) {
+          var last = u.burst === 1, hitB = u.hitNext && last; if (u.hitNext && v.air) { u.mt = 90; return; }
+          if (!hitB && !canDodge(v) && !u.hitNext) { u.burst = 0; u.mt = 220; }
+          else { if (hitB) dueUse(); mechFire(s, u, v, hitB, hitB ? hitD() : 0, last); u.burst--; u.mt = u.burst > 0 ? 100 : 320; }
+        } else mechPick(u, v, s, due());
+      }
+    } else if (m === 'bomb') {
+      u.aim = Math.min(1, u.aim + dt / 180);
+      if (!u.bombThrown) { if (u.mt <= 0) { u.bombThrown = true; var bHit = u.hitNext; if (bHit) dueUse(); mechBomb(s, u, v, bHit, bHit ? hitD() : 0); u.mt = 650; } }
+      else if (u.mt <= 0) { mechPick(u, v, s, due()); }
     } else if (m === 'melee') {
       u.atkT += dt; var t = u.atkT, plannedStrike = u.hitNext ? 2 : 0;
       if (u.hitNext && dist > 56) u.x += u.dir * 0.2 * dt;
@@ -828,7 +874,12 @@
   /* named maneuvers, so a dogfight is not always one ship glued behind the other */
   function pickMove(s, dist) {
     var r = Math.random();
-    return (r < 0.28 && dist > 380) ? 'merge' : r < 0.5 ? 'scissor' : r < 0.72 ? 'boost' : 'barrel';
+    return (r < 0.16 && dist > 380) ? 'merge'
+      : r < 0.3 ? 'scissor'
+      : r < 0.42 ? 'boost'
+      : r < 0.56 ? 'barrel'
+      : (r < 0.78 && dist > 200) ? 'volley'
+      : 'overcharge';
   }
   function dogAI(s, dt) {
     var f = s.f, e = s.e, clk = s.clk;
@@ -844,10 +895,13 @@
 
     if (s.move === 'chase' && s.moveIn <= 0 && dist > 130) {
       s.move = pickMove(s, dist); s.moveT = 0; s.passed = false;
+      s.volN = 0; s.volT = 0; s.chargeT = 0;
       if (s.move === 'merge') sayAs(Math.random() < 0.5 ? 'f' : 'e', 'Merging!', 1300);
       else if (s.move === 'boost') sayAs(ev.side, 'Falling back!', 1300);
       else if (s.move === 'scissor') sayAs(Math.random() < 0.5 ? 'f' : 'e', 'Scissors!', 1300);
-      else sayAs(ev.side, 'Watch this.', 1300);
+      else if (s.move === 'barrel') sayAs(ev.side, 'Watch this.', 1300);
+      else if (s.move === 'volley') sayAs(ch.side, 'Full burst!', 1300);
+      else sayAs(ch.side, 'Charging up!', 1300);
     } else if (s.move !== 'chase') s.moveT += dt;
 
     var wantC, wantE, spC, spE;
@@ -871,6 +925,27 @@
       wantE = Math.atan2(ev.y - ch.y, ev.x - ch.x) + Math.sin(clk * 0.009) * 2.1; spE = 360;
       wantC = Math.atan2(dy, dx); spC = 300;
       if (s.moveT > 1300) { s.move = 'chase'; s.moveIn = rnd(4500, 7200); }
+    } else if (s.move === 'volley') {
+      wantC = Math.atan2(dy, dx); spC = 190;
+      var awayV = Math.atan2(ev.y - ch.y, ev.x - ch.x); wantE = awayV + Math.sin(clk * 0.005 + ev.seed) * 0.8; spE = 370;
+      s.volT -= dt;
+      if (s.volT <= 0 && s.volN < 5 && dist > 90) {
+        var isFv = ch.side === 'f', dueV = isFv ? dueE(s) : dueF(s);
+        if (dueV) { if (isFv) s.plan.ei++; else s.plan.fi++; }
+        fireShip(ch, ev, dueV, dueV ? (isFv ? hitDmgE(s) : s.plan.fdmg) : 0);
+        s.volN++; s.volT = 140;
+      }
+      if (s.volN >= 5 || s.moveT > 1600) { s.move = 'chase'; s.moveIn = rnd(4500, 7200); }
+    } else if (s.move === 'overcharge') {
+      wantC = Math.atan2(dy, dx); spC = 140;
+      var awayO = Math.atan2(ev.y - ch.y, ev.x - ch.x); wantE = awayO + Math.sin(clk * 0.004 + ev.seed) * 0.5; spE = 330;
+      s.chargeT += dt; if (Math.random() < 0.5) burst(ch.x + Math.cos(ch.ang) * 16, ch.y + Math.sin(ch.ang) * 16, 1, 'spark', '255,255,255', 0.15, 240);
+      if (s.chargeT > 950) {
+        var isFo = ch.side === 'f', dueO = isFo ? dueE(s) : dueF(s);
+        if (dueO) { if (isFo) s.plan.ei++; else s.plan.fi++; }
+        fireShip(ch, ev, dueO, dueO ? (isFo ? hitDmgE(s) : s.plan.fdmg) : 0, true);
+        s.move = 'chase'; s.moveIn = rnd(5000, 8000);
+      } else if (s.moveT > 2400) { s.move = 'chase'; s.moveIn = rnd(4500, 7200); }
     } else {
       wantC = Math.atan2(ev.y + ev.vy * 0.4 - ch.y, ev.x + ev.vx * 0.4 - ch.x); spC = dist > 340 ? 400 : dist > 240 ? 310 : dist > 160 ? 240 : 190;
       if (dist < 135) { wantC = ch.ang + (ch.bank >= 0 ? 1 : -1) * 0.9; spC = 330; }
@@ -882,7 +957,7 @@
     steerShip(ev, wallBias(ev, withSep(ev, wantE, ch, 260, 3)), spE, (ev.jink > 0 ? 5.2 : 3.4) + extraTurn, dt);
     if (dist < 120 && s.move !== 'merge') { var push = (120 - dist) * 0.5; ch.x -= dx / dist * push; ch.y -= dy / dist * push; ev.x += dx / dist * push; ev.y += dy / dist * push; }
     keepIn(f); keepIn(e);
-    if (!(s.move === 'merge' && !s.passed)) {
+    if (!(s.move === 'merge' && !s.passed) && s.move !== 'volley' && s.move !== 'overcharge') {
       tryFire(s, f, e, dt, function () { return dueE(s); }, function () { s.plan.ei++; }, function () { return hitDmgE(s); });
       tryFire(s, e, f, dt, function () { return dueF(s); }, function () { s.plan.fi++; }, function () { return s.plan.fdmg; });
     }
@@ -901,7 +976,7 @@
   }
   function stepStory(r, dt, now, P) {
     var s = ST, f = s.f, e = s.e; if (s.slow > 0) { s.slow -= dt; dt *= 0.22; } s.pt += dt; s.clk += dt;
-    stepParts(dt); stepLasers(dt, P); stepHalves(dt);
+    stepParts(dt); stepLasers(dt, P); stepBombs(dt, P); stepHalves(dt);
     [f, e].forEach(function (u) { if (u) { u.flash = Math.max(0, u.flash - dt / 260); u.roll = u.roll > 0 ? u.roll + dt * 0.011 : 0; if (u.roll > 6.28) u.roll = 0; u.bank *= Math.pow(0.5, dt / 250); } });
     r.x = f.x; r.y = f.y;
     var ph = s.ph, stg = stageFor(ph, s), ck = stg[1] + stg[2]; if (ck !== s.capKey) { s.capKey = ck; setCap(stg[0], stg[1], stg[2]); }
@@ -991,12 +1066,12 @@
     }
   }
   function killFoe(P) {
-    var s = ST, e = s.e; if (!e.alive) return; e.alive = false; e.al = 0; s.lasers.length = 0; boom(e.x, e.y + (e.m > 0.5 ? FEET - 14 : 0), true, P); ringFx(e.x, e.y, P.hot, 110); sayAs('e', 'Impossible...', 1200);
+    var s = ST, e = s.e; if (!e.alive) return; e.alive = false; e.al = 0; s.lasers.length = 0; s.bombs.length = 0; boom(e.x, e.y + (e.m > 0.5 ? FEET - 14 : 0), true, P); ringFx(e.x, e.y, P.hot, 110); sayAs('e', 'Impossible...', 1200);
     s.ph = 'victory'; s.vt = 0; s.vsaid = false; s.killed = true; s.stamp = { x: e.x, y: e.y, t0: s.clk };
     fought = true;
   }
   function startNext(P) {
-    var s = ST, f = s.f, e = s.e; s.lasers.length = 0;
+    var s = ST, f = s.f, e = s.e; s.lasers.length = 0; s.bombs.length = 0;
     if (f.m > 0.5) { f.tr = { st: 'hop', t: 0 }; e.tr = { st: 'hop', t: 0 }; s.ph = 'toShip'; s.pt = 0; sayAs('e', 'Back to the air!', 1600); return; }
     var pl = ((s.round === 1 && s.win >= 2) || (s.round === 3 && s.win >= 4)) ? pickPlat() : null;
     if (!pl) { s.round++; planRound(false); s.rt = 0; s.dirT = 0; sayAs('e', ['', 'Round two? Fine.', 'Round three!', 'One more round.'][Math.min(3, s.round - 1)] || 'Again!', 1500); return; }
@@ -1004,7 +1079,7 @@
     e.tr = { st: 'fly', t: 0, tx: exx, ty: pr.top - 90, delay: 0 }; f.tr = { st: 'fly', t: 0, tx: fxx, ty: pr.top - 90, delay: 650 };
     s.ph = 'toMech'; s.pt = 0; sayAs('e', "Let's settle this on foot.", 2200); setTimeout(function () { if (ST === s) sayAs('f', 'Fine. Transforming!', 1800); }, 1100);
   }
-  function abortMech(P) { var s = ST; s.lasers.length = 0; [s.f, s.e].forEach(function (u) { if (u && u.alive) { u.tr = u.m > 0.3 ? { st: 'hop', t: 0 } : null; if (!u.tr) { u.m = 0; } } }); s.ph = 'toShip'; s.pt = 0; }
+  function abortMech(P) { var s = ST; s.lasers.length = 0; s.bombs.length = 0; [s.f, s.e].forEach(function (u) { if (u && u.alive) { u.tr = u.m > 0.3 ? { st: 'hop', t: 0 } : null; if (!u.tr) { u.m = 0; } } }); s.ph = 'toShip'; s.pt = 0; }
   function finishStory(sleep) {
     restoreAst(); ST = null; roam = null; root.classList.remove('roaming'); hideSay(); hideCap(); rx = mx; ry = my;
     lastN = performance.now(); /* give the page a moment of quiet before the next idle nudge */
@@ -1041,7 +1116,7 @@
     if (e && e.alive) { drawShipU(ctx, P, e, now); drawMechU(ctx, P, e, now); }
     if (s.ph === 'cta' && s.tgEl) { var tb = s.tgEl.getBoundingClientRect(), pu = (now % 1600) / 1600; ctx.save(); ctx.strokeStyle = 'rgba(' + P.hot + ',' + ((1 - pu) * 0.8).toFixed(2) + ')'; ctx.lineWidth = 2; ctx.strokeRect(tb.left - 6 - pu * 12, tb.top - 6 - pu * 12, tb.width + 12 + pu * 24, tb.height + 12 + pu * 24); ctx.restore(); }
     drawShipU(ctx, P, f, now); drawMechU(ctx, P, f, now);
-    drawLasers(ctx, P); drawParts(ctx, P);
+    drawLasers(ctx, P); drawBombs(ctx, P); drawParts(ctx, P);
     if (s.stamp) { var ag = (s.clk - s.stamp.t0) / 3400; if (ag < 1) { var a2 = ag < 0.1 ? ag / 0.1 : (1 - ag) / 0.9, sx2 = clampV(s.stamp.x, 90, innerWidth - 90), sy3 = clampV(s.stamp.y - 34 - ag * 20, 110, innerHeight - 80); ctx.save(); ctx.translate(sx2, sy3); ctx.rotate(-0.1); ctx.globalAlpha = a2; ctx.font = '700 13px "JetBrains Mono",ui-monospace,monospace'; ctx.textAlign = 'center'; var tw = ctx.measureText('FINDING CLOSED').width; ctx.fillStyle = 'rgba(13,17,23,.7)'; ctx.fillRect(-tw / 2 - 10, -17, tw + 20, 26); ctx.strokeStyle = 'rgba(' + P.hot + ',.95)'; ctx.lineWidth = 2; ctx.strokeRect(-tw / 2 - 10, -17, tw + 20, 26); ctx.fillStyle = 'rgba(' + P.node + ',.98)'; ctx.fillText('FINDING CLOSED', 0, 1); ctx.restore(); } else s.stamp = null; }
     if (e && e.alive && ['dog', 'duel', 'toMech', 'toShip'].indexOf(s.ph) >= 0) drawBar(ctx, P, e, e.m > 0.5 ? 74 : 38);
     if (f.al > 0.5 && ['dog', 'duel', 'toMech', 'toShip', 'victory'].indexOf(s.ph) >= 0) drawBar(ctx, P, f, f.m > 0.5 ? 74 : 38);
