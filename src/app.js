@@ -387,7 +387,7 @@
 
   /* ---------- cursor: reticle, target lock, trail, click burst, idle roamers ---------- */
   var dot = $('.cursor-dot'), ring = $('.cursor-ring'), tag = $('.cursor-tag'), lock = $('.cur-lock'), fx = $('#curfx'), fctx = fx && fx.getContext('2d');
-  var corners = $$('.cur-lock i'), CS = 13, QS = new URLSearchParams(location.search), IDLE = +QS.get('idle') || 30000;
+  var corners = $$('.cur-lock i'), CS = 13, QS = new URLSearchParams(location.search), IDLE = +QS.get('idle') || 3000;
   var mx = innerWidth / 2, my = innerHeight / 2, rx = mx, ry = my, cursorOn = false, lockEl = null, trail = [], C = null, spinAnim = null, popT = null, lastMove = performance.now(), roam = null, fr = 0, pcache = [], pc = 0;
   function sizeFx() { if (!fx) return; fx.width = innerWidth; fx.height = innerHeight; }
   sizeFx(); window.addEventListener('resize', sizeFx);
