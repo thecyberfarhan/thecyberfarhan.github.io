@@ -293,7 +293,7 @@
     var W = innerWidth, H = innerHeight, CS = 44, cols = Math.ceil(W / CS), rows = Math.ceil(H / CS), cell = [], i, bg = getComputedStyle(root).getPropertyValue('--bg').trim() || '#0d1117';
     scan.width = W; scan.height = H; scan.classList.add('on');
     for (i = 0; i < cols * rows; i++) cell.push({ j: Math.random(), f: Math.random() });
-    var A = 700, HOLD = 120, B = 1000, tStart = performance.now(), midDone = false;
+    var A = 460, HOLD = 70, B = 620, tStart = performance.now(), midDone = false;
     function ease(x) { return x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2; }
     function frame(now) {
       var t = now - tStart, y, phase;
@@ -380,7 +380,7 @@
     sT = sClamp(sT + d); sOn = true;
   }, { passive: false });
   (function sLoop() {
-    if (sOn) { sC += (sT - sC) * 0.09; if (Math.abs(sT - sC) < 0.4) { sC = sT; sOn = false; } window.scrollTo(0, sC); }
+    if (sOn) { sC += (sT - sC) * 0.38; if (Math.abs(sT - sC) < 0.4) { sC = sT; sOn = false; } window.scrollTo(0, sC); }
     requestAnimationFrame(sLoop);
   })();
   window.addEventListener('keydown', function () { sOn = false; });
@@ -524,7 +524,7 @@
   }
   function applyHit(u, dmg, P, big) {
     if (!u.alive) return; if (u.guard > 0.3) { ringFx(u.x + u.dir * 16, u.y + FEET - 22, '255,255,255', 40); burst(u.x + u.dir * 16, u.y + FEET - 22, 10, 'shard', P.hot, 0.35, 500); } u.guard = 0; u.charge = 0; ST.nhit = (ST.nhit || 0) + 1; u.hp = Math.max(u.side === 'f' ? 35 : 0, u.hp - dmg); u.flash = 1; u.kx += (u.side === 'f' ? -1 : 1) * 40; if (u.m > 0.5) { u.stag = 260; u.kx += (u.side === 'f' ? -1 : 1) * 60; } burst(u.x, u.y, big ? 16 : 8, 'spark', P.hot, big ? 0.55 : 0.4, 420);
-    if (big) ST.slow = Math.max(ST.slow || 0, 170);
+    if (big) ST.slow = Math.max(ST.slow || 0, 110);
     if (u.side === 'e' && u.hp <= 0) { ST.killed = true; if (u.m > 0.5) ST.slow = 700; }
   }
   function stepLasers(dt, P) {
@@ -732,16 +732,16 @@
     var dist = Math.abs(v.x - u.x), r = Math.random(), wide = (ST.bw || 400) > 330; u.hitNext = false; u.after = ''; u.mt = rnd(500, 1000); u.burst = 0; u.jump = null; u.charge = 0; u.guard = 0; u.dive = 0; u.up = false; u.bombThrown = false;
     if (due) {
       u.hitNext = true;
-      if (dist > 170 && Math.random() < 0.22) { u.mode = 'barrage'; u.mt = 160; u.burst = 7; ST.slow = Math.max(ST.slow || 0, 220); sayAs(u.side, u.side === 'f' ? 'Full auto!' : 'Suppressing fire!', 1300); return; }
-      if (dist > 150 && Math.random() < 0.2) { u.mode = 'bomb'; u.mt = 480; ST.slow = Math.max(ST.slow || 0, 260); sayAs(u.side, u.side === 'f' ? 'Fire in the hole!' : 'Catch!', 1300); return; }
-      if (dist > 150 && Math.random() < 0.3) { u.mode = 'charge'; u.mt = 0; ST.slow = Math.max(ST.slow || 0, 500); return; }
+      if (dist > 170 && Math.random() < 0.22) { u.mode = 'barrage'; u.mt = 160; u.burst = 7; sayAs(u.side, u.side === 'f' ? 'Full auto!' : 'Suppressing fire!', 1300); return; }
+      if (dist > 150 && Math.random() < 0.2) { u.mode = 'bomb'; u.mt = 480; sayAs(u.side, u.side === 'f' ? 'Fire in the hole!' : 'Catch!', 1300); return; }
+      if (dist > 150 && Math.random() < 0.3) { u.mode = 'charge'; u.mt = 0; return; }
       if (dist > 110 && wide && Math.random() < 0.3) { u.mode = 'dive'; return; }
       if (dist > 120) { u.want = rnd(130, 210); u.after = 'shoot'; } else { u.want = 46; u.after = 'melee'; } u.mode = 'walk'; return;
     }
     if (r < 0.1) { u.want = rnd(150, 240); u.after = 'shoot'; u.mode = 'walk'; }
-    else if (r < 0.18 && dist > 170) { u.mode = 'barrage'; u.mt = 160; u.burst = 7; ST.slow = Math.max(ST.slow || 0, 220); sayAs(u.side, u.side === 'f' ? 'Hold still!' : 'Take this!', 1300); }
-    else if (r < 0.25 && dist > 150) { u.mode = 'bomb'; u.mt = 480; ST.slow = Math.max(ST.slow || 0, 260); sayAs(u.side, u.side === 'f' ? 'Incoming!' : 'Dodge this.', 1300); }
-    else if (r < 0.37 && dist > 150) { u.mode = 'charge'; ST.slow = Math.max(ST.slow || 0, 500); }
+    else if (r < 0.18 && dist > 170) { u.mode = 'barrage'; u.mt = 160; u.burst = 7; sayAs(u.side, u.side === 'f' ? 'Hold still!' : 'Take this!', 1300); }
+    else if (r < 0.25 && dist > 150) { u.mode = 'bomb'; u.mt = 480; sayAs(u.side, u.side === 'f' ? 'Incoming!' : 'Dodge this.', 1300); }
+    else if (r < 0.37 && dist > 150) { u.mode = 'charge'; }
     else if (r < 0.49 && wide) { u.mode = 'leap'; }
     else if (r < 0.59 && wide && dist > 110) { u.mode = 'dive'; }
     else if (r < 0.72) { u.want = rnd(44, 60); u.after = 'melee'; u.mode = 'walk'; u.dash = true; }
@@ -902,8 +902,8 @@
       else if (s.move === 'boost') sayAs(ev.side, 'Falling back!', 1300);
       else if (s.move === 'scissor') sayAs(Math.random() < 0.5 ? 'f' : 'e', 'Scissors!', 1300);
       else if (s.move === 'barrel') sayAs(ev.side, 'Watch this.', 1300);
-      else if (s.move === 'volley') { ST.slow = Math.max(ST.slow || 0, 220); sayAs(ch.side, 'Full burst!', 1300); }
-      else { ST.slow = Math.max(ST.slow || 0, 500); sayAs(ch.side, 'Charging up!', 1300); }
+      else if (s.move === 'volley') sayAs(ch.side, 'Full burst!', 1300);
+      else sayAs(ch.side, 'Charging up!', 1300);
     } else if (s.move !== 'chase') s.moveT += dt;
 
     var wantC, wantE, spC, spE;
@@ -932,7 +932,7 @@
       var awayV = Math.atan2(ev.y - ch.y, ev.x - ch.x); wantE = awayV + Math.sin(clk * 0.005 + ev.seed) * 0.8; spE = 370;
       s.volT -= dt;
       if (s.volT <= 0 && s.volN < 5 && dist > 90) {
-        var isFv = ch.side === 'f', dueV = isFv ? dueE(s) : dueF(s);
+        var isFv = ch.side === 'f', dueV = s.volN === 0 && (isFv ? dueE(s) : dueF(s));
         if (dueV) { if (isFv) s.plan.ei++; else s.plan.fi++; }
         fireShip(ch, ev, dueV, dueV ? (isFv ? hitDmgE(s) : s.plan.fdmg) : 0);
         s.volN++; s.volT = 140;
