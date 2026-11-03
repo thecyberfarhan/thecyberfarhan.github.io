@@ -600,6 +600,9 @@
     ctx.beginPath(); ctx.moveTo(24, 0); ctx.lineTo(14, -4); ctx.lineTo(-6, -6.5); ctx.lineTo(-13, -4); ctx.lineTo(-13, 4); ctx.lineTo(-6, 6.5); ctx.lineTo(14, 4); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.globalAlpha = al * 0.45; ctx.beginPath(); ctx.moveTo(16, 0); ctx.lineTo(-11, 0); ctx.moveTo(-2, -6); ctx.lineTo(-2, 6); ctx.stroke(); ctx.globalAlpha = al;
     ctx.fillStyle = 'rgba(' + c.h + ',.4)'; ctx.beginPath(); ctx.ellipse(8, 0, 6, 3.2, 0, 0, 6.283); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(5.5, -1.6); ctx.lineTo(9.5, 0.8); ctx.stroke();
+    ctx.strokeStyle = 'rgba(' + c.s + ',.5)'; [-1, 1].forEach(function (sd) { ctx.beginPath(); ctx.moveTo(-3, sd * 3.2); ctx.lineTo(1.5, sd * 3.2); ctx.stroke(); });
+    ctx.strokeStyle = 'rgba(' + c.s + ',.95)';
     ctx.fillStyle = 'rgba(' + c.h + ',.95)'; ctx.beginPath(); ctx.arc(22, 0, 1.4, 0, 6.283); ctx.fill();
     if (u.flash > 0) { ctx.fillStyle = 'rgba(255,255,255,' + (u.flash * 0.7).toFixed(2) + ')'; ctx.beginPath(); ctx.arc(0, 0, 17, 0, 6.283); ctx.fill(); }
     ctx.restore();
@@ -631,9 +634,18 @@
     var aim = u.aim, bash = u.atk, hx2 = 11 + aim * 3, hy2 = -15 - aim * 6, ga = 0.5 * (1 - aim);
     if (bash > 0.02 || bash < -0.02) { var bp = bash > 0 ? bash : bash * 0.9; hx2 = 12 + bp * 6; hy2 = -26 + (bp + 0.8) * 9; ga = -1.25 + (bp + 0.8) * 1.45; }
     else if (u.wave > 0) { hx2 = 10; hy2 = -33 + Math.sin(now / 90) * 1.5; ga = -1.4; }
+    var meleeActive = bash > 0.02 || bash < -0.02;
     ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(8, -23); ctx.lineTo(hx2, hy2); ctx.stroke();
-    ctx.save(); ctx.translate(hx2, hy2); ctx.rotate(ga); ctx.lineWidth = 1.2; ctx.fillStyle = 'rgba(' + c.s + ',.9)'; ctx.fillRect(-6, -1.6, 12, 3.2); ctx.strokeRect(-6, -1.6, 12, 3.2);
-    ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(6, 0); ctx.lineTo(16, 0); ctx.stroke(); ctx.fillStyle = hot; ctx.fillRect(14.5, -1.6, 2.4, 3.2); ctx.fillStyle = plate; ctx.fillRect(-2, 1.6, 3, 3.2); ctx.fillRect(-4, -3.4, 5, 1.8); ctx.restore();
+    ctx.save(); ctx.translate(hx2, hy2); ctx.rotate(ga);
+    if (meleeActive) {
+      ctx.lineWidth = 1; ctx.fillStyle = 'rgba(' + c.s + ',.92)'; poly([[-3, 2.6], [15, 0.6], [15, -0.6], [-3, -2.6], [-5, 0]]); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = hot; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(-1, 0); ctx.lineTo(13, 0); ctx.stroke(); ctx.strokeStyle = line;
+      ctx.fillStyle = plate; ctx.fillRect(-6, -2.2, 4, 4.4);
+    } else {
+      ctx.lineWidth = 1.2; ctx.fillStyle = 'rgba(' + c.s + ',.9)'; ctx.fillRect(-6, -1.6, 12, 3.2); ctx.strokeRect(-6, -1.6, 12, 3.2);
+      ctx.lineWidth = 2.2; ctx.beginPath(); ctx.moveTo(6, 0); ctx.lineTo(16, 0); ctx.stroke(); ctx.fillStyle = hot; ctx.fillRect(14.5, -1.6, 2.4, 3.2); ctx.fillStyle = plate; ctx.fillRect(-2, 1.6, 3, 3.2); ctx.fillRect(-4, -3.4, 5, 1.8);
+    }
+    ctx.restore();
     ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, -28); ctx.lineTo(0, -26); ctx.stroke();
     ctx.lineWidth = 1.5; ctx.fillStyle = body; poly([[-5.5, -40], [5.5, -40], [8, -35], [7, -28.5], [-7, -28.5], [-8, -35]]); ctx.fill(); ctx.stroke();
     ctx.fillStyle = plate; poly([[-5.5, -40], [5.5, -40], [6.4, -37.5], [-6.4, -37.5]]); ctx.fill();
