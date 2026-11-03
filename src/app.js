@@ -507,15 +507,26 @@
       ctx.restore();
     });
   }
+  /* the exact point drawShipU paints the wingtip cannon's muzzle at, in world space, so a bolt never appears to come from empty air */
+  function shipMuzzle(u, side) {
+    var scl = (u.sc || 1) * 1.25, a0 = u.ang, px = -1 * scl, py = side * 13.5 * scl;
+    return { x: u.x + px * Math.cos(a0) - py * Math.sin(a0), y: u.y + px * Math.sin(a0) + py * Math.cos(a0) };
+  }
   function fireShip(u, v, hit, dmg, big) {
-    var a0 = u.ang, side = (u.fs = -(u.fs || 1)), ang = a0 + (hit ? 0 : (Math.random() < 0.5 ? -1 : 1) * rnd(0.2, 0.34)), ox = u.x + Math.cos(a0) * 12 - Math.sin(a0) * side * 15, oy = u.y + Math.sin(a0) * 12 + Math.cos(a0) * side * 15, sp = big ? 1.05 : 0.82;
+    var a0 = u.ang, side = (u.fs = -(u.fs || 1)), ang = a0 + (hit ? 0 : (Math.random() < 0.5 ? -1 : 1) * rnd(0.2, 0.34)), tip = shipMuzzle(u, side), ox = tip.x, oy = tip.y, sp = big ? 1.05 : 0.82;
     ST.lasers.push({ x: ox, y: oy, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, side: u.side, hit: hit, dmg: dmg, tgt: v, home: hit, life: 2300, big: !!big });
     if (big) { burst(ox, oy, 10, 'spark', '255,255,255', 0.4, 300); ringFx(ox, oy, u.side === 'f' ? '127,168,204' : '180,35,44', 26); }
     burst(ox, oy, 3, 'spark', '255,255,255', 0.2, 180);
   }
   function jinkShip(u, p) { if (Math.random() < p && u.jink <= 0) { u.jink = 560; u.jdir = Math.random() < 0.5 ? -1 : 1; if (u.roll <= 0) u.roll = 0.01; } }
+  /* the exact point drawMechU paints the gun barrel's muzzle at, in world space -- mirrors the hx2/hy2/ga pose math used there */
+  function mechMuzzle(u) {
+    var aim = u.aim, hx2 = 11 + aim * 3, hy2 = -15 - aim * 6, ga = 0.5 * (1 - aim);
+    var sc2 = 1.1 * (u.sc || 1) * (0.5 + 0.5 * u.m), mlx = hx2 + 16 * Math.cos(ga), mly = hy2 + 16 * Math.sin(ga);
+    return { x: u.x + mlx * sc2 * u.dir, y: u.y + FEET + mly * sc2 };
+  }
   function mechFire(s, u, v, hit, dmg, big) {
-    var sc = 1.05, mx = u.x + u.dir * 29 * sc, my = u.y + FEET - 22 * sc, ty = v.y + FEET - 22, dist = Math.max(40, Math.abs(v.x - u.x));
+    var tip = mechMuzzle(u), mx = tip.x, my = tip.y, ty = v.y + FEET - 22, dist = Math.max(40, Math.abs(v.x - u.x));
     if (hit) ST.nfire = (ST.nfire || 0) + 1;
     ST.lasers.push({ x: mx, y: my, vx: u.dir * 0.95, vy: hit ? (ty - my) / (dist / 0.95) : 0, side: u.side, hit: hit, dmg: dmg, tgt: v, home: false, life: 1600, mech: true, big: !!big });
     if (big) { burst(mx, my, 10, 'spark', '255,255,255', 0.4, 300); ringFx(mx, my, '255,255,255', 30); }
@@ -550,7 +561,7 @@
   }
   /* a lobbed explosive: a slower, dodgeable finisher with real weight when it lands */
   function mechBomb(s, u, v, hit, dmg) {
-    var sc = 1.05, mx = u.x + u.dir * 26 * sc, my = u.y + FEET - 32 * sc, tx = hit ? v.x : v.x + (Math.random() < 0.5 ? -1 : 1) * rnd(55, 95), ty = v.y + FEET - 22;
+    var tip = mechMuzzle(u), mx = tip.x, my = tip.y, tx = hit ? v.x : v.x + (Math.random() < 0.5 ? -1 : 1) * rnd(55, 95), ty = v.y + FEET - 22;
     ST.bombs.push({ x: mx, y: my, x0: mx, y0: my, tx: tx, ty: ty, t: 0, dur: 820, side: u.side, hit: hit, dmg: dmg, tgt: v });
     if (!hit) v.dodgeAt = s.clk + 560;
     burst(mx, my, 4, 'smoke', u.side === 'f' ? '127,168,204' : '180,35,44', 0.14, 320);
@@ -598,6 +609,8 @@
       ctx.strokeStyle = 'rgba(' + c.s + ',.9)'; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.moveTo(-8, sd * 15 * wf); ctx.lineTo(-1, sd * 13.5 * wf); ctx.stroke(); ctx.fillStyle = 'rgba(' + c.h + ',.85)'; ctx.beginPath(); ctx.arc(-1, sd * 13.5 * wf, 0.9, 0, 6.283); ctx.fill();
     });
     ctx.beginPath(); ctx.moveTo(24, 0); ctx.lineTo(14, -4); ctx.lineTo(-6, -6.5); ctx.lineTo(-13, -4); ctx.lineTo(-13, 4); ctx.lineTo(-6, 6.5); ctx.lineTo(14, 4); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = 'rgba(' + c.f + ',.34)'; ctx.beginPath(); ctx.moveTo(-9, -4); ctx.lineTo(-15, -11); ctx.lineTo(-11, -3.4); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-9, 4); ctx.lineTo(-15, 11); ctx.lineTo(-11, 3.4); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.globalAlpha = al * 0.45; ctx.beginPath(); ctx.moveTo(16, 0); ctx.lineTo(-11, 0); ctx.moveTo(-2, -6); ctx.lineTo(-2, 6); ctx.stroke(); ctx.globalAlpha = al;
     ctx.fillStyle = 'rgba(' + c.h + ',.4)'; ctx.beginPath(); ctx.ellipse(8, 0, 6, 3.2, 0, 0, 6.283); ctx.fill(); ctx.stroke();
     ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 0.8; ctx.beginPath(); ctx.moveTo(5.5, -1.6); ctx.lineTo(9.5, 0.8); ctx.stroke();
@@ -620,6 +633,7 @@
     [-1, 1].forEach(function (side) {
       var pp = ph + (side > 0 ? Math.PI : 0), swg = u.air ? 0 : Math.sin(pp) * 5 * (walk ? 1 : 0), lift = u.air ? 5 : Math.max(0, Math.cos(pp)) * 3 * (walk ? 1 : 0), hx = side * 4, fx2 = hx + swg;
       ctx.lineWidth = 3.2; ctx.beginPath(); ctx.moveTo(hx, -11); ctx.lineTo(hx + swg * 0.5 + side * 1.5, -6 - lift * 0.6); ctx.lineTo(fx2, -lift - 1.5); ctx.stroke();
+      ctx.fillStyle = plate; ctx.beginPath(); ctx.arc(hx + swg * 0.5 + side * 1.5, -6 - lift * 0.6, 1.5, 0, 6.283); ctx.fill(); ctx.stroke();
       ctx.lineWidth = 1.4; ctx.fillStyle = plate; poly([[fx2 - 4, -lift], [fx2 + 5, -lift], [fx2 + 5, -lift - 3.2], [fx2 - 2, -lift - 3.2]]); ctx.fill(); ctx.stroke();
     });
     var sw = walk ? Math.sin(ph) * 3 : -2;
@@ -1108,7 +1122,7 @@
   }
 
   if (QS.get('debug')) window.__adv = function (ms) { if (!ST || !roam) return; var n = Math.ceil(ms / 40), P = pal(), i; for (i = 0; i < n && ST; i++) stepStory(roam, 40, performance.now(), P); };
-  if (QS.get('debug')) window.__st = function () { return ST && { ph: ST.ph, round: ST.round, win: ST.win, pt: Math.round(ST.pt), rt: Math.round(ST.rt), ehp: ST.e && Math.round(ST.e.hp), fhp: Math.round(ST.f.hp), em: ST.e && +ST.e.m.toFixed(2), fm: +ST.f.m.toFixed(2), ftr: ST.f.tr && ST.f.tr.st, etr: ST.e && ST.e.tr && ST.e.tr.st, fy: Math.round(ST.f.y), ey: ST.e && Math.round(ST.e.y), fx: Math.round(ST.f.x), ex: ST.e && Math.round(ST.e.x), top: ST.pl && Math.round(ST.pl.getBoundingClientRect().top), fmode: ST.f.mode, emode: ST.e && ST.e.mode, fh: ST.f.hitNext, eh: ST.e && ST.e.hitNext, fafter: ST.f.after, fwant: Math.round(ST.f.want), burst: ST.f.burst, mt: Math.round(ST.f.mt), eair: ST.e && ST.e.air, fstag: Math.round(ST.f.stag), ns: ST.ns, nsp: ST.nsp, nclash: ST.nclash, nup: ST.nup, slow: ST.slow, nsd: ST.nsd, nsa: ST.nsa, move: ST.move, cap: ST.capKey, quiet: ST.quiet, nfire: ST.nfire, nhit: ST.nhit, ei: ST.plan && ST.plan.ei, en: ST.plan && ST.plan.e.length, killed: ST.killed, lasers: ST.lasers.length, parts: ST.parts.length, ast: AST.length, hidden: AST.filter(function (a) { return a.hide; }).length }; };
+  if (QS.get('debug')) window.__st = function () { return ST && { ph: ST.ph, round: ST.round, win: ST.win, pt: Math.round(ST.pt), rt: Math.round(ST.rt), ehp: ST.e && Math.round(ST.e.hp), fhp: Math.round(ST.f.hp), em: ST.e && +ST.e.m.toFixed(2), fm: +ST.f.m.toFixed(2), ftr: ST.f.tr && ST.f.tr.st, etr: ST.e && ST.e.tr && ST.e.tr.st, fy: Math.round(ST.f.y), ey: ST.e && Math.round(ST.e.y), fx: Math.round(ST.f.x), ex: ST.e && Math.round(ST.e.x), top: ST.pl && Math.round(ST.pl.getBoundingClientRect().top), fmode: ST.f.mode, emode: ST.e && ST.e.mode, fh: ST.f.hitNext, eh: ST.e && ST.e.hitNext, fafter: ST.f.after, fwant: Math.round(ST.f.want), burst: ST.f.burst, mt: Math.round(ST.f.mt), eair: ST.e && ST.e.air, fstag: Math.round(ST.f.stag), ns: ST.ns, nsp: ST.nsp, nclash: ST.nclash, nup: ST.nup, slow: ST.slow, nsd: ST.nsd, nsa: ST.nsa, move: ST.move, cap: ST.capKey, quiet: ST.quiet, nfire: ST.nfire, nhit: ST.nhit, ei: ST.plan && ST.plan.ei, en: ST.plan && ST.plan.e.length, killed: ST.killed, lasers: ST.lasers.length, l0: ST.lasers[0] && { x: Math.round(ST.lasers[0].x), y: Math.round(ST.lasers[0].y), mech: !!ST.lasers[0].mech }, parts: ST.parts.length, ast: AST.length, hidden: AST.filter(function (a) { return a.hide; }).length }; };
   function drawRoam(ctx, P, dt, now) {
     var r = roam, s = ST; if (!s) { roam = null; root.classList.remove('roaming'); return; }
     if (r.back) {
