@@ -279,7 +279,7 @@
   var ssy = 0, plxDone = false;
   (function plx() {
     if (Math.abs(sy - ssy) < 0.05 && plxDone) { requestAnimationFrame(plx); return; }
-    ssy += (sy - ssy) * 0.12; plxDone = Math.abs(sy - ssy) < 0.05;
+    ssy += (sy - ssy) * 0.32; plxDone = Math.abs(sy - ssy) < 0.05;
     var h = VH, k = Math.min(ssy / h, 1.4), fade = Math.max(0, 1 - ssy / (h * 0.7)).toFixed(3);
     if (copy) { copy.style.transform = 'translate3d(0,' + (-ssy * 0.14).toFixed(2) + 'px,0)'; copy.style.opacity = fade; }
     if (medalWrap) { medalWrap.style.transform = 'translate3d(0,' + (-ssy * 0.22).toFixed(2) + 'px,0) scale(' + Math.max(1 - k * 0.1, 0.75).toFixed(4) + ')'; medalWrap.style.opacity = fade; }
