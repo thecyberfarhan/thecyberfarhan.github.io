@@ -1,5 +1,5 @@
 /* caches the site on the first visit so repeat visits load from the device */
-var V = '64', CORE = ['./', 'assets/app.js?v=64', 'assets/cpent-medal.webp', 'assets/avatar.jpg', 'assets/contributions.svg', 'assets/contributions-m.svg', 'assets/contributions-light.svg', 'assets/contributions-m-light.svg', 'manifest.webmanifest', 'assets/icons/icon-192.png'];
+var V = '66', CORE = ['./', 'assets/app.js?v=66', 'assets/cpent-medal.webp', 'assets/avatar.jpg', 'assets/contributions.svg', 'assets/contributions-m.svg', 'assets/contributions-light.svg', 'assets/contributions-m-light.svg', 'manifest.webmanifest', 'assets/icons/icon-192.png'];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(V).then(function (c) { return Promise.all(CORE.map(function (u) { return c.add(u).catch(function () {}); })); }).then(function () { return self.skipWaiting(); }));
 });

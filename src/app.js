@@ -188,10 +188,10 @@
       ['hashcat -m 0 hash.txt rockyou.txt', ['5f4dcc3b5aa765d61d8327deb882cf99:password', '[+] 1/1 hashes cracked']]
     ], 7, 2200);
     termLoop($('.cterm-body'), [
-      ['./contact.sh --open', ['[+] role: penetration tester', '[+] focus: web and API security', '[+] status: open to conversations']],
-      ['cat channels.txt', ['linkedin   in/cyber-farhan-hussain', 'github     @thecyberfarhan', 'tryhackme  farhan.hussain', 'writeups   CTF-Writeups']],
+      ['./contact.sh --open', ['[+] availability: immediate', '[+] location: remote preferred', '[+] status: open to conversations']],
+      ['cat ~/.plan', ['1. read the sample report', '2. skim a writeup or two', '3. send me a message']],
       ['whoami && id', ['farhan', 'uid=1000(farhan) gid=1000(pentester)', '[+] certified: CPENT']],
-      ['./say_hi.sh', ['[*] waiting for your message...', '[+] pick a channel on the right']],
+      ['./say_hi.sh', ['[*] waiting for your message...', '[+] email is the fastest route']],
       ['ping -c 1 farhan', ['PING farhan: 56 data bytes', '[+] reachable, reply pending your message']]
     ], 8, 2600);
   }
@@ -283,7 +283,7 @@
     var h = VH, k = Math.min(ssy / h, 1.4), fade = Math.max(0, 1 - ssy / (h * 0.7)).toFixed(3);
     if (copy) { copy.style.transform = 'translate3d(0,' + (-ssy * 0.14).toFixed(2) + 'px,0)'; copy.style.opacity = fade; }
     if (medalWrap) { medalWrap.style.transform = 'translate3d(0,' + (-ssy * 0.22).toFixed(2) + 'px,0) scale(' + Math.max(1 - k * 0.1, 0.75).toFixed(4) + ')'; medalWrap.style.opacity = fade; }
-    if (gl) gl.style.opacity = Math.max(0.85 - k * 0.8, 0).toFixed(3);
+    if (gl) gl.style.opacity = Math.max(0.5 - k * 0.5, 0).toFixed(3);
     requestAnimationFrame(plx);
   })();
 
@@ -651,7 +651,7 @@
 
   function pickPlat() {
     var best = null, bd = 1e9;
-    $$('.card,.wcard,.tool-col,.stat,.live-card,.ccard,.nf,.pm,.game,.open-card,.termcard,.cterm,.jt-b,.sky,.steps li').forEach(function (el) {
+    $$('.card,.wcard,.tool-col,.stat,.live-card,.ccard,.nf,.pm,.game,.open-card,.termcard,.cterm,.jt-b,.sky,.steps li,.lrow,.big-stats,.about-l,.rail,.c-l,.link-rows').forEach(function (el) {
       var r = el.getBoundingClientRect(); if (r.width < 300 || r.top < 170 || r.top > innerHeight - 150 || r.left < -10 || r.right > innerWidth + 10) return;
       var d = Math.abs(r.top - innerHeight * 0.55) + Math.abs((r.left + r.right) / 2 - innerWidth / 2) * 0.3; if (d < bd) { bd = d; best = el; }
     });
@@ -1212,16 +1212,16 @@
     about: ['Fact', 'This page uses no frameworks, only hand-written HTML, CSS and JavaScript.', 'See the tools', 'tools'],
     tools: ['Fact', 'There are 32 tools in the columns below, grouped by the phase of a test they belong to.', 'Read the writeups', 'proof'],
     proof: ['Fact', '37 writeups so far: 32 from TryHackMe and 5 from Hack The Box.', 'Open the repo', 'https://github.com/thecyberfarhan/CTF-Writeups'],
-    sky: ['Fact', 'The best single day of the last year had 10 contributions.', 'Live stats', 'live'],
+    sky: ['Fact', 'The best single day of the last year had 10 contributions.', 'My journey', 'journey'],
     live: ['Fact', 'TryHackMe puts this profile in the top 3 percent, with 100+ rooms completed.', 'Open TryHackMe', 'https://tryhackme.com/p/farhan.hussain'],
-    contact: ['Fact', 'The terminal on the left cycles through five commands, then starts over.', 'See the writeups', 'proof']
+    contact: ['Fact', 'The terminal under the links cycles through a few commands, then starts over.', 'See the writeups', 'proof']
   };
   var ASKS = {
     hero: ['Question', 'Short on time? Pick one and I will take you there.', [['Tools', 'tools'], ['Writeups', 'proof'], ['Contact', 'contact']]],
     about: ['Question', 'Want the toolbox first, or the proof?', [['Toolbox', 'tools'], ['Proof', 'proof']]],
-    tools: ['Question', 'Looking for something specific?', [['Writeups', 'proof'], ['TryHackMe', 'live'], ['Contact', 'contact']]],
+    tools: ['Question', 'Looking for something specific?', [['Writeups', 'proof'], ['Journey', 'journey'], ['Contact', 'contact']]],
     proof: ['Question', 'Read one, or hear from the author directly?', [['All writeups', 'https://github.com/thecyberfarhan/CTF-Writeups'], ['Contact', 'contact']]],
-    sky: ['Question', 'Curious about the bigger picture?', [['Live stats', 'live'], ['Writeups', 'proof']]],
+    sky: ['Question', 'Curious about the bigger picture?', [['Journey', 'journey'], ['Writeups', 'proof']]],
     live: ['Question', 'Want to see the work behind these numbers?', [['Writeups', 'proof'], ['GitHub', 'https://github.com/thecyberfarhan']]],
     contact: ['Question', 'Which door do you want to knock on?', [['LinkedIn', 'https://www.linkedin.com/in/cyber-farhan-hussain/'], ['GitHub', 'https://github.com/thecyberfarhan']]]
   };
@@ -1230,9 +1230,9 @@
     var G = function (id, label) { return { label: label, id: id }; }, U = function (url, label) { return { label: label, url: url }; };
     if (sec === 'hero') return [G('about', 'About me'), G('tools', 'See my tools')];
     if (sec === 'about') return [G('tools', 'See my tools'), G('proof', 'Read my writeups')];
-    if (sec === 'tools') return [G('proof', 'Read my writeups'), G('live', 'Live stats')];
+    if (sec === 'tools') return [G('proof', 'Read my writeups'), G('journey', 'My journey')];
     if (sec === 'proof') { var h = el && el.tagName === 'A' ? el.href : null; return h ? [U(h, 'Open this writeup'), G('contact', 'Contact me')] : [U('https://github.com/thecyberfarhan/CTF-Writeups', 'All writeups'), G('contact', 'Contact me')]; }
-    if (sec === 'sky') return [G('live', 'Live stats'), G('contact', 'Contact me')];
+    if (sec === 'sky') return [G('journey', 'My journey'), G('contact', 'Contact me')];
     if (sec === 'live') return [U('https://tryhackme.com/p/farhan.hussain', 'Open TryHackMe'), G('contact', 'Contact me')];
     if (sec === 'contact') { var c = el && el.tagName === 'A' ? el.href : null; return c ? [U(c, 'Open this'), G('proof', 'Read my writeups')] : [U('https://www.linkedin.com/in/cyber-farhan-hussain/', 'Open LinkedIn'), G('proof', 'Read my writeups')]; }
     return [G('contact', 'Contact me')];
@@ -1279,18 +1279,18 @@
   function inView(el) { var r = el.getBoundingClientRect(); return r.top > 90 && r.bottom < innerHeight - 40 && r.left >= 0 && r.right <= innerWidth; }
   function sectionNow() {
     var sky = $('.sky'); if (sky) { var r = sky.getBoundingClientRect(); if (r.top < innerHeight * 0.6 && r.bottom > innerHeight * 0.4) return 'sky'; }
-    var cur = 'hero', ids = ['hero', 'about', 'journey', 'tools', 'proof', 'live', 'play', 'arch', 'contact'];
+    var cur = 'hero', ids = ['hero', 'proof', 'about', 'tools', 'journey', 'play', 'arch', 'contact'];
     ids.forEach(function (id) { var s = document.getElementById(id); if (s && s.getBoundingClientRect().top < innerHeight * 0.5) cur = id; });
     return cur;
   }
   function nameOf(el) { var b = el.querySelector('b'), h = el.querySelector('h3'), l = el.querySelector('.tl'); return (b && b.textContent) || (h && h.textContent) || (l && l.textContent) || el.getAttribute('data-nudge') || ''; }
   function visibleBig(el) { var r = el.getBoundingClientRect(), vis = Math.min(r.bottom, innerHeight - 50) - Math.max(r.top, 100); return r.left >= 0 && r.right <= innerWidth && vis >= Math.min(r.height * 0.8, 150) && r.width >= 200; }
   function pickSpeaker(sec) {
-    var sel = sec === 'tools' ? '.tool-col' : sec === 'proof' ? '.wcard' : sec === 'about' ? '.card, .steps li' : sec === 'journey' ? '.jt-b, .open-card' : sec === 'play' ? '.game' : sec === 'arch' ? '.nf, .pm, .arch-c' : sec === 'sky' ? '.sky' : sec === 'live' ? '.live-card' : sec === 'contact' ? '.cterm, .ccard' : sec === 'hero' ? '.medal-stage, .termcard' : '';
+    var sel = sec === 'tools' ? '.tool-col' : sec === 'proof' ? '.big-stats, .sky' : sec === 'about' ? '.about-l, .method' : sec === 'journey' ? '.rail' : sec === 'play' ? '.game' : sec === 'arch' ? '.nf, .pm, .arch-c' : sec === 'sky' ? '.sky' : sec === 'contact' ? '.c-l, .cterm' : sec === 'hero' ? '.medal-stage, .termcard' : '';
     if (!sel) return null; var list = $$(sel).filter(visibleBig); return list.length ? list[Math.floor(Math.random() * list.length)] : null;
   }
   /* a notification never sits on top of other content: it picks the free spot with the least overlap */
-  var BLK = '.card,.wcard,.chip-tile,.tool-col,.stat,.lc-stat,.ccard,.termcard,.cterm,.live-card,.btn,.title,.sub,.pills,.lead,.hero-copy h1,.role,.medal-stage,.sky,.eyebrow,.arch-q,.jt-b,.open-card,.steps li,.nf,.pm,.game,.tech li,.thm-badge,.hud,.prompt';
+  var BLK = '.card,.wcard,.chip-tile,.tool-col,.stat,.lc-stat,.big-stats>div,.lrow,.statement,.defs,.method li,.rn,.big-line,.mail-big,.prefs,.link-rows a,.who,.ccard,.termcard,.cterm,.live-card,.btn,.title,.sub,.pills,.lead,.hero-copy h1,.role,.medal-stage,.sky,.eyebrow,.arch-q,.jt-b,.open-card,.steps li,.nf,.pm,.game,.tech li,.thm-badge,.hud,.prompt';
   var pmKey = null, pmAt = 0, freeNudge = false, lastOv = 0;
   function blockers(skip) {
     var out = [];
@@ -1438,8 +1438,8 @@
     tm.classList.remove('on'); setTimeout(function () { tm.hidden = true; }, 220);
     try { tmIn.blur(); } catch (e) {}
   }
-  var SECS = ['about', 'journey', 'tools', 'proof', 'live', 'play', 'arch', 'contact'];
-  var FILES = ['about/', 'journey/', 'tools/', 'proof/', 'live/', 'play/', 'arch/', 'contact/', 'resume.pdf'];
+  var SECS = ['proof', 'about', 'tools', 'journey', 'play', 'arch', 'contact'];
+  var FILES = ['proof/', 'about/', 'tools/', 'journey/', 'play/', 'arch/', 'contact/', 'resume.pdf'];
   var CMDS = {
     help: function (o) {
       ['Commands:', '  ls, cd, pwd, cat, tree   browse like a real shell (try: cd tools, cat core.txt)', '  ls              list sections', '  goto <section>  jump there (about, journey, tools, proof, live, play, contact)', '  whoami          who am I', '  skills          what I work with', '  certs           certifications', '  writeups        featured writeups', '  projects        things I built', '  education       school', '  contact         where to reach me', '  resume          download my resume', '  play            open the mini TryHackMe-style room', '  theme           toggle day / night', '  clear, exit     tidy up', 'Not everything is listed. Poke around.'].forEach(function (l) { pr(o, l, l.charAt(0) === ' ' ? '' : 'c'); });
@@ -1515,7 +1515,6 @@
     journey: { 'timeline.txt': ['2023-2025  Intermediate (HSSC), ICS, Al-Hayat College, 87%', 'Labs       TryHackMe (100+ rooms), Hack The Box, HTB Academy, PicoCTF, PortSwigger, Hacker101', 'Writeups   37 published on GitHub', 'Tooling    Python venv manager (~1,800 LOC), automation scripts', '2026       CPENT certified (EC-Council), TryHackMe top 3%', 'Now        Open to work: Junior Penetration Tester / Web and API Security Tester'] },
     tools: { 'core.txt': ['Kali, Linux, Windows, Python, Bash, PowerShell, JavaScript, SQL, Docker, GitHub, VS Code, VMware'], 'recon.txt': ['Nmap, Nessus, Nikto, RustScan, Masscan, Subfinder, Shodan, Maltego'], 'web.txt': ['Burp Suite, OWASP ZAP, ffuf, feroxbuster, SQLMap, Caido, XSStrike, WPScan'], 'exploitation.txt': ['Metasploit, Cobalt Strike, Mythic, BloodHound, Impacket, NetExec, Mimikatz, Evil-WinRM'], 'passwords-network.txt': ['Hydra, John the Ripper, Hashcat, Wireshark, tcpdump, Aircrack-ng, Bettercap, Ligolo-ng'], 'techniques.txt': ['OWASP Top 10, SQL injection, XSS, password spraying, Kerberoasting, AS-REP roasting, Pass-the-Hash, DCSync, Golden and Silver tickets, AMSI bypass, privilege escalation (Linux and Windows), pivoting, reverse shells, lateral movement, AD enumeration'] },
     proof: { 'stats.txt': ['TryHackMe ranking   top 3%', 'Rooms completed     100+', 'Published writeups  37'], 'writeups.txt': ['Mr Robot CTF, Mustacchio, Archetype, Cap, Overpass, Silver Platter, Watcher, tomghost', 'github.com/thecyberfarhan/CTF-Writeups'] },
-    live: { 'tryhackme.txt': ['farhan.hussain', 'tryhackme.com/p/farhan.hussain', 'rank: top 3%   rooms: 100+   writeups: 37'] },
     play: { 'README.txt': ['A tiny TryHackMe-style room. Three difficulties: easy, normal, impossible.', 'Run ./start to jump to the game.'], start: { exec: 'play' } },
     arch: { 'neofetch.txt': ['OS: Arch Linux x86_64', 'Shell: zsh', 'Role: Penetration Tester', 'Motto: btw'], 'motto.txt': ['I use Arch, btw.'] },
     contact: { 'links.txt': ['LinkedIn   linkedin.com/in/cyber-farhan-hussain', 'GitHub     github.com/thecyberfarhan', 'TryHackMe  tryhackme.com/p/farhan.hussain', 'Email      farhan736hussain@gmail.com'] },
