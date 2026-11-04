@@ -1652,7 +1652,16 @@
         tabs.forEach(function (t) { t.classList.remove('on'); t.setAttribute('aria-selected', 'false'); });
         tab.classList.add('on'); tab.setAttribute('aria-selected', 'true');
         var cat = tab.getAttribute('data-cat');
-        items.forEach(function (li) { li.hidden = !(cat === 'all' || li.getAttribute('data-cat') === cat); });
+        items.forEach(function (li) {
+          var show = cat === 'all' || li.getAttribute('data-cat') === cat;
+          clearTimeout(li._pjT);
+          if (show) {
+            li.hidden = false; void li.offsetWidth; li.classList.remove('pj-out');
+          } else {
+            li.classList.add('pj-out');
+            li._pjT = setTimeout(function () { li.hidden = true; }, 280);
+          }
+        });
       });
     });
   })();
