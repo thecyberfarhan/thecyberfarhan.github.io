@@ -1664,7 +1664,7 @@
     var d = document.createElement('div'); if (cls) d.className = cls; d.textContent = text; box.appendChild(d); while (box.childElementCount > 400) box.removeChild(box.firstChild); box.scrollTop = box.scrollHeight; requestAnimationFrame(function () { box.scrollTop = box.scrollHeight; }); return d;
   }
   function prLink(box, label, href, dl) {
-    var d = document.createElement('div'), a = document.createElement('a'); a.href = href; a.textContent = label; if (dl) a.setAttribute('download', 'Farhan_Hussain_Resume.pdf'); else { a.target = '_blank'; a.rel = 'noopener'; }
+    var d = document.createElement('div'), a = document.createElement('a'); a.href = href; a.textContent = label; if (dl) a.setAttribute('download', 'Farhan_Hussain_Resume_2026-11-04.pdf'); else { a.target = '_blank'; a.rel = 'noopener'; }
     d.appendChild(a); box.appendChild(d); box.scrollTop = box.scrollHeight;
   }
   function openTerm() {
@@ -1698,7 +1698,7 @@
     education: function (o) { pr(o, 'Intermediate (HSSC), ICS, Al-Hayat College, 2023 to 2025, 87%.'); },
     journey: function (o) { pr(o, 'Opening the journey section...', 'm'); go('journey'); },
     contact: function (o) { prLink(o, 'LinkedIn  in/cyber-farhan-hussain', 'https://www.linkedin.com/in/cyber-farhan-hussain/'); prLink(o, 'GitHub    @thecyberfarhan', 'https://github.com/thecyberfarhan'); prLink(o, 'TryHackMe farhan.hussain', 'https://tryhackme.com/p/farhan.hussain'); prLink(o, 'Email     farhan736hussain@gmail.com', 'mailto:farhan736hussain@gmail.com'); },
-    resume: function (o) { pr(o, 'Downloading Farhan_Hussain_Resume.pdf ...', 'ok'); var a = document.createElement('a'); a.href = 'assets/Farhan_Hussain_Resume.pdf'; a.setAttribute('download', 'Farhan_Hussain_Resume.pdf'); document.body.appendChild(a); a.click(); a.remove(); },
+    resume: function (o) { pr(o, 'Downloading Farhan_Hussain_Resume_2026-11-04.pdf ...', 'ok'); var a = document.createElement('a'); a.href = 'assets/Farhan_Hussain_Resume_2026-11-04.pdf'; a.setAttribute('download', 'Farhan_Hussain_Resume_2026-11-04.pdf'); document.body.appendChild(a); a.click(); a.remove(); },
     cv: function (o) { CMDS.resume(o); },
     play: function (o) { pr(o, 'Loading target.htb ...', 'm'); closeTerm(); go('play'); },
     ctf: function (o) { CMDS.play(o); },
