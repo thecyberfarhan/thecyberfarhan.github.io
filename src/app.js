@@ -6,7 +6,15 @@
   ['#tm-input', '#g-input'].forEach(function (s) { var i = document.querySelector(s); if (i) i.maxLength = 200; });
   var $ = function (s, c) { return (c || document).querySelector(s); };
   var $$ = function (s, c) { return Array.prototype.slice.call((c || document).querySelectorAll(s)); };
-  var motion = true;
+  var motion = (function () {
+    try {
+      var v = localStorage.getItem('motion');
+      if (v === 'full') return true;
+      if (v === 'reduced') return false;
+    } catch (e) {}
+    try { return !matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return true; }
+  })();
+  root.setAttribute('data-motion', motion ? 'full' : 'reduced');
   var PAL = { dark: { node: '201,209,217', link: '127,168,204', hot: '180,35,44', wire: '127,168,204', wireHot: '194,104,108', halo: '13,17,23' }, light: { node: '31,35,40', link: '63,110,154', hot: '176,74,79', wire: '63,110,154', wireHot: '176,74,79', halo: '250,251,253' } };
   function pal() { return PAL[root.getAttribute('data-theme') === 'light' ? 'light' : 'dark']; }
 
@@ -34,6 +42,20 @@
     }).catch(function () {});
     vt.finished.then(function () { root.classList.remove('no-tr'); }, function () { root.classList.remove('no-tr'); });
   });
+
+  /* ---------- motion toggle: full animation vs. a calmer, mostly-still page ---------- */
+  var mBtn = $('#motion-toggle');
+  if (mBtn) {
+    mBtn.setAttribute('aria-pressed', motion ? 'false' : 'true');
+    mBtn.setAttribute('aria-label', motion ? 'Turn most animations off' : 'Turn animations back on');
+    mBtn.addEventListener('click', function () {
+      var next = !motion;
+      try { localStorage.setItem('motion', next ? 'full' : 'reduced'); } catch (e) {}
+      root.classList.add('motion-switching');
+      root.setAttribute('data-motion', next ? 'full' : 'reduced');
+      setTimeout(function () { location.reload(); }, 180);
+    });
+  }
 
   /* ---------- split headings into letters ---------- */
   $$('.split').forEach(function (el) {
@@ -111,9 +133,9 @@
     drawGlobe(); requestAnimationFrame(gframe);
   }
   function startGlobe() { if (!gl || !gctx || G.running || !G.show || document.hidden) return; G.running = true; requestAnimationFrame(gframe); }
-  buildGlobe(); sizeGlobe(); drawGlobe(); startGlobe();
+  buildGlobe(); sizeGlobe(); drawGlobe(); if (motion) startGlobe();
   window.addEventListener('resize', function () { sizeGlobe(); buildGlobe(); drawGlobe(); });
-  document.addEventListener('visibilitychange', function () { if (document.hidden) G.running = false; else startGlobe(); });
+  document.addEventListener('visibilitychange', function () { if (document.hidden) G.running = false; else if (motion) startGlobe(); });
   window.addEventListener('pointermove', function (e) { if (e.pointerType === 'mouse') { G.mx = e.clientX / innerWidth - 0.5; G.my = e.clientY / innerHeight - 0.5; } }, { passive: true });
 
   /* ---------- loader: counter drives the globe assembling ---------- */
@@ -125,7 +147,8 @@
     (function step(t) { if (!g0) g0 = t; G.grow = Math.min((t - g0) / dur, 1); if (G.grow < 1) requestAnimationFrame(step); })(performance.now());
   }
   function finishLoader() {
-    root.classList.add('loaded'); G.assemble = 1; growGlobe();
+    root.classList.add('loaded'); G.assemble = 1;
+    if (motion) growGlobe(); else { G.grow = 1; drawGlobe(); }
     try { sessionStorage.setItem('seen', '1'); localStorage.setItem('introAt', String(Date.now())); } catch (e) {}
     setTimeout(begin, seen ? 550 : 650);
     setTimeout(function () { root.classList.remove('loading'); root.classList.add('done'); }, seen ? 1500 : 1700);
@@ -178,6 +201,7 @@
     function wait(fn, ms) { setTimeout(function () { if (live) fn(); else wait(fn, 400); }, ms); }
     function typeCmd(txt, done) { var d = line('cmd'), i = 0; (function t() { d.textContent = '$ ' + txt.slice(0, i++); if (i <= txt.length) wait(t, 38); else wait(done, 380); })(); }
     function out(arr, i, done) { if (i >= arr.length) return wait(done, pause); var d = line(arr[i].indexOf('[+]') === 0 ? 'ok' : 'out'); d.textContent = arr[i]; wait(function () { out(arr, i + 1, done); }, 420); }
+    if (!motion) { var s0 = scripts[0]; typeCmd(s0[0], function () { out(s0[1], 0, function () {}); }); return; }
     (function run() { var s = scripts[si++ % scripts.length]; typeCmd(s[0], function () { out(s[1], 0, run); }); })();
   }
   function termDemo() {
@@ -261,7 +285,8 @@
     nav.classList.toggle('scrolled', y > 30);
     nav.style.transform = (performance.now() > navHold && y > lastY && y > 500 && !pill.classList.contains('open')) ? 'translateY(-90px)' : '';
     if (medal && !fineMouse) medal.style.setProperty('--my', Math.min(y / 14, 24) + 'deg');
-    G.show = y < VH * 1.5; if (G.show) startGlobe(); else G.running = false;
+    G.show = y < VH * 1.5; if (G.show && motion) startGlobe(); else G.running = false;
+    if (!motion && gl) { drawGlobe(); gl.style.opacity = y < VH * 0.7 ? '' : '0'; }
     lastY = y;
     var nxt = cur ? cur.a : null;
     if (nxt !== active) { active = nxt; links.forEach(function (a) { a.classList.toggle('on', a === active); }); moveInd(active); $$('.tabbar a').forEach(function (a) { a.classList.toggle('on', !!active && a.dataset.nav === active.dataset.nav); }); setTitle(active ? active.dataset.nav : ''); moveTabInd(); }
@@ -270,7 +295,7 @@
   window.addEventListener('scroll', function () { if (!ticking) { ticking = true; requestAnimationFrame(onScroll); } }, { passive: true });
   onScroll();
   var ssy = 0, plxDone = false;
-  (function plx() {
+  if (motion) (function plx() {
     if (Math.abs(sy - ssy) < 0.05 && plxDone) { requestAnimationFrame(plx); return; }
     ssy += (sy - ssy) * 0.32; plxDone = Math.abs(sy - ssy) < 0.05;
     var h = VH, k = Math.min(ssy / h, 1.4), fade = Math.max(0, 1 - ssy / (h * 0.7)).toFixed(3);
@@ -357,7 +382,7 @@
   window.addEventListener('pointermove', function (e) {
     if (e.pointerType !== 'mouse') return;
     fineMouse = true;
-    if (!cursorOn) { cursorOn = true; root.classList.add('has-cursor'); rx = e.clientX; ry = e.clientY; startCursor(); }
+    if (!cursorOn && motion) { cursorOn = true; root.classList.add('has-cursor'); rx = e.clientX; ry = e.clientY; startCursor(); }
     mx = e.clientX; my = e.clientY; lastMove = performance.now(); needMove = false;
     dot.style.transform = 'translate3d(' + mx + 'px,' + my + 'px,0)';
     var txt = !!(e.target.closest && e.target.closest('input,textarea,[contenteditable="true"]')); dot.classList.toggle('txt', txt); ring.classList.toggle('txt', txt);
@@ -1334,8 +1359,8 @@
   function startBg() { if (!bgc || bgRun || document.hidden) return; bgRun = true; requestAnimationFrame(bgFrame); }
   window.addEventListener('pointermove', function (e) { if (e.pointerType === 'mouse') { bmx = e.clientX / innerWidth - 0.5; bmy = e.clientY / innerHeight - 0.5; } }, { passive: true });
   window.addEventListener('resize', function () { sizeBg(); mkNodes(); if (!ST) mkAst(); drawBg(); });
-  document.addEventListener('visibilitychange', function () { if (document.hidden) bgRun = false; else startBg(); });
-  sizeBg(); mkNodes(); drawBg(); startBg();
+  document.addEventListener('visibilitychange', function () { if (document.hidden) bgRun = false; else if (motion) startBg(); });
+  sizeBg(); mkNodes(); drawBg(); if (motion) startBg();
   window.addEventListener('load', function () { setTimeout(function () { if (!ST) mkAst(); }, 400); });
 
   /* ---------- idle nudges: whatever you are looking at gets sarcastic ---------- */
@@ -1669,6 +1694,7 @@
   /* ---------- command palette (Enter) + mini TryHackMe-style room ---------- */
   var tm = $('#tm'), tmOut = $('#tm-out'), tmIn = $('#tm-input'), tmBtn = $('#tm-btn');
   var tmHist = [], tmHi = 0, tmBooted = false;
+  try { if (tmBtn && localStorage.getItem('tmSeen') === '1') tmBtn.classList.add('seen'); } catch (e) {}
   function pr(box, text, cls) {
     var d = document.createElement('div'); if (cls) d.className = cls; d.textContent = text; box.appendChild(d); while (box.childElementCount > 400) box.removeChild(box.firstChild); box.scrollTop = box.scrollHeight; requestAnimationFrame(function () { box.scrollTop = box.scrollHeight; }); return d;
   }
@@ -1676,10 +1702,17 @@
     var d = document.createElement('div'), a = document.createElement('a'); a.href = href; a.textContent = label; if (dl) a.setAttribute('download', 'Farhan_Hussain_Resume_2026-11-04.pdf'); else { a.target = '_blank'; a.rel = 'noopener'; }
     d.appendChild(a); box.appendChild(d); box.scrollTop = box.scrollHeight;
   }
+  function typeLine(box, text, cls, done) {
+    if (!motion) { pr(box, text, cls); if (done) done(); return; }
+    var d = document.createElement('div'); if (cls) d.className = cls; box.appendChild(d);
+    var i = 0;
+    (function t() { d.textContent = text.slice(0, i++); box.scrollTop = box.scrollHeight; if (i <= text.length) setTimeout(t, 14); else if (done) done(); })();
+  }
   function openTerm() {
     if (!tm.hidden || IS_TOUCH || innerWidth < 821) return;
     tm.hidden = false; void tm.offsetWidth; tm.classList.add('on');
-    if (!tmBooted) { tmBooted = true; pr(tmOut, 'Farhan OS 1.0. Type help or ls to see what you can do.', 'm'); }
+    if (tmBtn && !tmBtn.classList.contains('seen')) { tmBtn.classList.add('seen'); try { localStorage.setItem('tmSeen', '1'); } catch (e) {} }
+    if (!tmBooted) { tmBooted = true; typeLine(tmOut, 'Farhan OS 1.0. Type help or ls to see what you can do.', 'm'); }
     setTimeout(function () { try { tmIn.focus({ preventScroll: true }); } catch (e) { tmIn.focus(); } }, 60);
   }
   function closeTerm() {
@@ -1691,7 +1724,7 @@
   var FILES = ['proof/', 'about/', 'tools/', 'projects/', 'journey/', 'play/', 'arch/', 'contact/', 'resume.pdf'];
   var CMDS = {
     help: function (o) {
-      ['Commands:', '  ls, cd, pwd, cat, tree   browse like a real shell (try: cd tools, cat core.txt)', '  ls              list sections', '  goto <section>  jump there (about, journey, tools, proof, live, play, contact)', '  whoami          who am I', '  skills          what I work with', '  certs           certifications', '  writeups        featured writeups', '  projects        things I built', '  education       school', '  contact         where to reach me', '  resume          download my resume', '  play            open the mini TryHackMe-style room', '  theme           toggle day / night', '  clear, exit     tidy up', 'Not everything is listed. Poke around.'].forEach(function (l) { pr(o, l, l.charAt(0) === ' ' ? '' : 'c'); });
+      ['Commands:', '  ls, cd, pwd, cat, tree   browse like a real shell (try: cd tools, cat core.txt)', '  ls              list sections', '  goto <section>  jump there (about, journey, tools, proof, live, play, contact)', '  whoami          who am I', '  skills          what I work with', '  certs           certifications', '  writeups        featured writeups', '  projects        things I built', '  education       school', '  contact         where to reach me', '  resume          download my resume', '  play            open the mini TryHackMe-style room', '  theme           toggle day / night', '  banner          show the splash', '  clear, exit     tidy up', 'Tab completes, arrow keys recall history. Not everything is listed, poke around.'].forEach(function (l) { pr(o, l, l.charAt(0) === ' ' ? '' : 'c'); });
     },
     ls: function (o, a) {
       if (/a/.test(a || '')) { pr(o, FILES.concat(['.secret']).join('   '), 'a'); } else pr(o, FILES.join('   '), 'a');
@@ -1752,7 +1785,8 @@
     coffee: function (o) { pr(o, '   ( (\n    ) )\n  ........\n  |      |]\n  \\      /\n   `----\'\nCoffee ready. Fuel for the next writeup.', 'y'); },
     hello: function (o) { pr(o, 'Hello, visitor. Type resume to grab my CV.', 'c'); },
     hi: function (o) { CMDS.hello(o); },
-    '42': function (o) { pr(o, 'The answer to life, the universe and a CTF flag.', 'y'); }
+    '42': function (o) { pr(o, 'The answer to life, the universe and a CTF flag.', 'y'); },
+    banner: function (o) { pr(o, 'FARHAN', 'c'); pr(o, 'web & api penetration tester  //  cpent certified', 'm'); pr(o, '================================================', 'a'); }
   };
   var CNAMES = Object.keys(CMDS);
   /* ---------- a tiny read-only shell: virtual filesystem, cd, ls, cat and friends ---------- */

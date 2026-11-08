@@ -101,6 +101,38 @@
 }
 @media (max-width:820px){.big-stats b{font-size:2.05rem;white-space:nowrap;letter-spacing:-.03em}.big-stats>div{padding-right:2px}}
 /* light-mode contrast pass */html[data-theme=light]{--bg:#e4e9ef;--surface:#fbfcfd;--tile:#d6dde5;--border:#b4bec9;--muted:#4f5a66;--steel:#2f5f8a;--lav:#55527a;--bronze:#7a5524;--red:#9a3a3f;--shadow:rgba(28,35,43,.22)}html[data-theme=light] .gm-badge{color:#9a1c24}html[data-theme=light] .game[data-lv=easy] .gm-badge{color:#2d6a40}html[data-theme=light] .game[data-lv=normal] .gm-badge{color:#7a5524}html[data-theme=light] .rn-t{color:color-mix(in srgb,var(--c) 70%,#000)}html[data-theme=light] .pills .p-steel{color:#27547c;background:rgba(47,95,138,.1);border-color:rgba(47,95,138,.55)}html[data-theme=light] .l-veryeasy{color:#4a4770;border-color:rgba(85,82,122,.65)}html[data-theme=light] .l-easy{color:#27547c;border-color:rgba(47,95,138,.65)}html[data-theme=light] .l-medium{color:#8a2f34;border-color:rgba(154,58,63,.65)}html[data-theme=light] .l-active{color:#2f6a1f;border-color:rgba(59,122,40,.5)}html[data-theme=light] .l-written{color:#2f5f8a;border-color:rgba(69,111,150,.5)}html[data-theme=light] .l-private{color:#5d6772;border-color:rgba(93,103,114,.5)}html[data-theme=light] .l-fork{color:#4a4770;border-color:rgba(74,71,112,.5)}html[data-theme=light] .card,html[data-theme=light] .tile,html[data-theme=light] .game,html[data-theme=light] .ledger,html[data-theme=light] .rail{box-shadow:0 1px 2px var(--shadow),0 8px 22px -12px var(--shadow)}</style>
+<style>
+/* motion toggle: a real slider switch, matches the day/night button's size and hover */
+.motion-toggle{position:relative}
+.motion-toggle .mt-track{position:relative;display:block;width:34px;height:18px;border-radius:999px;background:var(--border);transition:background .3s var(--ease)}
+.motion-toggle .mt-knob{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:var(--muted);box-shadow:0 1px 2px var(--shadow);transition:transform .3s var(--ease),background .3s var(--ease)}
+html[data-motion="full"] .motion-toggle .mt-track{background:var(--accent)}
+html[data-motion="full"] .motion-toggle .mt-knob{transform:translateX(16px);background:#fff}
+.motion-toggle:hover .mt-track{filter:brightness(1.18)}
+html.motion-switching{transition:opacity .16s linear;opacity:.5}
+/* reduced motion: most ambient/idle animation stops; short content reveals and hover states stay */
+html[data-motion="reduced"] .typed{animation:type 1s steps(9) 2.8s forwards}
+html[data-motion="reduced"] .caret{display:none}
+html[data-motion="reduced"] .medal,html[data-motion="reduced"] .medal-wrap,html[data-motion="reduced"] .ring,html[data-motion="reduced"] .o1,html[data-motion="reduced"] .o2,html[data-motion="reduced"] .ticker-track,html[data-motion="reduced"] .jt-dot,html[data-motion="reduced"] .cur{animation:none}
+/* terminal launcher: a real terminal-window glyph, idle glow ring, first-visit hint dot */
+.tm-btn{overflow:visible}
+.tm-btn::before{content:"";position:absolute;inset:-5px;border-radius:16px;border:1px solid var(--accent);opacity:0;animation:tmring 2.8s ease-in-out infinite}
+.tm-btn.seen::before{animation:none;display:none}
+@keyframes tmring{0%,100%{transform:scale(.92);opacity:0}45%{opacity:.5}70%{transform:scale(1.18);opacity:0}}
+.tm-hint{position:absolute;top:-3px;right:-3px;width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--bg);animation:tmhint 1.8s ease-in-out infinite;z-index:1}
+.tm-btn.seen .tm-hint{display:none}
+@keyframes tmhint{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.4);opacity:.5}}
+.tm-btn .ic{transition:transform .3s var(--ease)}
+.tm-btn:hover .ic{transform:scale(1.1)}
+html[data-motion="reduced"] .tm-btn::before,html[data-motion="reduced"] .tm-hint{animation:none;display:none}
+/* terminal open: a snappier pop with a touch of overshoot, plus a one-time scan sweep */
+.tm-box{position:relative;transition:transform .32s cubic-bezier(.34,1.56,.64,1),opacity .2s var(--ease)}
+.tm-box::after{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent);opacity:0;pointer-events:none}
+.tm.on .tm-box::after{animation:tmscan .55s ease-out}
+@keyframes tmscan{0%{top:0;opacity:.85}100%{top:98%;opacity:0}}
+html[data-motion="reduced"] .tm-box{transition:opacity .18s linear}
+html[data-motion="reduced"] .tm.on .tm-box::after{animation:none;display:none}
+</style>
 <script>setTimeout(function(){var r=document.documentElement;r.classList.remove("loading");r.classList.add("loaded","done")},9000)</script>
 </head>
 <body>
@@ -140,6 +172,7 @@
       <a href="#contact" data-go="contact" data-nav="contact"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"> <path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7" /> <rect x="2" y="4" width="20" height="16" rx="2" /> </svg><span>Contact</span></a>
     </nav>
     <button class="theme" id="theme" type="button" aria-label="Switch between day and night mode" title="Day / night"><svg class="ic moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"> <path d="M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401" /> </svg><svg class="ic sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"> <circle cx="12" cy="12" r="4" /> <path d="M12 2v2" /> <path d="M12 20v2" /> <path d="m4.93 4.93 1.41 1.41" /> <path d="m17.66 17.66 1.41 1.41" /> <path d="M2 12h2" /> <path d="M20 12h2" /> <path d="m6.34 17.66-1.41 1.41" /> <path d="m19.07 4.93-1.41 1.41" /> </svg></button>
+    <button class="theme motion-toggle" id="motion-toggle" type="button" aria-label="Turn most animations off" title="Motion: on/off"><span class="mt-track"><span class="mt-knob"></span></span></button>
     <button class="share" id="share" type="button" aria-label="Share this page" title="Share"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"> <circle cx="18" cy="5" r="3" /> <circle cx="6" cy="12" r="3" /> <circle cx="18" cy="19" r="3" /> <line x1="8.59" x2="15.42" y1="13.51" y2="17.49" /> <line x1="15.41" x2="8.59" y1="6.51" y2="10.49" /> </svg></button>
     <button class="burger" id="burger" type="button" aria-label="Menu" aria-expanded="false"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"> <path d="M4 5h16" /> <path d="M4 12h16" /> <path d="M4 19h16" /> </svg></button>
   </div>
@@ -366,11 +399,11 @@
   <div class="tm-out" id="tm-out"></div>
   <form class="tm-in" id="tm-form" autocomplete="off"><span id="tm-ps">visitor@farhan:~$</span><input id="tm-input" type="text" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Command"></form>
 </div></div>
-<button class="tm-btn" id="tm-btn" type="button" aria-label="Open command palette" title="Press Enter"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"> <path d="M12 19h8" /> <path d="m4 17 6-6-6-6" /> </svg></button>
+<button class="tm-btn" id="tm-btn" type="button" aria-label="Open command palette" title="Terminal — press Enter or Ctrl K"><span class="tm-hint" aria-hidden="true"></span><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"> <rect x="3" y="4" width="18" height="16" rx="2.5" /> <path d="m7.5 9.5 2.5 2.5-2.5 2.5" /> <path d="M13 14.5h3.5" /> </svg></button>
 <footer class="foot">
   <span>Last updated 3 November 2026</span>
   <span>Built by hand, no frameworks.</span>
 </footer>
-<script src="assets/app.js?v=91" defer></script>
+<script src="assets/app.js?v=94" defer></script>
 </body>
 </html>
