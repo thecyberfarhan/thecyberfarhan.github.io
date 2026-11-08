@@ -1277,61 +1277,11 @@
     }
   }
   function sizeBg() { if (!bgc) return; var d = Math.min(window.devicePixelRatio || 1, 1.5); BW = innerWidth; BH = innerHeight; bgc.width = BW * d; bgc.height = BH * d; bctx.setTransform(d, 0, 0, d, 0, 0); mkShapes(); }
-  var nodes = [];
-  function mkNodes() {
-    var n = innerWidth < 820 ? 34 : 70; nodes = [];
-    for (var i = 0; i < n; i++) nodes.push({ x: Math.random() * BW, y: Math.random() * BH, vx: (Math.random() - 0.5) * 0.25, vy: (Math.random() - 0.5) * 0.25, z: 0.3 + Math.random() * 0.7, hot: i % 13 === 0 });
-  }
-  var pkts = [], pulses = [], nextPkt = 0, nextPulse = 0;
-  function drawNet(P) {
-    var i, j, a, b, dx, dy, d, mxp = (bmx + 0.5) * BW, myp = (bmy + 0.5) * BH;
-    for (i = 0; i < nodes.length; i++) {
-      a = nodes[i]; a.x += a.vx; a.y += a.vy;
-      if (a.x < -20) a.x = BW + 20; else if (a.x > BW + 20) a.x = -20; if (a.y < -20) a.y = BH + 20; else if (a.y > BH + 20) a.y = -20;
-    }
-    bctx.lineWidth = 1;
-    for (i = 0; i < nodes.length; i++) {
-      a = nodes[i];
-      var ay = a.y - ((sy * 0.08 * a.z) % (BH + 40));
-      for (j = i + 1; j < nodes.length; j++) {
-        b = nodes[j]; dx = a.x - b.x; dy = (a.y - b.y); d = dx * dx + dy * dy;
-        if (d < 14400) { bctx.strokeStyle = 'rgba(' + P.link + ',' + ((1 - d / 14400) * 0.16 * Math.min(a.z, b.z)).toFixed(3) + ')'; bctx.beginPath(); bctx.moveTo(a.x, a.y); bctx.lineTo(b.x, b.y); bctx.stroke(); }
-      }
-      dx = a.x - mxp; dy = a.y - myp; d = dx * dx + dy * dy;
-      if (d < 22500) { bctx.strokeStyle = 'rgba(' + P.hot + ',' + ((1 - d / 22500) * 0.35).toFixed(3) + ')'; bctx.beginPath(); bctx.moveTo(a.x, a.y); bctx.lineTo(mxp, myp); bctx.stroke(); }
-      bctx.fillStyle = a.hot ? 'rgba(' + P.hot + ',' + (0.35 * a.z).toFixed(2) + ')' : 'rgba(' + P.node + ',' + (0.22 * a.z).toFixed(2) + ')';
-      bctx.beginPath(); bctx.arc(a.x, a.y, a.hot ? 2.4 : 1.4 * a.z + 0.4, 0, 6.283); bctx.fill();
-    }
-  }
-  var SNIP = ['0x41414141', 'root@kali:~#', 'nmap -sV -p-', 'SELECT * FROM users', 'CVE-2021-44228', 'HTTP/1.1 200 OK', 'sudo -l', 'id=1 OR 1=1', 'whoami', 'uid=0(root)', '/etc/shadow', '$ ssh user@lab', 'GET /admin 302', 'base64 -d', 'chmod +s /bin/bash', 'nc -lvnp 4444', 'XSS <script>', '0xdeadbeef', 'flag{...}', 'hashcat -m 0'], flo = [];
-  function mkFlo() { flo = []; var n = innerWidth < 820 ? 8 : 16; for (var i = 0; i < n; i++) flo.push({ t: SNIP[i % SNIP.length], x: Math.random(), y: Math.random() * 1.4, v: 0.08 + Math.random() * 0.16, z: 0.3 + Math.random() * 0.7 }); }
-  function drawFlo(P) {
-    if (!flo.length) mkFlo();
-    bctx.font = '11px "JetBrains Mono","Fira Code",ui-monospace,monospace'; bctx.textBaseline = 'middle';
-    for (var i = 0; i < flo.length; i++) {
-      var f = flo[i]; f.y -= f.v * 0.0006 * 16; if (f.y < -0.1) { f.y = 1.1; f.x = Math.random(); }
-      var yy = f.y * BH - (sy * 0.05 * f.z) % BH, a = Math.min(1, Math.min(f.y + 0.1, 1.1 - f.y) * 6) * 0.2 * f.z;
-      bctx.fillStyle = 'rgba(' + P.node + ',' + a.toFixed(3) + ')'; bctx.fillText(f.t, f.x * (BW - 160) + 20 + bmx * 20 * f.z, yy);
-    }
-  }
-  function drawLive(P) {
-    var now = performance.now(), i, a, b;
-    if (now > nextPkt && nodes.length > 4) {
-      nextPkt = now + 450 + Math.random() * 500;
-      for (var tries = 0; tries < 12; tries++) { a = nodes[Math.floor(Math.random() * nodes.length)]; b = nodes[Math.floor(Math.random() * nodes.length)]; var dx = a.x - b.x, dy = a.y - b.y; if (a !== b && dx * dx + dy * dy < 14400) { pkts.push({ a: a, b: b, t: 0, s: 0.008 + Math.random() * 0.01, hot: Math.random() < 0.3 }); break; } }
-    }
-    for (i = pkts.length - 1; i >= 0; i--) {
-      var p = pkts[i]; p.t += p.s; if (p.t >= 1) { pkts.splice(i, 1); continue; }
-      var x = p.a.x + (p.b.x - p.a.x) * p.t, y = p.a.y + (p.b.y - p.a.y) * p.t, col = p.hot ? P.hot : P.link;
-      bctx.fillStyle = 'rgba(' + col + ',.16)'; bctx.beginPath(); bctx.arc(x, y, 6, 0, 6.283); bctx.fill();
-      bctx.fillStyle = 'rgba(' + col + ',.9)'; bctx.beginPath(); bctx.arc(x, y, 2.2, 0, 6.283); bctx.fill();
-    }
-  }
   function drawBg() {
     if (!bctx || !BW) return;
     bctx.clearRect(0, 0, BW, BH);
     var P = pal(), fade;
-    if (!nodes.length) mkNodes(); drawNet(P); drawLive(P); if (AST.length) drawAstBg(bctx, P);
+    if (AST.length) drawAstBg(bctx, P);
     for (var i = 0; i < shapes.length; i++) {
       var sh = shapes[i], cy = sh.doc - sy * sh.depth, cx = sh.x * BW + bmx * 30 * sh.depth;
       if (cy < -140 || cy > BH + 140) continue;
@@ -1358,9 +1308,9 @@
   }
   function startBg() { if (!bgc || bgRun || document.hidden) return; bgRun = true; requestAnimationFrame(bgFrame); }
   window.addEventListener('pointermove', function (e) { if (e.pointerType === 'mouse') { bmx = e.clientX / innerWidth - 0.5; bmy = e.clientY / innerHeight - 0.5; } }, { passive: true });
-  window.addEventListener('resize', function () { sizeBg(); mkNodes(); if (!ST) mkAst(); drawBg(); });
+  window.addEventListener('resize', function () { sizeBg(); if (!ST) mkAst(); drawBg(); });
   document.addEventListener('visibilitychange', function () { if (document.hidden) bgRun = false; else if (motion) startBg(); });
-  sizeBg(); mkNodes(); drawBg(); if (motion) startBg();
+  sizeBg(); drawBg(); if (motion) startBg();
   window.addEventListener('load', function () { setTimeout(function () { if (!ST) mkAst(); }, 400); });
 
   /* ---------- idle nudges: whatever you are looking at gets sarcastic ---------- */
