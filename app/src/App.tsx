@@ -4,6 +4,7 @@ import Nav from './components/Nav/Nav';
 import Hero from './components/Hero/Hero';
 import Cursor from './components/Cursor/Cursor';
 import Scene from './components/Scene/Scene';
+import Nudges from './components/Nudges/Nudges';
 import Proof from './components/Proof/Proof';
 import About from './components/About/About';
 import Tools from './components/Tools/Tools';
@@ -34,6 +35,7 @@ export default function App() {
       {!ready && <Loader portraitSrc="/assets/portrait-bw.webp" onDone={() => setReady(true)} />}
       <Scene />
       <Cursor />
+      <Nudges />
       <Nav />
       <main>
         <Hero ready={ready} />

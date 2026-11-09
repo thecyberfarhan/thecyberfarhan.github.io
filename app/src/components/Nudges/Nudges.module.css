@@ -1,0 +1,20 @@
+.nudge {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 60;
+  max-width: 280px;
+  padding: 14px 16px;
+  border-radius: 12px 12px 2px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: 0 18px 40px -12px var(--shadow);
+  font-size: .86rem;
+  color: var(--soft);
+  line-height: 1.45;
+  pointer-events: none;
+}
+
+@media (max-width: 600px) {
+  .nudge { left: 20px; right: 20px; bottom: 20px; max-width: none; }
+}
