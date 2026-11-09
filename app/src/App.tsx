@@ -9,6 +9,8 @@ import About from './components/About/About';
 import Tools from './components/Tools/Tools';
 import Projects from './components/Projects/Projects';
 import Journey from './components/Journey/Journey';
+import Play from './components/Play/Play';
+import Arch from './components/Arch/Arch';
 import Contact from './components/Contact/Contact';
 import Footer from './components/Footer/Footer';
 import { useSiteStore } from './state/useSiteStore';
@@ -40,6 +42,8 @@ export default function App() {
         <Tools />
         <Projects />
         <Journey />
+        <Play />
+        <Arch />
         <Contact />
       </main>
       <Footer />
