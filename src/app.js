@@ -6,15 +6,21 @@
   ['#g-input'].forEach(function (s) { var i = document.querySelector(s); if (i) i.maxLength = 200; });
   var $ = function (s, c) { return (c || document).querySelector(s); };
   var $$ = function (s, c) { return Array.prototype.slice.call((c || document).querySelectorAll(s)); };
-  var motion = (function () {
+  var motionLevel = (function () {
     try {
-      var v = localStorage.getItem('motion');
-      if (v === 'full') return true;
-      if (v === 'reduced') return false;
+      var v = localStorage.getItem('motionLevel');
+      if (v === '0' || v === '1' || v === '2') return +v;
+      var old = localStorage.getItem('motion');
+      if (old === 'full') return 1;
+      if (old === 'reduced') return 0;
     } catch (e) {}
-    try { return !matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return true; }
+    try { return matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1; } catch (e) { return 1; }
   })();
-  root.setAttribute('data-motion', motion ? 'full' : 'reduced');
+  var MOTION_NAMES = ['reduced', 'full', 'max'], MOTION_LABELS = ['Calm', 'Dynamic', 'Max'];
+  var motion = motionLevel > 0;
+  var motionScale = motionLevel === 2 ? 1.6 : 1;
+  root.setAttribute('data-motion', MOTION_NAMES[motionLevel]);
+  root.style.setProperty('--mscale', motionScale);
   var PAL = { dark: { node: '201,209,217', link: '127,168,204', hot: '180,35,44', wire: '127,168,204', wireHot: '194,104,108', halo: '13,17,23' }, light: { node: '31,35,40', link: '63,110,154', hot: '176,74,79', wire: '63,110,154', wireHot: '176,74,79', halo: '250,251,253' } };
   function pal() { return PAL[root.getAttribute('data-theme') === 'light' ? 'light' : 'dark']; }
 
@@ -43,16 +49,16 @@
     vt.finished.then(function () { root.classList.remove('no-tr'); }, function () { root.classList.remove('no-tr'); });
   });
 
-  /* ---------- motion toggle: full animation vs. a calmer, mostly-still page ---------- */
-  var mBtn = $('#motion-toggle');
+  /* ---------- motion dial: Calm / Dynamic / Max, not a binary switch ---------- */
+  var mBtn = $('#motion-toggle'), mLabel = mBtn && mBtn.querySelector('.mt-label');
   if (mBtn) {
-    mBtn.setAttribute('aria-pressed', motion ? 'false' : 'true');
-    mBtn.setAttribute('aria-label', motion ? 'Turn most animations off' : 'Turn animations back on');
+    mBtn.setAttribute('aria-label', 'Motion level: ' + MOTION_LABELS[motionLevel] + '. Click to change.');
+    if (mLabel) mLabel.textContent = MOTION_LABELS[motionLevel];
     mBtn.addEventListener('click', function () {
-      var next = !motion;
-      try { localStorage.setItem('motion', next ? 'full' : 'reduced'); } catch (e) {}
+      var next = (motionLevel + 1) % 3;
+      try { localStorage.setItem('motionLevel', String(next)); } catch (e) {}
       root.classList.add('motion-switching');
-      root.setAttribute('data-motion', next ? 'full' : 'reduced');
+      root.setAttribute('data-motion', MOTION_NAMES[next]);
       setTimeout(function () { location.reload(); }, 180);
     });
   }
@@ -1180,7 +1186,10 @@
   function loop(now) {
     var dt = Math.min(now - lastF, 50); lastF = now;
     var k = 1 - Math.pow(1 - 0.18, dt / 16.667), k2 = 1 - Math.pow(1 - 0.3, dt / 16.667);
-    rx += (mx - rx) * k; ry += (my - ry) * k;
+    var lockRect = lockEl ? lockEl.getBoundingClientRect() : null;
+    var tgx = mx, tgy = my;
+    if (lockRect) { var lcx = lockRect.left + lockRect.width / 2, lcy = lockRect.top + lockRect.height / 2; tgx = lcx + (mx - lcx) * 0.35; tgy = lcy + (my - lcy) * 0.35; }
+    rx += (tgx - rx) * k; ry += (tgy - ry) * k;
     var p0 = 'translate3d(' + rx.toFixed(2) + 'px,' + ry.toFixed(2) + 'px,0)';
     ring.style.transform = p0;
     tag.style.transform = 'translate3d(' + (rx + 34).toFixed(2) + 'px,' + (ry + 28).toFixed(2) + 'px,0)';
@@ -1190,7 +1199,7 @@
     var ang = [-1.5708, 0, 1.5708, 3.1416], tp = [], q;
     for (q = 0; q < 4; q++) tp.push([rx + Math.cos(ang[q] + spinA) * 24 - CS / 2, ry + Math.sin(ang[q] + spinA) * 24 - CS / 2]);
     var tg;
-    if (lockEl) { var r = lockEl.getBoundingClientRect(), pad = 9, l0 = r.left - pad, t0 = r.top - pad, r0 = r.right + pad - CS, b0 = r.bottom + pad - CS; tg = [[l0, t0], [r0, t0], [l0, b0], [r0, b0]]; }
+    if (lockRect) { var r = lockRect, pad = 9, l0 = r.left - pad, t0 = r.top - pad, r0 = r.right + pad - CS, b0 = r.bottom + pad - CS; tg = [[l0, t0], [r0, t0], [l0, b0], [r0, b0]]; }
     else tg = [tp[3], tp[0], tp[2], tp[1]];
     if (!C) C = tg.map(function (pp) { return [pp[0], pp[1]]; });
     for (q = 0; q < 4; q++) {
@@ -1270,11 +1279,11 @@
       return { v: v, e: e }; })()
   };
   function mkShapes() {
-    var kinds = ['cube', 'ico', 'octa', 'cube', 'ico', 'octa', 'cube', 'ico', 'cube', 'ico', 'octa', 'cube'], n = innerWidth < 820 ? 6 : 12, docH = Math.max(document.documentElement.scrollHeight, innerHeight * 4);
+    var kinds = ['cube', 'ico', 'octa', 'cube', 'ico', 'octa', 'cube', 'ico', 'cube', 'ico', 'octa', 'cube'], base = innerWidth < 820 ? 6 : 12, n = Math.round(base * (motionLevel === 2 ? 1.5 : 1)), docH = Math.max(document.documentElement.scrollHeight, innerHeight * 4);
     shapes = [];
     for (var i = 0; i < n; i++) {
       shapes.push({ g: GEO[kinds[i % kinds.length]], x: (i % 2 ? 0.9 : 0.08) + (Math.random() - 0.5) * 0.05, doc: (i + 0.6) / n * docH * 0.92 + 120, s: 34 + Math.random() * 42, depth: 0.25 + Math.random() * 0.5,
-        ax: Math.random() * 6, ay: Math.random() * 6, vx: (Math.random() - 0.5) * 0.012, vy: 0.004 + Math.random() * 0.01, hot: i % 4 === 1 });
+        ax: Math.random() * 6, ay: Math.random() * 6, vx: (Math.random() - 0.5) * 0.012 * motionScale, vy: (0.004 + Math.random() * 0.01) * motionScale, hot: i % 4 === 1 });
     }
   }
   function sizeBg() { if (!bgc) return; var d = Math.min(window.devicePixelRatio || 1, 1.5); BW = innerWidth; BH = innerHeight; bgc.width = BW * d; bgc.height = BH * d; bctx.setTransform(d, 0, 0, d, 0, 0); mkShapes(); }
