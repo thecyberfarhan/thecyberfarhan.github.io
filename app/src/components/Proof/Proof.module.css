@@ -1,0 +1,108 @@
+.topRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 40px;
+  align-items: start;
+  margin-bottom: 64px;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 48px;
+}
+
+.statNum {
+  font-size: clamp(2.4rem, 5vw, 3.6rem);
+  font-weight: 800;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.statLabel {
+  font-family: var(--mono);
+  font-size: .72rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.medal {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.medalImgWrap {
+  position: relative;
+  width: 84px; height: 84px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex: none;
+  box-shadow: 0 14px 26px -8px var(--shadow);
+}
+.medalImgWrap img { width: 100%; height: 100%; object-fit: cover; }
+
+.medalText a { color: var(--steel); font-size: .84rem; }
+.medalText a:hover { text-decoration: underline; }
+.medalCert { font-family: var(--mono); color: var(--muted); font-size: .8rem; }
+.medalCert span { color: var(--text); }
+
+.ledger {
+  border-top: 1px solid var(--border);
+  margin-bottom: 36px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 140px 1fr 90px 28px;
+  gap: 18px;
+  align-items: center;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--border);
+  transition: background .2s;
+}
+.row:hover { background: color-mix(in srgb, var(--tile) 55%, transparent); }
+
+.platform { font-family: var(--mono); font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.rowBody h3 { font-size: 1rem; color: var(--text); margin-bottom: 4px; }
+.rowBody p { font-size: .88rem; color: var(--muted); line-height: 1.5; }
+
+.diff { font-family: var(--mono); font-size: .7rem; text-align: center; padding: 5px 0; border-radius: 999px; border: 1px solid var(--border); }
+.diff.easy { color: var(--steel); border-color: color-mix(in srgb, var(--steel) 50%, var(--border)); }
+.diff.medium { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 50%, var(--border)); }
+.diff.veryEasy { color: var(--bronze); border-color: color-mix(in srgb, var(--bronze) 50%, var(--border)); }
+
+.arrow { color: var(--muted); transition: transform .25s var(--ease), color .25s; }
+.row:hover .arrow { transform: translateX(3px); color: var(--text); }
+
+.foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 64px;
+}
+
+.thm { display: flex; align-items: center; gap: 10px; }
+.thm img { width: 36px; height: 36px; border-radius: 50%; }
+.thm .handle { font-size: .9rem; color: var(--text); }
+.thm .url { font-family: var(--mono); font-size: .76rem; color: var(--muted); }
+
+.readAll {
+  padding: 11px 18px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  font-size: .88rem;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--tile);
+}
+.readAll:hover { background: var(--surface); }
+
+.ghActivity img {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+}

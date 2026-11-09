@@ -38,46 +38,13 @@
 
   --sans: Inter, "Segoe UI", "Helvetica Neue", Arial, system-ui, sans-serif;
   --mono: "JetBrains Mono", "Fira Code", ui-monospace, Consolas, "DejaVu Sans Mono", monospace;
+  --display: "Anton", Impact, sans-serif;
   --ease: cubic-bezier(.2, .7, .2, 1);
   --slow: cubic-bezier(.65, 0, .2, 1);
 }
 
-html[data-theme="light"] {
-  color-scheme: light;
-  --bg: #e9edf2;
-  --surface: #f4f6f9;
-  --tile: #dfe4ea;
-  --border: #c6cdd6;
-  --text: #1c232b;
-  --soft: #3a434d;
-  --muted: #5d6772;
-  --steel: #456f96;
-  --bronze: #8f6a3a;
-  --red: #a9484d;
-  --lav: #6d6a8c;
-
-  --ic-kali: #3b6a86;
-  --ic-linux: #232a31;
-  --ic-windows: #1f62ad;
-  --ic-python: #2a639c;
-  --ic-bash: #3b7a28;
-  --ic-powershell: #2a639c;
-  --ic-js: #9a7c00;
-  --ic-sql: #8a5a1c;
-  --ic-docker: #1b72bd;
-  --ic-github: #1f2328;
-  --ic-vscode: #1c68b0;
-  --ic-vmware: #454d57;
-
-  --nav-bg: rgba(244, 246, 249, .7);
-  --nav-bg2: rgba(244, 246, 249, .9);
-  --menu-bg: rgba(244, 246, 249, .96);
-  --pill-bg: rgba(244, 246, 249, .85);
-  --pill-red: #8a1d24;
-  --shadow: rgba(28, 35, 43, .16);
-  --glare: rgba(255, 255, 255, .35);
-  --btn-shine: rgba(255, 255, 255, .4);
-}
+/* Dark mode only — the day/night toggle is gone. The hero's light "cover page" zone
+   (see Hero.module.css) is a deliberate one-off, not a site-wide light theme. */
 
 /* Motion-level tokens: a dial (0/1/2), not a binary switch. Every timeline builder reads
    --motion-scale as a duration multiplier; nothing hardcodes a raw duration. */

@@ -21,7 +21,6 @@ export default function Scene() {
   const mountRef = useRef<HTMLDivElement>(null);
   const [supported, setSupported] = useState(true);
   const motionLevel = useSiteStore((s) => s.motionLevel);
-  const theme = useSiteStore((s) => s.theme);
 
   useEffect(() => {
     const mount = mountRef.current;
@@ -135,9 +134,9 @@ export default function Scene() {
       renderer.dispose();
       mount.removeChild(renderer.domElement);
     };
-    // Rebuild the whole scene when the motion-level tier or theme changes
-    // (density/colors differ enough per tier/theme that a partial update isn't worth it).
-  }, [motionLevel, theme]);
+    // Rebuild the whole scene when the motion-level tier changes (density differs
+    // enough per tier that a partial update isn't worth it).
+  }, [motionLevel]);
 
   if (!supported) return null;
   return <div ref={mountRef} className={styles.canvasWrap} aria-hidden="true" />;

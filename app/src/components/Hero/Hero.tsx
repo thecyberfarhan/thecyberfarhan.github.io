@@ -27,19 +27,42 @@ export default function Hero({ ready }: HeroProps) {
 
     const portrait = rootRef.current.querySelector<HTMLElement>('[data-portrait]');
     if (portrait) {
-      gsap.fromTo(portrait, { autoAlpha: 0, scale: 1.08 },
-        { autoAlpha: 1, scale: 1, duration: dur(1.1), ease: 'power3.out', delay: dur(.2) });
+      gsap.fromTo(portrait, { autoAlpha: 0, scale: 1.06 },
+        { autoAlpha: 1, scale: 1, duration: dur(1.1), ease: 'power3.out', delay: dur(.15) });
     }
   }, [ready]);
 
   return (
     <section ref={rootRef} className={styles.hero} id="hero">
-      <div className={styles.copy}>
+      <div className={styles.lightZone}>
+        <div className={styles.dots} />
+        <div className={styles.topRow}>
+          <span className={styles.eyebrow} data-reveal>Portfolio, 2026</span>
+          <span className={styles.openTag} data-reveal><i />Open to work</span>
+        </div>
+        <div className={styles.nameStage}>
+          <div className={styles.portrait} data-portrait>
+            <img
+              className={styles.portraitImg}
+              src="/assets/portrait-bw.webp"
+              srcSet="/assets/portrait-bw-700.webp 700w, /assets/portrait-bw.webp 1200w"
+              sizes="(max-width: 880px) 56vw, 40vw"
+              alt="Farhan Hussain"
+              fetchPriority="high"
+            />
+          </div>
+          <h1 className={styles.name}>
+            <span className={styles.line1} data-reveal>Farhan</span>
+            <span className={styles.line2} data-reveal>Hussain</span>
+          </h1>
+        </div>
+      </div>
+
+      <div className={styles.darkZone}>
         <span className={styles.prompt} data-reveal>$ whoami</span>
-        <h1 className={styles.name} data-reveal>Farhan</h1>
-        <p className={styles.role} data-reveal>Web and API penetration tester</p>
         <p className={styles.lead} data-reveal>
-          I break things in labs, write down how, and build Python tooling to speed up the boring parts.
+          Web and API penetration tester. I break things in labs, write down how, and build
+          Python tooling to speed up the boring parts.
         </p>
         <div className={styles.pills} data-reveal>
           <span className={styles.pill}>CPENT certified</span>
@@ -58,17 +81,6 @@ export default function Hero({ ready }: HeroProps) {
             GitHub
           </a>
         </div>
-      </div>
-      <div className={styles.portraitWrap} data-portrait>
-        <img
-          className={styles.portraitImg}
-          src="/assets/portrait.webp"
-          srcSet="/assets/portrait-700.webp 700w, /assets/portrait.webp 1200w"
-          sizes="(max-width: 880px) 320px, 540px"
-          alt="Farhan Hussain, stylized dark portrait"
-          fetchPriority="high"
-        />
-        <div className={styles.portraitRing} />
       </div>
     </section>
   );
