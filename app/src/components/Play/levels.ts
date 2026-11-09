@@ -60,7 +60,7 @@ export const LEVELS: Record<string, LevelConfig> = {
     flag: 'THM{easy_peasy_recon}',
     briefing: [
       'The company site acme.corp lives on a machine at 10.10.11.42 (we call it "target").',
-      'Never hacked anything before? Perfect. Press Run on each step below — it types the exact command for you.',
+      'Never hacked anything before? Perfect. Press Run on each step below and it types the exact command for you.',
       'Once you have the flag, type: submit THM{...}',
     ],
   },
@@ -107,7 +107,7 @@ export const LEVELS: Record<string, LevelConfig> = {
     ],
     flag: 'THM{b64_is_not_encryption}',
     briefing: [
-      'Same target, no hand-holding this time. No command list — figure out each step yourself.',
+      'Same target, no hand-holding this time. No command list. You figure out each step.',
       'Type: hint if you get stuck. Hints are counted, not penalized.',
     ],
   },

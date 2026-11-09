@@ -1,6 +1,6 @@
 export const SECTION_LINES: Record<string, string[]> = {
   hero: [
-    'No rush. Good pentests take time — so does reading a portfolio.',
+    'No rush. Good pentests take time. So does reading a portfolio.',
     'The idle grid behind me is doing more work than most hero sections.',
   ],
   proof: [
@@ -13,11 +13,11 @@ export const SECTION_LINES: Record<string, string[]> = {
   ],
   tools: [
     'Burp Suite and I have history.',
-    'Hover a tool — none of this list is padding.',
+    'Hover a tool. None of this list is padding.',
   ],
   projects: [
     'ReconKit has tests. Actual tests. I know, shocking.',
-    'One of these is a fork with a merged fix. The other is still open. I checked.',
+    'Both forks here ship a real fix, not just a clone with a new README.',
   ],
   journey: [
     'The timeline ends at "open to work." That’s not subtle on purpose.',

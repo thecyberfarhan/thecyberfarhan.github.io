@@ -24,7 +24,7 @@ export default function Journey() {
       index="05 / Journey"
       eyebrow="Journey"
       title="How I got here"
-      sub="Scroll sideways — six stops from first lab to open to work."
+      sub="Scroll sideways. Six stops from first lab to open to work."
     >
       <div className={styles.rail} data-reveal-group>
         {NODES.map((n) => (
