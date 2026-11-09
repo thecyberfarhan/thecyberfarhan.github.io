@@ -73,72 +73,122 @@
     });
   });
 
-  /* ---------- the globe: assembles during loading, then stays as the page background ---------- */
+  /* ---------- the globe: real WebGL (Three.js) now, assembles during loading, stays as the page background ---------- */
   var sy = 0;
-  var gl = $('#globe'), gctx = gl && gl.getContext('2d'), GW = 0, GH = 0, gp = [], glk = [];
+  var gl = $('#globe'), gp = [];
   var G = { assemble: 0, grow: 0, rot: 0, tilt: 0.35, mx: 0, my: 0, running: false, show: true, t0: performance.now(), links: 0 };
   function ease3(x) { return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; }
+
+  var glSupported = true, glRenderer, glScene, glCamera, glGroup, glNodes, glHot, glLinks, glRing1, glRing2;
+  var glNodePos, glNodeStart, glNodeDelay, glHotIdx = [], glLinkPairs = [];
+
+  (function initGL() {
+    if (!gl || !window.THREE) { glSupported = false; return; }
+    try { glRenderer = new THREE.WebGLRenderer({ canvas: gl, alpha: true, antialias: true }); }
+    catch (e) { glSupported = false; return; }
+    if (!glRenderer.getContext()) { glSupported = false; return; }
+    glScene = new THREE.Scene();
+    glCamera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
+    glCamera.position.z = 4.6;
+    glGroup = new THREE.Group();
+    glScene.add(glGroup);
+    function ring(radius, tiltX, tiltZ, color) {
+      var m = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.006, 6, 96), new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0 }));
+      m.rotation.x = tiltX; m.rotation.z = tiltZ; return m;
+    }
+    glRing1 = ring(1.32, 1.15, 0.5, '#7FA8CC'); glGroup.add(glRing1);
+    glRing2 = ring(1.58, 0.55, -0.9, '#B4232C'); glGroup.add(glRing2);
+  })();
+
   function buildGlobe() {
-    var n = innerWidth < 760 ? 70 : 120, i; gp = []; glk = [];
-    for (i = 0; i < n; i++) { var k = (i + 0.5) / n, phi = Math.acos(1 - 2 * k), th = Math.PI * (1 + Math.sqrt(5)) * i; gp.push({ x: Math.cos(th) * Math.sin(phi), y: Math.cos(phi), z: Math.sin(th) * Math.sin(phi), sx: Math.random(), sy: Math.random(), hot: i % 19 === 0, delay: Math.random() * 0.25 }); }
-    for (i = 0; i < n; i++) for (var q = i + 1; q < n; q++) { var dx = gp[i].x - gp[q].x, dy = gp[i].y - gp[q].y, dz = gp[i].z - gp[q].z; if (dx * dx + dy * dy + dz * dz < 0.36) glk.push([i, q]); }
-    G.links = glk.length;
+    var n = innerWidth < 760 ? 70 : 120, i;
+    gp = []; glHotIdx = [];
+    glNodePos = new Float32Array(n * 3); glNodeStart = new Float32Array(n * 3); glNodeDelay = new Float32Array(n);
+    var pairs = [];
+    for (i = 0; i < n; i++) {
+      var k = (i + 0.5) / n, phi = Math.acos(1 - 2 * k), th = Math.PI * (1 + Math.sqrt(5)) * i;
+      glNodePos[i * 3] = Math.cos(th) * Math.sin(phi); glNodePos[i * 3 + 1] = Math.cos(phi); glNodePos[i * 3 + 2] = Math.sin(th) * Math.sin(phi);
+      var sr = 2.4 + Math.random() * 1.6, sth = Math.random() * 6.283, sph = Math.random() * 3.1416;
+      glNodeStart[i * 3] = Math.cos(sth) * Math.sin(sph) * sr; glNodeStart[i * 3 + 1] = (Math.random() - 0.5) * sr * 1.4; glNodeStart[i * 3 + 2] = Math.sin(sth) * Math.sin(sph) * sr;
+      glNodeDelay[i] = Math.random() * 0.6;
+      var hot = i % 19 === 0; gp.push({ hot: hot }); if (hot) glHotIdx.push(i);
+    }
+    for (i = 0; i < n; i++) for (var q = i + 1; q < n; q++) {
+      var dx = glNodePos[i * 3] - glNodePos[q * 3], dy = glNodePos[i * 3 + 1] - glNodePos[q * 3 + 1], dz = glNodePos[i * 3 + 2] - glNodePos[q * 3 + 2];
+      if (dx * dx + dy * dy + dz * dz < 0.36) { pairs.push(i, q); }
+    }
+    G.links = pairs.length / 2; glLinkPairs = pairs;
+    if (!glSupported) return;
+    var P = pal();
+    if (glNodes) { glGroup.remove(glNodes); glNodes.geometry.dispose(); glNodes.material.dispose(); }
+    var ngeo = new THREE.BufferGeometry(); ngeo.setAttribute('position', new THREE.BufferAttribute(glNodeStart.slice(), 3));
+    glNodes = new THREE.Points(ngeo, new THREE.PointsMaterial({ color: 'rgb(' + P.node + ')', size: .05, transparent: true, opacity: .75, sizeAttenuation: true, depthWrite: false }));
+    glGroup.add(glNodes);
+    if (glHot) { glGroup.remove(glHot); glHot.geometry.dispose(); glHot.material.dispose(); }
+    var hotStart = new Float32Array(glHotIdx.length * 3);
+    for (i = 0; i < glHotIdx.length; i++) { var hi = glHotIdx[i]; hotStart[i * 3] = glNodeStart[hi * 3]; hotStart[i * 3 + 1] = glNodeStart[hi * 3 + 1]; hotStart[i * 3 + 2] = glNodeStart[hi * 3 + 2]; }
+    var hgeo = new THREE.BufferGeometry(); hgeo.setAttribute('position', new THREE.BufferAttribute(hotStart, 3));
+    glHot = new THREE.Points(hgeo, new THREE.PointsMaterial({ color: 'rgb(' + P.hot + ')', size: .1, transparent: true, opacity: .95, sizeAttenuation: true, depthWrite: false }));
+    glGroup.add(glHot);
+    if (glLinks) { glGroup.remove(glLinks); glLinks.geometry.dispose(); glLinks.material.dispose(); }
+    var lpos = new Float32Array(pairs.length * 3);
+    for (i = 0; i < pairs.length; i += 2) { var a = pairs[i], b = pairs[i + 1], o = (i / 2) * 6; lpos[o] = glNodeStart[a * 3]; lpos[o + 1] = glNodeStart[a * 3 + 1]; lpos[o + 2] = glNodeStart[a * 3 + 2]; lpos[o + 3] = glNodeStart[b * 3]; lpos[o + 4] = glNodeStart[b * 3 + 1]; lpos[o + 5] = glNodeStart[b * 3 + 2]; }
+    var lgeo = new THREE.BufferGeometry(); lgeo.setAttribute('position', new THREE.BufferAttribute(lpos, 3));
+    glLinks = new THREE.LineSegments(lgeo, new THREE.LineBasicMaterial({ color: 'rgb(' + P.link + ')', transparent: true, opacity: .16 }));
+    glGroup.add(glLinks);
   }
-  function sizeGlobe() { if (!gl) return; var d = Math.min(window.devicePixelRatio || 1, innerWidth < 760 ? 1.25 : 1.5); GW = innerWidth; GH = innerHeight; gl.width = GW * d; gl.height = GH * d; gctx.setTransform(d, 0, 0, d, 0, 0); }
+
+  function sizeGlobe() {
+    if (!gl || !glSupported || !glRenderer) return;
+    var d = Math.min(window.devicePixelRatio || 1, innerWidth < 760 ? 1.25 : 1.5);
+    glRenderer.setPixelRatio(d); glRenderer.setSize(innerWidth, innerHeight, false);
+    glCamera.aspect = innerWidth / Math.max(innerHeight, 1); glCamera.updateProjectionMatrix();
+  }
+
+  function assembleFrac(delay) { return ease3(Math.min(1, Math.max(0, (G.assemble * 1.25 - delay) / 0.75))); }
+  function lerp3(out, oi, sx, sy2, sz, tx, ty, tz, f) { out[oi] = sx + (tx - sx) * f; out[oi + 1] = sy2 + (ty - sy2) * f; out[oi + 2] = sz + (tz - sz) * f; }
+
   function drawGlobe() {
-    if (!gctx || !GW) return; gctx.clearRect(0, 0, GW, GH);
-    var P = pal(), small = GW < 760, m = Math.min(GW, GH), e = ease3(G.grow);
-    var cx = GW / 2, cy = GH * 0.42 + (GH * (small ? 0.36 : 0.46) - GH * 0.42) * e;
-    var R = m * 0.27 + ((small ? Math.min(GW * 0.56, GH * 0.34) : m * 0.46) - m * 0.27) * e;
-    R *= 1 + Math.min(sy / Math.max(VH, 1), 1.4) * 0.22;
-    var cyaw = Math.cos(G.rot), syaw = Math.sin(G.rot), cp = Math.cos(G.tilt), sp = Math.sin(G.tilt), pr = [], t = performance.now() / 1000, i;
-    for (i = 0; i < gp.length; i++) {
-      var o = gp[i], x = o.x * cyaw + o.z * syaw, z = -o.x * syaw + o.z * cyaw, y = o.y * cp - z * sp; z = o.y * sp + z * cp;
-      var s = 1 / (1.9 - z * 0.5), tx = cx + x * R * s * 1.9, ty = cy + y * R * s * 1.9;
-      var f = Math.min(1, Math.max(0, (G.assemble * 1.25 - o.delay) / 0.75)); f = ease3(f);
-      pr.push({ x: o.sx * GW + (tx - o.sx * GW) * f, y: o.sy * GH + (ty - o.sy * GH) * f, z: z, s: s, f: f });
+    if (!glSupported || !glRenderer || !glNodes) return;
+    var P = pal(), i;
+    glNodes.material.color.setStyle('rgb(' + P.node + ')');
+    glHot.material.color.setStyle('rgb(' + P.hot + ')');
+    glLinks.material.color.setStyle('rgb(' + P.link + ')');
+
+    var npos = glNodes.geometry.attributes.position.array, n = npos.length / 3;
+    for (i = 0; i < n; i++) { var f = assembleFrac(glNodeDelay[i]); lerp3(npos, i * 3, glNodeStart[i * 3], glNodeStart[i * 3 + 1], glNodeStart[i * 3 + 2], glNodePos[i * 3], glNodePos[i * 3 + 1], glNodePos[i * 3 + 2], f); }
+    glNodes.geometry.attributes.position.needsUpdate = true;
+
+    var hpos = glHot.geometry.attributes.position.array;
+    for (i = 0; i < glHotIdx.length; i++) { var hi = glHotIdx[i], f2 = assembleFrac(glNodeDelay[hi]); lerp3(hpos, i * 3, glNodeStart[hi * 3], glNodeStart[hi * 3 + 1], glNodeStart[hi * 3 + 2], glNodePos[hi * 3], glNodePos[hi * 3 + 1], glNodePos[hi * 3 + 2], f2); }
+    glHot.geometry.attributes.position.needsUpdate = true;
+
+    var lpos = glLinks.geometry.attributes.position.array;
+    for (i = 0; i < glLinkPairs.length; i += 2) {
+      var a = glLinkPairs[i], b = glLinkPairs[i + 1], o = (i / 2) * 6, fa = assembleFrac(glNodeDelay[a]), fb = assembleFrac(glNodeDelay[b]);
+      lerp3(lpos, o, glNodeStart[a * 3], glNodeStart[a * 3 + 1], glNodeStart[a * 3 + 2], glNodePos[a * 3], glNodePos[a * 3 + 1], glNodePos[a * 3 + 2], fa);
+      lerp3(lpos, o + 3, glNodeStart[b * 3], glNodeStart[b * 3 + 1], glNodeStart[b * 3 + 2], glNodePos[b * 3], glNodePos[b * 3 + 1], glNodePos[b * 3 + 2], fb);
     }
-    var la = Math.min(1, Math.max(0, (G.assemble - 0.5) / 0.4));
-    gctx.lineWidth = 1;
-    for (i = 0; i < glk.length; i++) {
-      var a = pr[glk[i][0]], b = pr[glk[i][1]], al = (0.05 + ((a.z + b.z) / 2 + 1) * 0.1) * la * Math.min(a.f, b.f); if (al < 0.01) continue;
-      gctx.strokeStyle = 'rgba(' + P.link + ',' + al.toFixed(3) + ')'; gctx.beginPath(); gctx.moveTo(a.x, a.y); gctx.lineTo(b.x, b.y); gctx.stroke();
-    }
-    var ra = ease3(G.grow);
-    if (ra > 0.02) {
-      var rings = [[1.28, 1.15, 0.5, 0.0004, 5], [1.55, 0.55, -0.9, -0.0003, 3.2]];
-      for (var ri = 0; ri < rings.length; ri++) {
-        var rg = rings[ri], seg = 72, last = null, ang0 = t * rg[3] * 1000;
-        for (var sg = 0; sg <= seg; sg++) {
-          var th2 = sg / seg * 6.283, ox = Math.cos(th2) * rg[0], oz = Math.sin(th2) * rg[0], oy = 0;
-          var y1 = oy * Math.cos(rg[1]) - oz * Math.sin(rg[1]), z1 = oy * Math.sin(rg[1]) + oz * Math.cos(rg[1]), x1 = ox;
-          var x2 = x1 * Math.cos(rg[2]) - y1 * Math.sin(rg[2]), y2 = x1 * Math.sin(rg[2]) + y1 * Math.cos(rg[2]);
-          var x3 = x2 * cyaw + z1 * syaw, z3 = -x2 * syaw + z1 * cyaw, y3 = y2 * cp - z3 * sp; z3 = y2 * sp + z3 * cp;
-          var s3 = 1 / (1.9 - z3 * 0.5), px = cx + x3 * R * s3 * 1.9, py = cy + y3 * R * s3 * 1.9;
-          if (last) { gctx.strokeStyle = 'rgba(' + (ri ? P.hot : P.link) + ',' + (0.1 * ra * (0.4 + (z3 + 1) / 2)).toFixed(3) + ')'; gctx.beginPath(); gctx.moveTo(last[0], last[1]); gctx.lineTo(px, py); gctx.stroke(); }
-          last = [px, py];
-        }
-        var sat = (t * rg[4] * 0.2) % 6.283, sx = Math.cos(sat) * rg[0], sz = Math.sin(sat) * rg[0], sy1 = sz * Math.sin(rg[1]), sz1 = sz * Math.cos(rg[1]), sx2 = sx * Math.cos(rg[2]) - (-sy1 * 0 + (0 * Math.cos(rg[1]) - sz * Math.sin(rg[1]))) * Math.sin(rg[2]);
-        var yy1 = 0 * Math.cos(rg[1]) - sz * Math.sin(rg[1]), yy2 = sx * Math.sin(rg[2]) + yy1 * Math.cos(rg[2]), xx2 = sx * Math.cos(rg[2]) - yy1 * Math.sin(rg[2]);
-        var xx3 = xx2 * cyaw + sz1 * syaw, zz3 = -xx2 * syaw + sz1 * cyaw, yy3 = yy2 * cp - zz3 * sp; zz3 = yy2 * sp + zz3 * cp;
-        var ss = 1 / (1.9 - zz3 * 0.5);
-        gctx.fillStyle = 'rgba(' + (ri ? P.hot : P.node) + ',' + (0.8 * ra).toFixed(2) + ')'; gctx.beginPath(); gctx.arc(cx + xx3 * R * ss * 1.9, cy + yy3 * R * ss * 1.9, 3.2, 0, 6.283); gctx.fill();
-      }
-    }
-    for (i = 0; i < pr.length; i++) {
-      var q2 = pr[i], dep = (q2.z + 1) / 2;
-      if (gp[i].hot) { var pulse = 0.6 + Math.sin(t * 2 + i) * 0.4; gctx.fillStyle = 'rgba(' + P.hot + ',' + (0.35 + dep * 0.55).toFixed(2) + ')'; gctx.beginPath(); gctx.arc(q2.x, q2.y, (2.4 + pulse * 1.2) * q2.s * 1.4, 0, 6.283); gctx.fill(); }
-      else { gctx.fillStyle = 'rgba(' + P.node + ',' + (0.2 + dep * 0.6).toFixed(2) + ')'; gctx.beginPath(); gctx.arc(q2.x, q2.y, 1.4 + dep * 1.4, 0, 6.283); gctx.fill(); }
-    }
+    glLinks.geometry.attributes.position.needsUpdate = true;
+    glLinks.material.opacity = .16 * Math.min(1, Math.max(0, (G.assemble - 0.5) / 0.4));
+
+    var e = ease3(G.grow), ringOp = .22 * e;
+    glRing1.material.opacity = ringOp; glRing2.material.opacity = ringOp * .85;
+    glRing1.rotation.y += 0.0008; glRing2.rotation.y -= 0.0006;
+
+    var scale = (0.78 + 0.22 * e) * (1 + Math.min(sy / Math.max(VH, 1), 1.4) * 0.12);
+    glGroup.scale.setScalar(scale);
+    glGroup.rotation.y = G.rot; glGroup.rotation.x = G.tilt - 0.35;
+    glCamera.position.x = G.mx * 0.6; glCamera.position.y = -G.my * 0.4; glCamera.lookAt(0, 0, 0);
+    glRenderer.render(glScene, glCamera);
   }
-  var gTog = 0;
+
   function gframe() {
     if (!G.running) return;
-    if (GW < 760 && (gTog ^= 1)) { requestAnimationFrame(gframe); return; }
     G.rot += 0.0016 + sy * 0.0000012 + G.mx * 0.002; G.tilt += ((0.35 + G.my * 0.5) - G.tilt) * 0.04;
     drawGlobe(); requestAnimationFrame(gframe);
   }
-  function startGlobe() { if (!gl || !gctx || G.running || !G.show || document.hidden) return; G.running = true; requestAnimationFrame(gframe); }
+  function startGlobe() { if (!glSupported || !gl || G.running || !G.show || document.hidden) return; G.running = true; requestAnimationFrame(gframe); }
   buildGlobe(); sizeGlobe(); drawGlobe(); if (motion) startGlobe();
   window.addEventListener('resize', function () { sizeGlobe(); buildGlobe(); drawGlobe(); });
   document.addEventListener('visibilitychange', function () { if (document.hidden) G.running = false; else if (motion) startGlobe(); });
