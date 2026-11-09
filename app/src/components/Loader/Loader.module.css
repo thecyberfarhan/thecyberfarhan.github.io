@@ -1,0 +1,111 @@
+.loader {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: var(--bg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.topRow {
+  display: flex;
+  justify-content: space-between;
+  padding: 28px 32px;
+  font-family: var(--mono);
+  font-size: .78rem;
+  letter-spacing: .12em;
+  color: var(--muted);
+  text-transform: uppercase;
+  z-index: 2;
+}
+
+.marquee {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(-1.2rem, -2vw, -.4rem);
+  mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+}
+
+.line {
+  display: flex;
+  white-space: nowrap;
+  will-change: transform;
+}
+
+.lineInner {
+  display: flex;
+  white-space: nowrap;
+  font-weight: 800;
+  font-size: clamp(2.4rem, 9vw, 6.5rem);
+  letter-spacing: -.01em;
+  color: var(--soft);
+  opacity: .1;
+  text-transform: uppercase;
+  padding-right: .6em;
+}
+
+.lineInner .dot { color: var(--accent); opacity: .9; padding: 0 .5em; }
+
+.bottomRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding: 28px 32px 36px;
+  z-index: 2;
+}
+
+.status {
+  font-family: var(--mono);
+  font-size: .78rem;
+  letter-spacing: .14em;
+  color: var(--muted);
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.statusDot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+}
+
+.percent {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: clamp(2.2rem, 6vw, 3.4rem);
+  color: var(--text);
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.percent span { color: var(--muted); font-size: .5em; }
+
+.bar {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 2px;
+  background: var(--border);
+}
+
+.barFill {
+  height: 100%;
+  background: var(--accent);
+  width: 0%;
+  transform-origin: left;
+}
+
+.curtain {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  background: var(--bg);
+  pointer-events: none;
+}

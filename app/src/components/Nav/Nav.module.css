@@ -1,0 +1,69 @@
+.nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 32px;
+  background: var(--nav-bg);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  font-family: var(--mono);
+  font-weight: 700;
+  letter-spacing: .04em;
+  font-size: .95rem;
+  color: var(--text);
+}
+
+.controls { display: flex; align-items: center; gap: 10px; }
+
+.iconBtn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  transition: color .25s, background .25s, transform .5s var(--ease);
+}
+.iconBtn:hover { color: var(--text); background: var(--tile); }
+.iconBtn svg { width: 18px; height: 18px; }
+
+.motionDial {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--tile);
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.motionBar {
+  width: 3px;
+  border-radius: 2px;
+  background: var(--border);
+  transition: background .25s var(--ease), height .25s var(--ease);
+}
+.motionBar:nth-child(1) { height: 8px; }
+.motionBar:nth-child(2) { height: 13px; }
+.motionBar:nth-child(3) { height: 18px; }
+
+.motionDial[data-level="0"] .motionBar:nth-child(1) { background: var(--accent); }
+.motionDial[data-level="1"] .motionBar:nth-child(1),
+.motionDial[data-level="1"] .motionBar:nth-child(2) { background: var(--accent); }
+.motionDial[data-level="2"] .motionBar { background: var(--accent); }
+
+.motionLabel {
+  font-family: var(--mono);
+  font-size: .68rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-left: 2px;
+}
