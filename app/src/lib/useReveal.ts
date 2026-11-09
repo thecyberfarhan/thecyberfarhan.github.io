@@ -28,18 +28,31 @@ export function useReveal(containerRef: RefObject<HTMLElement | null>) {
 
       groups.forEach((nodes, group) => {
         gsap.set(nodes, { yPercent: 30, autoAlpha: 0 });
-        gsap.to(nodes, {
+        const tween = {
           yPercent: 0,
           autoAlpha: 1,
           duration: dur(.8),
           stagger: stagger(.08),
           ease: 'power3.out',
-          scrollTrigger: {
-            trigger: group as Element,
-            start: 'top 85%',
-            toggleActions: 'play none none none',
-          },
-        });
+        };
+        // A hash-link, refresh, or back/forward navigation can land the browser
+        // already scrolled past this group before ScrollTrigger ever registers
+        // it, which would otherwise leave the content stuck invisible forever.
+        // Reveal immediately for anything already on screen; only groups still
+        // below the fold get a real scroll trigger.
+        const top = (group as Element).getBoundingClientRect().top;
+        if (top < innerHeight * 0.85) {
+          gsap.to(nodes, tween);
+        } else {
+          gsap.to(nodes, {
+            ...tween,
+            scrollTrigger: {
+              trigger: group as Element,
+              start: 'top 85%',
+              toggleActions: 'play none none none',
+            },
+          });
+        }
       });
     }, el);
 
