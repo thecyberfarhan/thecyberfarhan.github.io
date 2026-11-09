@@ -8,6 +8,9 @@ import Proof from './components/Proof/Proof';
 import About from './components/About/About';
 import Tools from './components/Tools/Tools';
 import Projects from './components/Projects/Projects';
+import Journey from './components/Journey/Journey';
+import Contact from './components/Contact/Contact';
+import Footer from './components/Footer/Footer';
 import { useSiteStore } from './state/useSiteStore';
 import { useSmoothScroll } from './lib/useSmoothScroll';
 
@@ -36,7 +39,10 @@ export default function App() {
         <About />
         <Tools />
         <Projects />
+        <Journey />
+        <Contact />
       </main>
+      <Footer />
     </>
   );
 }

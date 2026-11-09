@@ -8,6 +8,8 @@ const LINKS = [
   ['About', '#about'],
   ['Tools', '#tools'],
   ['Projects', '#projects'],
+  ['Journey', '#journey'],
+  ['Contact', '#contact'],
 ];
 
 export default function Nav() {
