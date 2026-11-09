@@ -5,6 +5,22 @@
   margin: 0 auto;
 }
 
+.index {
+  position: absolute;
+  top: 110px;
+  right: 32px;
+  font-family: var(--mono);
+  font-size: .78rem;
+  letter-spacing: .1em;
+  color: var(--muted);
+  opacity: .6;
+}
+
+@media (max-width: 700px) {
+  .sec { padding: 80px 20px; }
+  .index { top: 78px; right: 20px; }
+}
+
 .sec::before {
   content: "";
   position: absolute;

@@ -46,6 +46,7 @@ export default function Projects() {
       ref={rootRef}
       id="projects"
       wash="accent"
+      index="04 / Projects"
       eyebrow="Projects"
       title="Tools I built, reports I wrote"
       sub="Not just labs I completed. Source and tests on GitHub."

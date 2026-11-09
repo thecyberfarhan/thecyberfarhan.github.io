@@ -1,23 +1,17 @@
 .hero {
   position: relative;
-  background: linear-gradient(to bottom, #f7f7f5 0%, #f7f7f5 56%, var(--bg) 86%, var(--bg) 100%);
-}
-
-/* ---------- light "cover page" zone: portrait + giant interleaved name ---------- */
-.lightZone {
-  position: relative;
-  min-height: 92vh;
-  padding-top: 96px;
+  background: var(--bg);
   overflow: hidden;
+  padding-top: 72px;
 }
 
 .dots {
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(#d8d8d4 1.4px, transparent 1.4px);
-  background-size: 26px 26px;
-  -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+  background-image: radial-gradient(color-mix(in srgb, var(--steel) 22%, transparent) 1.4px, transparent 1.4px);
+  background-size: 28px 28px;
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 30% 35%, #000 0%, transparent 75%);
+  mask-image: radial-gradient(ellipse 70% 60% at 30% 35%, #000 0%, transparent 75%);
 }
 
 .topRow {
@@ -26,53 +20,65 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 6%;
-}
-
-.eyebrow {
+  padding: 24px 6% 0;
   font-family: var(--mono);
   font-size: .76rem;
-  letter-spacing: .14em;
+  letter-spacing: .12em;
   text-transform: uppercase;
-  color: #4a4a46;
+  color: var(--muted);
 }
 
-.openTag {
-  font-family: var(--mono);
-  font-size: .76rem;
-  letter-spacing: .1em;
-  text-transform: uppercase;
-  color: #4a4a46;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
+.openTag { display: inline-flex; align-items: center; gap: 8px; }
 .openTag i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); display: inline-block; }
 
 .nameStage {
   position: relative;
-  height: 68vh;
-  min-height: 460px;
+  height: 64vh;
+  min-height: 440px;
 }
 
 .portrait {
   position: absolute;
-  right: 6%;
+  right: 4%;
   top: -2%;
-  height: 102%;
-  width: 40%;
-  max-width: 560px;
+  height: 100%;
+  width: 42%;
+  max-width: 580px;
   z-index: 2;
 }
 .portraitImg {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: 50% 10%;
-  filter: grayscale(1) contrast(1.08);
-  -webkit-mask-image: linear-gradient(to bottom, #000 86%, transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 86%, transparent 100%);
+  object-position: 50% 8%;
+  filter: grayscale(1) contrast(1.1) brightness(.92);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 10%, #000 80%, transparent 100%),
+                       linear-gradient(to right, transparent 0%, #000 18%, #000 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 10%, #000 80%, transparent 100%),
+              linear-gradient(to right, transparent 0%, #000 18%, #000 100%);
+  mask-composite: intersect;
 }
+/* the site's own steel grid runs across the portrait so it reads as part of the scene, not a photo on top */
+.portraitGrid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--steel) 20%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--steel) 20%, transparent) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mix-blend-mode: overlay;
+  opacity: .5;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 10%, #000 80%, transparent 100%),
+                       linear-gradient(to right, transparent 0%, #000 18%, #000 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 10%, #000 80%, transparent 100%),
+              linear-gradient(to right, transparent 0%, #000 18%, #000 100%);
+  mask-composite: intersect;
+}
+.bridgeLines { position: absolute; inset: -6% -10%; z-index: 3; pointer-events: none; }
+.bridgeLines svg { width: 100%; height: 100%; }
+.bridgeLines circle { opacity: .9; }
 
 .name {
   position: absolute;
@@ -84,42 +90,51 @@
   font-weight: 400;
   text-transform: uppercase;
   line-height: .8;
-  color: #0a0a0a;
+  color: var(--text);
   letter-spacing: -.01em;
-  font-size: clamp(3.4rem, 9vw, 7.6rem);
+  font-size: clamp(3.2rem, 8.4vw, 7.2rem);
   white-space: nowrap;
 }
 .name .line1 { display: block; margin-right: -3vw; }
-.name .line2 {
-  position: relative;
-  z-index: 3; /* sits in front of the portrait */
-  display: block;
-  margin-left: 9vw;
-}
+.name .line2 { position: relative; z-index: 3; display: block; margin-left: 9vw; }
 
 @media (max-width: 880px) {
-  .lightZone { min-height: 72vh; }
-  .nameStage { height: 58vh; }
-  .portrait { right: 2%; width: 56%; }
-  .name { left: 4%; font-size: clamp(2.6rem, 11vw, 4.2rem); }
+  .nameStage { height: auto; min-height: 0; padding: 0 0 40px; }
+  .portrait {
+    position: relative;
+    right: auto; top: auto;
+    width: 72vw; max-width: 340px;
+    height: 56vh; min-height: 340px;
+    margin: 0 auto 8px;
+  }
+  .name {
+    position: relative;
+    left: auto; top: auto; transform: none;
+    text-align: center;
+    padding: 0 4%;
+    font-size: clamp(2.6rem, 13vw, 4.2rem);
+    white-space: normal;
+  }
   .name .line1 { margin-right: 0; }
-  .name .line2 { margin-left: 5vw; }
+  .name .line2 { margin-left: 0; }
+  .bridgeLines { display: none; }
 }
 
-/* ---------- dark zone: the site's own voice, picks up from here ---------- */
-.darkZone {
+/* ---------- detail block: same room, picks up right under the name ---------- */
+.details {
   position: relative;
   z-index: 4;
   max-width: 760px;
   margin: 0 auto;
-  padding: 36px 6% 90px;
-  text-align: left;
+  padding: 8px 6% 100px;
 }
 
 .prompt {
   font-family: var(--mono);
   color: var(--accent);
-  font-size: .9rem;
+  font-size: .82rem;
+  letter-spacing: .1em;
+  text-transform: uppercase;
   margin-bottom: 16px;
   display: block;
 }

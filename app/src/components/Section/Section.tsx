@@ -6,6 +6,7 @@ type Wash = 'steel' | 'lav' | 'bronze' | 'accent';
 interface SectionProps {
   id: string;
   wash: Wash;
+  index: string;
   eyebrow?: string;
   title: string;
   sub?: string;
@@ -14,8 +15,9 @@ interface SectionProps {
 }
 
 const Section = forwardRef<HTMLElement, SectionProps>(
-  ({ id, wash, eyebrow, title, sub, children, headExtra }, ref) => (
+  ({ id, wash, index, eyebrow, title, sub, children, headExtra }, ref) => (
     <section ref={ref} id={id} className={`${styles.sec} ${styles[wash]}`}>
+      <span className={styles.index} aria-hidden="true">{index}</span>
       <div className={styles.head} data-reveal>
         {eyebrow && <span className={styles.eyebrow}>{eyebrow}</span>}
         <h2 className={styles.title}>{title}</h2>

@@ -56,7 +56,7 @@ export default function Tools() {
   useReveal(rootRef);
 
   return (
-    <Section ref={rootRef} id="tools" wash="bronze" eyebrow="Core stack" title="A test, phase by phase">
+    <Section ref={rootRef} id="tools" wash="bronze" index="03 / Tools" eyebrow="Core stack" title="A test, phase by phase">
       <div className={styles.coreRow} data-reveal-group>
         {CORE.map(([name, token]) => (
           <span key={name} className={styles.chip} data-reveal>

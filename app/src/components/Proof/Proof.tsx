@@ -36,6 +36,7 @@ export default function Proof() {
       ref={rootRef}
       id="proof"
       wash="steel"
+      index="01 / Proof"
       eyebrow="Proof of work"
       title="Public and checkable"
       sub="Certification, rankings and every writeup on GitHub."

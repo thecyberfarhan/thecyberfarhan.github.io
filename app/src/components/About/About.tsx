@@ -17,7 +17,7 @@ export default function About() {
   useReveal(rootRef);
 
   return (
-    <Section ref={rootRef} id="about" wash="lav" eyebrow="About" title="How I work">
+    <Section ref={rootRef} id="about" wash="lav" index="02 / About" eyebrow="About" title="How I work">
       <div className={styles.grid}>
         <div>
           <p className={styles.statement} data-reveal>

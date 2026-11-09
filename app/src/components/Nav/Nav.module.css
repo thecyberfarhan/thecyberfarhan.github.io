@@ -70,3 +70,10 @@
   color: var(--muted);
   margin-left: 2px;
 }
+
+@media (max-width: 420px) {
+  .nav { padding: 14px 16px; }
+  .brand { font-size: .82rem; }
+  .motionDial { height: 34px; padding: 0 9px; gap: 3px; }
+  .motionLabel { display: none; }
+}
