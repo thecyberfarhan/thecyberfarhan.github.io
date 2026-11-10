@@ -106,7 +106,7 @@
     }
   }
 
-  var rainGlyphSize = 14, scanT = 0, glitchUntil = 0, glitchCols = [];
+  var rainGlyphSize = 14, scanT = 0, glitchUntil = 0, glitchCols = [], loadProgress = 1;
   function drawRain() {
     if (!gctx || !GW) return;
     updateTint();
@@ -119,7 +119,7 @@
       for (var k = 0; k < c.len; k++) {
         var gy = c.y - k * rainGlyphSize;
         if (gy < -rainGlyphSize || gy > GH + rainGlyphSize) continue;
-        var fade = 1 - k / c.len, op = Math.pow(fade, 1.4) * (c.hot ? 0.6 : 0.38);
+        var fade = 1 - k / c.len, op = Math.pow(fade, 1.4) * (c.hot ? 0.6 : 0.38) * (0.35 + 0.65 * loadProgress);
         var rgb = c.hot && k < 2 ? hotRGB : tr;
         if (k === 0 && Math.random() < 0.04) c.glyphs[0] = RAIN_CHARS[Math.floor(Math.random() * RAIN_CHARS.length)];
         gctx.fillStyle = 'rgba(' + rgb[0].toFixed(0) + ',' + rgb[1].toFixed(0) + ',' + rgb[2].toFixed(0) + ',' + op.toFixed(3) + ')';
@@ -145,9 +145,10 @@
   /* ---------- loader: counter drives the percentage readout ---------- */
   var seen = false;
   try { seen = sessionStorage.getItem('seen') === '1'; if (localStorage.getItem('introAt')) seen = true; } catch (e) {}
-  var pctEl = $('.ld-pct'), barEl = $('.ld-bar span'), msgEl = $('.ld-msg');
+  var pctEl = $('.ld-pct'), barEl = $('.ld-bar span'), msgEl = $('.ld-msg'), ldSpans = $$('.ld-line span');
   function finishLoader() {
     root.classList.add('loaded');
+    glitchUntil = performance.now() + 220; glitchCols = rainCols.filter(function () { return Math.random() < 0.35; });
     try { sessionStorage.setItem('seen', '1'); localStorage.setItem('introAt', String(Date.now())); } catch (e) {}
     setTimeout(begin, seen ? 350 : 450);
     setTimeout(function () { root.classList.remove('loading'); root.classList.add('done'); }, seen ? 900 : 1050);
@@ -156,9 +157,11 @@
   window.addEventListener('load', function () { loaded = true; });
   (function tick(now) {
     var p = Math.min((now - t0) / minMs, 1), shown = Math.round((loaded ? p : Math.min(p, 0.92)) * 100);
+    loadProgress = p;
     if (pctEl) pctEl.textContent = shown + '%';
     if (barEl) barEl.style.transform = 'scaleX(' + shown / 100 + ')';
     if (msgEl) msgEl.textContent = shown < 34 ? 'decrypting stream' : shown < 70 ? 'parsing glyphs' : shown < 100 ? 'syncing signal' : 'ready';
+    if (motion) ldSpans.forEach(function (s) { var a = s.getAnimations && s.getAnimations()[0]; if (a) a.playbackRate = 1 + p * 1.1; });
     if (p >= 1 && loaded) finishLoader(); else requestAnimationFrame(tick);
   })(t0);
 
@@ -1615,10 +1618,11 @@
     var cert = medalLink.getAttribute('data-cert'); if (!cert) return;
     (navigator.clipboard ? navigator.clipboard.writeText(cert) : Promise.reject()).then(function () { say('Cert copied: ' + cert); }, function () { say(cert); });
   });
-  var shareBtn = $('#share'), sheet = $('#sheet'), sheetBg = $('#sheetbg'), shareData = { title: document.title, text: 'Farhan, CPENT-certified penetration tester. Tools, writeups and contact.', url: location.origin + location.pathname };
+  var shareBtn = $('#share'), shareBtnM = $('#share-m'), sheet = $('#sheet'), sheetBg = $('#sheetbg'), shareData = { title: document.title, text: 'Farhan, CPENT-certified penetration tester. Tools, writeups and contact.', url: location.origin + location.pathname };
   function openSheet() { if (!sheet) return; var nat = $('.sh-native', sheet); if (nat) nat.style.display = navigator.share ? '' : 'none'; sheet.style.transform = ''; sheet.removeAttribute('inert'); sheet.setAttribute('aria-hidden', 'false'); root.classList.add('sheet-open'); }
   function closeSheet() { if (!sheet) return; root.classList.remove('sheet-open'); sheet.setAttribute('inert', ''); sheet.setAttribute('aria-hidden', 'true'); sheet.style.transform = ''; sheet.classList.remove('drag'); }
   if (shareBtn) shareBtn.addEventListener('click', openSheet);
+  if (shareBtnM) shareBtnM.addEventListener('click', openSheet);
   if (sheetBg) sheetBg.addEventListener('click', closeSheet);
   window.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSheet(); });
   if (sheet) {
@@ -1632,7 +1636,7 @@
     sheet.addEventListener('touchmove', function (e) { if (!dragging) return; dY = Math.max(0, e.touches[0].clientY - sY); sheet.style.transform = 'translateY(' + dY + 'px)'; }, { passive: true });
     sheet.addEventListener('touchend', function () { if (!dragging) return; dragging = false; sheet.classList.remove('drag'); if (dY > 90) closeSheet(); else sheet.style.transform = ''; });
   }
-  $$('.tabbar a, .share').forEach(function (el) { el.addEventListener('pointerdown', function () { if (navigator.vibrate && IS_TOUCH) navigator.vibrate(8); }); });
+  $$('.tabbar a, .tabbar button, .share').forEach(function (el) { el.addEventListener('pointerdown', function () { if (navigator.vibrate && IS_TOUCH) navigator.vibrate(8); }); });
 
   /* the brand mark has its own tiny easter egg: it talks back once per visit, then goes quiet */
   (function brandSpeaks() {
