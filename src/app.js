@@ -98,6 +98,38 @@
     buildRain(); computeSectionTops();
   }
 
+  /* a dim dot grid that only lights up, and links its nearby dots, within a radius of the real mouse -- the "flashlight over a field" effect */
+  var DOT_SPACING = 46, DOT_RADIUS = 160, dotMX = -9999, dotMY = -9999, dotHover = false;
+  window.addEventListener('pointermove', function (e) { if (e.pointerType !== 'mouse') return; dotMX = e.clientX; dotMY = e.clientY; dotHover = true; }, { passive: true });
+  window.addEventListener('pointerleave', function () { dotHover = false; });
+  function drawDotField(tr) {
+    if (!dotHover || !motion) return;
+    var r2 = DOT_RADIUS * DOT_RADIUS;
+    var x0 = Math.max(0, Math.floor((dotMX - DOT_RADIUS) / DOT_SPACING)), x1 = Math.ceil((dotMX + DOT_RADIUS) / DOT_SPACING);
+    var y0 = Math.max(0, Math.floor((dotMY - DOT_RADIUS) / DOT_SPACING)), y1 = Math.ceil((dotMY + DOT_RADIUS) / DOT_SPACING);
+    var pts = [], cx, cy;
+    for (cx = x0; cx <= x1; cx++) for (cy = y0; cy <= y1; cy++) {
+      var px = cx * DOT_SPACING, py = cy * DOT_SPACING, dx = px - dotMX, dy = py - dotMY, d2 = dx * dx + dy * dy;
+      if (d2 > r2) continue;
+      pts.push([px, py, 1 - Math.sqrt(d2) / DOT_RADIUS]);
+    }
+    var linkR2 = (DOT_SPACING * 1.55) * (DOT_SPACING * 1.55), i, j;
+    gctx.lineWidth = 1;
+    for (i = 0; i < pts.length; i++) for (j = i + 1; j < pts.length; j++) {
+      var dx = pts[i][0] - pts[j][0], dy = pts[i][1] - pts[j][1], d2 = dx * dx + dy * dy;
+      if (d2 > linkR2) continue;
+      var op = Math.min(pts[i][2], pts[j][2]) * 0.3;
+      gctx.strokeStyle = 'rgba(' + tr[0].toFixed(0) + ',' + tr[1].toFixed(0) + ',' + tr[2].toFixed(0) + ',' + op.toFixed(3) + ')';
+      gctx.beginPath(); gctx.moveTo(pts[i][0], pts[i][1]); gctx.lineTo(pts[j][0], pts[j][1]); gctx.stroke();
+    }
+    for (i = 0; i < pts.length; i++) {
+      var p = pts[i];
+      gctx.beginPath(); gctx.arc(p[0], p[1], 1.4 + p[2] * 1.3, 0, 6.2832);
+      gctx.fillStyle = 'rgba(' + tr[0].toFixed(0) + ',' + tr[1].toFixed(0) + ',' + tr[2].toFixed(0) + ',' + (p[2] * 0.85).toFixed(3) + ')';
+      gctx.fill();
+    }
+  }
+
   var rainGlyphSize = 14, scanT = 0, glitchUntil = 0, glitchCols = [];
   function drawRain() {
     if (!gctx || !GW) return;
@@ -120,6 +152,7 @@
       if (motion) { c.y += c.speed * (motionScale > 1 ? 1.15 : 1); if (c.y - c.len * rainGlyphSize > GH) { c.y = -Math.random() * innerHeight * 0.3; c.speed = rainSpeed(); } }
     });
     if (now < glitchUntil) { glitchCols.forEach(function (c) { gctx.fillStyle = 'rgba(' + hotRGB.join(',') + ',.5)'; gctx.fillText(c.glyphs[0], c.x + (Math.random() - 0.5) * 3, c.y + (Math.random() - 0.5) * 3); }); }
+    drawDotField(tr);
     scanT = (scanT + 0.12) % (GH + 160);
     var sg = gctx.createLinearGradient(0, scanT - 80, 0, scanT + 80);
     sg.addColorStop(0, 'rgba(255,255,255,0)'); sg.addColorStop(0.5, 'rgba(255,255,255,.035)'); sg.addColorStop(1, 'rgba(255,255,255,0)');
@@ -365,7 +398,7 @@
   /* ---------- cursor: reticle, target lock, trail, click burst, idle roamers ---------- */
   var dot = $('.cursor-dot'), ring = $('.cursor-ring'), tag = $('.cursor-tag'), lock = $('.cur-lock'), fx = $('#curfx'), fctx = fx && fx.getContext('2d');
   var corners = $$('.cur-lock i'), CS = 13, QS = new URLSearchParams(location.search), IDLE = +QS.get('idle') || 3000;
-  var mx = innerWidth / 2, my = innerHeight / 2, rx = mx, ry = my, cursorOn = false, lockEl = null, trail = [], C = null, spinAnim = null, popT = null, lastMove = performance.now(), roam = null, fr = 0, pcache = [], pc = 0;
+  var mx = innerWidth / 2, my = innerHeight / 2, rx = mx, ry = my, rvx = 0, rvy = 0, cursorOn = false, lockEl = null, trail = [], C = null, spinAnim = null, popT = null, lastMove = performance.now(), roam = null, fr = 0, pcache = [], pc = 0;
   function sizeFx() { if (!fx) return; fx.width = innerWidth; fx.height = innerHeight; }
   sizeFx(); window.addEventListener('resize', sizeFx);
   function targetOf(t) { var a = t && t.closest && t.closest('a,button,.tilt'); if (!a) return null; return (a.offsetWidth > 700 || a.offsetHeight > 520) ? null : a; }
@@ -1125,7 +1158,7 @@
   }
   function abortMech(P) { var s = ST; s.lasers.length = 0; s.bombs.length = 0; [s.f, s.e].forEach(function (u) { if (u && u.alive) { u.tr = u.m > 0.3 ? { st: 'hop', t: 0 } : null; if (!u.tr) { u.m = 0; } } }); s.ph = 'toShip'; s.pt = 0; }
   function finishStory(sleep) {
-    restoreAst(); ST = null; roam = null; root.classList.remove('roaming'); hideSay(); hideCap(); rx = mx; ry = my;
+    restoreAst(); ST = null; roam = null; root.classList.remove('roaming'); hideSay(); hideCap(); rx = mx; ry = my; rvx = 0; rvy = 0;
     lastN = performance.now(); /* give the page a moment of quiet before the next idle nudge */
     if (sleep) needMove = true; else ringPop();
   }
@@ -1185,7 +1218,9 @@
     var lockRect = lockEl ? lockEl.getBoundingClientRect() : null;
     var tgx = mx, tgy = my;
     if (lockRect) { var lcx = lockRect.left + lockRect.width / 2, lcy = lockRect.top + lockRect.height / 2; tgx = lcx + (mx - lcx) * 0.26; tgy = lcy + (my - lcy) * 0.26; }
-    rx += (tgx - rx) * k; ry += (tgy - ry) * k;
+    var sstiff = (motionLevel === 2 ? 0.28 : 0.24) * Math.min(dt / 16.667, 2), sdamp = 0.72;
+    rvx = (rvx + (tgx - rx) * sstiff) * sdamp; rvy = (rvy + (tgy - ry) * sstiff) * sdamp;
+    rx += rvx; ry += rvy;
     var p0 = 'translate3d(' + rx.toFixed(2) + 'px,' + ry.toFixed(2) + 'px,0)';
     ring.style.transform = p0;
     tag.style.transform = 'translate3d(' + (rx + 34).toFixed(2) + 'px,' + (ry + 28).toFixed(2) + 'px,0)';
