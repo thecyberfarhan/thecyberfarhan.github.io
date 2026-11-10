@@ -6,6 +6,8 @@
   ['#g-input'].forEach(function (s) { var i = document.querySelector(s); if (i) i.maxLength = 200; });
   var $ = function (s, c) { return (c || document).querySelector(s); };
   var $$ = function (s, c) { return Array.prototype.slice.call((c || document).querySelectorAll(s)); };
+  /* hardware check, not a per-event one -- real touchscreens sometimes fire synthetic/ghost "mouse" pointer events after a tap, so pointerType alone isn't reliable */
+  var IS_TOUCH = (function () { try { return matchMedia('(pointer: coarse)').matches; } catch (e) { return false; } })();
   var motionLevel = 2, motion = true, motionScale = 2.1;
   root.setAttribute('data-motion', 'max');
   root.style.setProperty('--mscale', motionScale);
@@ -55,7 +57,7 @@
   function rainSpeed() { return (motionLevel === 2 ? 1.25 : motionLevel === 0 ? 0.65 : 0.95) * (0.5 + Math.random() * 0.6); }
   function buildRain() {
     if (!gctx) return;
-    var colW = innerWidth < 760 ? 20 : 24, cols = Math.ceil(innerWidth / colW), density = motionLevel === 0 ? 0.4 : motionLevel === 2 ? 0.6 : 0.5, i;
+    var colW = innerWidth < 760 ? 20 : 24, cols = Math.ceil(innerWidth / colW), density = innerWidth < 760 ? 0.42 : (motionLevel === 0 ? 0.4 : motionLevel === 2 ? 0.6 : 0.5), i;
     rainCols = [];
     for (i = 0; i < cols; i++) {
       if (Math.random() > density) continue;
@@ -66,7 +68,7 @@
   }
   function sizeRain() {
     if (!gl || !gctx) return;
-    var d = Math.min(window.devicePixelRatio || 1, 1.5);
+    var d = Math.min(window.devicePixelRatio || 1, innerWidth < 760 ? 1.1 : 1.5);
     GW = innerWidth; GH = innerHeight;
     gl.width = GW * d; gl.height = GH * d; gctx.setTransform(d, 0, 0, d, 0, 0);
     buildRain(); computeSectionTops();
@@ -74,10 +76,10 @@
 
   /* a dim dot grid that only lights up, and links its nearby dots, within a radius of the real mouse -- the "flashlight over a field" effect */
   var DOT_SPACING = 46, DOT_RADIUS = 160, dotMX = -9999, dotMY = -9999, dotHover = false;
-  window.addEventListener('pointermove', function (e) { if (e.pointerType !== 'mouse') return; dotMX = e.clientX; dotMY = e.clientY; dotHover = true; }, { passive: true });
+  if (!IS_TOUCH) window.addEventListener('pointermove', function (e) { if (e.pointerType !== 'mouse') return; dotMX = e.clientX; dotMY = e.clientY; dotHover = true; }, { passive: true });
   window.addEventListener('pointerleave', function () { dotHover = false; });
   function drawDotField(tr) {
-    if (!dotHover || !motion) return;
+    if (!dotHover || !motion || IS_TOUCH) return;
     var r2 = DOT_RADIUS * DOT_RADIUS;
     var x0 = Math.max(0, Math.floor((dotMX - DOT_RADIUS) / DOT_SPACING)), x1 = Math.ceil((dotMX + DOT_RADIUS) / DOT_SPACING);
     var y0 = Math.max(0, Math.floor((dotMY - DOT_RADIUS) / DOT_SPACING)), y1 = Math.ceil((dotMY + DOT_RADIUS) / DOT_SPACING);
@@ -389,7 +391,7 @@
     if (!a && had) setTimeout(ringPop, 140);
   }
   window.addEventListener('pointermove', function (e) {
-    if (e.pointerType !== 'mouse') return;
+    if (e.pointerType !== 'mouse' || IS_TOUCH) return;
     fineMouse = true;
     if (!cursorOn && motion) { cursorOn = true; root.classList.add('has-cursor'); rx = e.clientX; ry = e.clientY; startCursor(); }
     mx = e.clientX; my = e.clientY; lastMove = performance.now(); needMove = false;
@@ -1291,7 +1293,7 @@
         ax: Math.random() * 6, ay: Math.random() * 6, vx: (Math.random() - 0.5) * 0.012 * motionScale, vy: (0.004 + Math.random() * 0.01) * motionScale, hot: i % 4 === 1 });
     }
   }
-  function sizeBg() { if (!bgc) return; var d = Math.min(window.devicePixelRatio || 1, 1.5); BW = innerWidth; BH = innerHeight; bgc.width = BW * d; bgc.height = BH * d; bctx.setTransform(d, 0, 0, d, 0, 0); mkShapes(); }
+  function sizeBg() { if (!bgc) return; var d = Math.min(window.devicePixelRatio || 1, innerWidth < 760 ? 1.1 : 1.5); BW = innerWidth; BH = innerHeight; bgc.width = BW * d; bgc.height = BH * d; bctx.setTransform(d, 0, 0, d, 0, 0); mkShapes(); }
   function drawBg() {
     if (!bctx || !BW) return;
     bctx.clearRect(0, 0, BW, BH);
@@ -1462,7 +1464,6 @@
     var id = bt.getAttribute('data-id'), url = bt.getAttribute('data-url'); hideNudge(); lastAct = performance.now();
     if (url) window.open(url, '_blank', 'noopener'); else if (id) go(id, id.charAt(0).toUpperCase() + id.slice(1));
   });
-  var IS_TOUCH = matchMedia('(pointer: coarse)').matches;
   nEl.addEventListener('mouseenter', function () { hovering = true; clearTimeout(hideT); });
   nEl.addEventListener('mouseleave', function () { hovering = false; clearTimeout(hideT); hideT = setTimeout(hideNudge, 5000); });
   var hiding = false;
