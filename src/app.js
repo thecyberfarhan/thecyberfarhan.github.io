@@ -398,7 +398,7 @@
   /* ---------- cursor: reticle, target lock, trail, click burst, idle roamers ---------- */
   var dot = $('.cursor-dot'), ring = $('.cursor-ring'), tag = $('.cursor-tag'), lock = $('.cur-lock'), fx = $('#curfx'), fctx = fx && fx.getContext('2d');
   var corners = $$('.cur-lock i'), CS = 13, QS = new URLSearchParams(location.search), IDLE = +QS.get('idle') || 3000;
-  var mx = innerWidth / 2, my = innerHeight / 2, rx = mx, ry = my, rvx = 0, rvy = 0, cursorOn = false, lockEl = null, trail = [], C = null, spinAnim = null, popT = null, lastMove = performance.now(), roam = null, fr = 0, pcache = [], pc = 0;
+  var mx = innerWidth / 2, my = innerHeight / 2, rx = mx, ry = my, cursorOn = false, lockEl = null, trail = [], C = null, spinAnim = null, popT = null, lastMove = performance.now(), roam = null, fr = 0, pcache = [], pc = 0;
   function sizeFx() { if (!fx) return; fx.width = innerWidth; fx.height = innerHeight; }
   sizeFx(); window.addEventListener('resize', sizeFx);
   function targetOf(t) { var a = t && t.closest && t.closest('a,button,.tilt'); if (!a) return null; return (a.offsetWidth > 700 || a.offsetHeight > 520) ? null : a; }
@@ -1158,7 +1158,7 @@
   }
   function abortMech(P) { var s = ST; s.lasers.length = 0; s.bombs.length = 0; [s.f, s.e].forEach(function (u) { if (u && u.alive) { u.tr = u.m > 0.3 ? { st: 'hop', t: 0 } : null; if (!u.tr) { u.m = 0; } } }); s.ph = 'toShip'; s.pt = 0; }
   function finishStory(sleep) {
-    restoreAst(); ST = null; roam = null; root.classList.remove('roaming'); hideSay(); hideCap(); rx = mx; ry = my; rvx = 0; rvy = 0;
+    restoreAst(); ST = null; roam = null; root.classList.remove('roaming'); hideSay(); hideCap(); rx = mx; ry = my;
     lastN = performance.now(); /* give the page a moment of quiet before the next idle nudge */
     if (sleep) needMove = true; else ringPop();
   }
@@ -1218,9 +1218,7 @@
     var lockRect = lockEl ? lockEl.getBoundingClientRect() : null;
     var tgx = mx, tgy = my;
     if (lockRect) { var lcx = lockRect.left + lockRect.width / 2, lcy = lockRect.top + lockRect.height / 2; tgx = lcx + (mx - lcx) * 0.26; tgy = lcy + (my - lcy) * 0.26; }
-    var sstiff = (motionLevel === 2 ? 0.28 : 0.24) * Math.min(dt / 16.667, 2), sdamp = 0.72;
-    rvx = (rvx + (tgx - rx) * sstiff) * sdamp; rvy = (rvy + (tgy - ry) * sstiff) * sdamp;
-    rx += rvx; ry += rvy;
+    rx += (tgx - rx) * k; ry += (tgy - ry) * k;
     var p0 = 'translate3d(' + rx.toFixed(2) + 'px,' + ry.toFixed(2) + 'px,0)';
     ring.style.transform = p0;
     tag.style.transform = 'translate3d(' + (rx + 34).toFixed(2) + 'px,' + (ry + 28).toFixed(2) + 'px,0)';
