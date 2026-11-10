@@ -6,37 +6,11 @@
   ['#g-input'].forEach(function (s) { var i = document.querySelector(s); if (i) i.maxLength = 200; });
   var $ = function (s, c) { return (c || document).querySelector(s); };
   var $$ = function (s, c) { return Array.prototype.slice.call((c || document).querySelectorAll(s)); };
-  var motionLevel = (function () {
-    try {
-      var v = localStorage.getItem('motionLevel');
-      if (v === '0' || v === '1' || v === '2') return +v;
-      var old = localStorage.getItem('motion');
-      if (old === 'full') return 1;
-      if (old === 'reduced') return 0;
-    } catch (e) {}
-    try { return matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 1; } catch (e) { return 1; }
-  })();
-  var MOTION_NAMES = ['reduced', 'full', 'max'], MOTION_LABELS = ['Calm', 'Dynamic', 'Max'];
-  var motion = motionLevel > 0;
-  var motionScale = motionLevel === 2 ? 2.1 : 1;
-  root.setAttribute('data-motion', MOTION_NAMES[motionLevel]);
+  var motionLevel = 2, motion = true, motionScale = 2.1;
+  root.setAttribute('data-motion', 'max');
   root.style.setProperty('--mscale', motionScale);
   var PAL = { dark: { node: '201,209,217', link: '127,168,204', hot: '180,35,44', wire: '127,168,204', wireHot: '194,104,108', halo: '13,17,23' }, light: { node: '31,35,40', link: '63,110,154', hot: '176,74,79', wire: '63,110,154', wireHot: '176,74,79', halo: '250,251,253' } };
   function pal() { return PAL.dark; }
-
-  /* ---------- motion dial: Calm / Dynamic / Max, not a binary switch ---------- */
-  var mBtn = $('#motion-toggle'), mLabel = mBtn && mBtn.querySelector('.mt-label');
-  if (mBtn) {
-    mBtn.setAttribute('aria-label', 'Motion level: ' + MOTION_LABELS[motionLevel] + '. Click to change.');
-    if (mLabel) mLabel.textContent = MOTION_LABELS[motionLevel];
-    mBtn.addEventListener('click', function () {
-      var next = (motionLevel + 1) % 3;
-      try { localStorage.setItem('motionLevel', String(next)); } catch (e) {}
-      root.classList.add('motion-switching');
-      root.setAttribute('data-motion', MOTION_NAMES[next]);
-      setTimeout(function () { location.reload(); }, 180);
-    });
-  }
 
   /* ---------- split headings into letters ---------- */
   $$('.split').forEach(function (el) {
