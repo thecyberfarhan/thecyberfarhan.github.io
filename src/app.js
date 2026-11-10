@@ -57,6 +57,68 @@
   var glSupported = true, glRenderer, glScene, glCamera, glGroup, glNodes, glHot, glLinks, glRing1, glRing2, glLight, glSatL, glSatR;
   var glNodePos, glNodeStart, glNodeDelay, glHotIdx = [], glLinkPairs = [];
 
+  /* ---------- the globe morphs into a different shape per section as you scroll ---------- */
+  var SCENE_ORDER = ['hero', 'proof', 'about', 'tools', 'projects', 'journey', 'play', 'arch', 'contact'];
+  var glShapes = {}, glSceneTops = [], glTargetPos;
+  function shapeSphere(n, out) {
+    for (var i = 0; i < n; i++) { var k = (i + 0.5) / n, phi = Math.acos(1 - 2 * k), th = Math.PI * (1 + Math.sqrt(5)) * i; out[i * 3] = Math.cos(th) * Math.sin(phi); out[i * 3 + 1] = Math.cos(phi); out[i * 3 + 2] = Math.sin(th) * Math.sin(phi); }
+  }
+  function shapeBadge(n, out) {
+    for (var i = 0; i < n; i++) { var ring = i % 4, t = i / n, radius = 0.32 + ring * 0.27, ang = t * 6.2832 * (ring + 1.6) + ring * 1.1; out[i * 3] = Math.cos(ang) * radius; out[i * 3 + 1] = Math.sin(ang) * radius * 0.92; out[i * 3 + 2] = (ring - 1.5) * 0.11; }
+  }
+  function shapeHelix(n, out, wx) {
+    var r = 0.5 * Math.min(wx, 1.3);
+    for (var i = 0; i < n; i++) { var t = i / n, strand = i % 2, ang = t * 8 * Math.PI + strand * Math.PI; out[i * 3] = Math.cos(ang) * r; out[i * 3 + 1] = (t - 0.5) * 2.1; out[i * 3 + 2] = Math.sin(ang) * r; }
+  }
+  function shapeGrid(n, out, wx) {
+    var cols = Math.max(4, Math.round(Math.sqrt(n * wx))), rows = Math.ceil(n / cols);
+    for (var i = 0; i < n; i++) { var cx = i % cols, cy = Math.floor(i / cols) % rows; out[i * 3] = (cx / (cols - 1) - 0.5) * 2.1 * wx; out[i * 3 + 1] = (cy / Math.max(rows - 1, 1) - 0.5) * 1.5; out[i * 3 + 2] = ((i % 3) - 1) * 0.16; }
+  }
+  function shapeProjects(n, out, wx) {
+    var clusters = 5, perC = Math.ceil(n / clusters);
+    for (var i = 0; i < n; i++) { var c = Math.floor(i / perC), cx = (c / (clusters - 1) - 0.5) * 2.5 * wx, local = i % perC, corner = local % 8; var bx = (corner & 1) ? 0.18 : -0.18, by = (corner & 2) ? 0.18 : -0.18, bz = (corner & 4) ? 0.18 : -0.18; out[i * 3] = cx + bx + (Math.random() - 0.5) * 0.04; out[i * 3 + 1] = by * 1.4 + (c % 2 ? 0.25 : -0.25); out[i * 3 + 2] = bz; }
+  }
+  function shapeJourney(n, out) {
+    for (var i = 0; i < n; i++) { var t = i / n, ang = t * 6 * Math.PI, r = 0.25 + t * 0.85; out[i * 3] = Math.cos(ang) * r; out[i * 3 + 1] = (t - 0.5) * 2.2; out[i * 3 + 2] = Math.sin(ang) * r * 0.6; }
+  }
+  function shapeRain(n, out, wx) {
+    var cols = Math.max(6, Math.round(10 * wx));
+    for (var i = 0; i < n; i++) { var col = i % cols, row = Math.floor(i / cols); out[i * 3] = (col / (cols - 1) - 0.5) * 2.4 * wx; out[i * 3 + 1] = ((row * 0.37) % 2) - 1; out[i * 3 + 2] = (col % 2 ? 0.1 : -0.1); }
+  }
+  function shapeHub(n, out, wx) {
+    for (var i = 0; i < n; i++) { var ring = i % 3, t = i / n, radius = (0.35 + ring * 0.42) * Math.min(wx, 1.6), ang = t * 6.2832 * (ring + 1); out[i * 3] = Math.cos(ang) * radius; out[i * 3 + 1] = Math.sin(ang) * radius * 0.5; out[i * 3 + 2] = (ring - 1) * 0.22; }
+  }
+  function shapeFunnel(n, out) {
+    for (var i = 0; i < n; i++) { var t = i / n, ang = t * 10 * Math.PI, r = (1 - t) * 1.05 + 0.04; out[i * 3] = Math.cos(ang) * r; out[i * 3 + 1] = (t - 0.5) * 1.7; out[i * 3 + 2] = Math.sin(ang) * r; }
+  }
+  function computeSceneTops() {
+    var y = window.scrollY || 0;
+    glSceneTops = SCENE_ORDER.map(function (id) { var el = document.getElementById(id); return el ? el.getBoundingClientRect().top + y : 0; });
+  }
+  function buildShapes(n) {
+    var wx = Math.min(Math.max(innerWidth / Math.max(innerHeight, 1), 1), 1.9);
+    glShapes = { hero: glNodePos };
+    glShapes.proof = new Float32Array(n * 3); shapeBadge(n, glShapes.proof);
+    glShapes.about = new Float32Array(n * 3); shapeHelix(n, glShapes.about, wx);
+    glShapes.tools = new Float32Array(n * 3); shapeGrid(n, glShapes.tools, wx);
+    glShapes.projects = new Float32Array(n * 3); shapeProjects(n, glShapes.projects, wx);
+    glShapes.journey = new Float32Array(n * 3); shapeJourney(n, glShapes.journey);
+    glShapes.play = new Float32Array(n * 3); shapeRain(n, glShapes.play, wx);
+    glShapes.arch = new Float32Array(n * 3); shapeHub(n, glShapes.arch, wx);
+    glShapes.contact = new Float32Array(n * 3); shapeFunnel(n, glShapes.contact);
+    glTargetPos = new Float32Array(n * 3);
+    computeSceneTops();
+  }
+  function updateMorphTarget() {
+    if (!glTargetPos || !glSceneTops.length) return;
+    var tops = glSceneTops, m = SCENE_ORDER.length, idx = 0, i;
+    for (i = 0; i < m - 1; i++) { if (sy >= tops[i + 1]) idx = i + 1; }
+    var bIdx = Math.min(idx + 1, m - 1), ta = tops[idx], tb = tops[bIdx];
+    var frac = (bIdx > idx && tb > ta) ? Math.min(1, Math.max(0, (sy - ta) / (tb - ta))) : 0;
+    var A = glShapes[SCENE_ORDER[idx]], B = glShapes[SCENE_ORDER[bIdx]];
+    for (i = 0; i < glTargetPos.length; i++) glTargetPos[i] = A[i] + (B[i] - A[i]) * frac;
+  }
+
   (function initGL() {
     if (!gl || !window.THREE) { glSupported = false; return; }
     try { glRenderer = new THREE.WebGLRenderer({ canvas: gl, alpha: true, antialias: true }); }
@@ -107,6 +169,7 @@
       if (dx * dx + dy * dy + dz * dz < 0.36) { pairs.push(i, q); }
     }
     G.links = pairs.length / 2; glLinkPairs = pairs;
+    buildShapes(n);
     if (!glSupported) return;
     var P = pal();
     if (glNodes) { glGroup.remove(glNodes); glNodes.geometry.dispose(); glNodes.material.dispose(); }
@@ -140,23 +203,24 @@
   function drawGlobe() {
     if (!glSupported || !glRenderer || !glNodes) return;
     var P = pal(), i;
+    updateMorphTarget();
     glNodes.material.color.setStyle('rgb(' + P.node + ')');
     glHot.material.color.setStyle('rgb(' + P.hot + ')');
     glLinks.material.color.setStyle('rgb(' + P.link + ')');
 
     var npos = glNodes.geometry.attributes.position.array, n = npos.length / 3;
-    for (i = 0; i < n; i++) { var f = assembleFrac(glNodeDelay[i]); lerp3(npos, i * 3, glNodeStart[i * 3], glNodeStart[i * 3 + 1], glNodeStart[i * 3 + 2], glNodePos[i * 3], glNodePos[i * 3 + 1], glNodePos[i * 3 + 2], f); }
+    for (i = 0; i < n; i++) { var f = assembleFrac(glNodeDelay[i]); lerp3(npos, i * 3, glNodeStart[i * 3], glNodeStart[i * 3 + 1], glNodeStart[i * 3 + 2], glTargetPos[i * 3], glTargetPos[i * 3 + 1], glTargetPos[i * 3 + 2], f); }
     glNodes.geometry.attributes.position.needsUpdate = true;
 
     var hpos = glHot.geometry.attributes.position.array;
-    for (i = 0; i < glHotIdx.length; i++) { var hi = glHotIdx[i], f2 = assembleFrac(glNodeDelay[hi]); lerp3(hpos, i * 3, glNodeStart[hi * 3], glNodeStart[hi * 3 + 1], glNodeStart[hi * 3 + 2], glNodePos[hi * 3], glNodePos[hi * 3 + 1], glNodePos[hi * 3 + 2], f2); }
+    for (i = 0; i < glHotIdx.length; i++) { var hi = glHotIdx[i], f2 = assembleFrac(glNodeDelay[hi]); lerp3(hpos, i * 3, glNodeStart[hi * 3], glNodeStart[hi * 3 + 1], glNodeStart[hi * 3 + 2], glTargetPos[hi * 3], glTargetPos[hi * 3 + 1], glTargetPos[hi * 3 + 2], f2); }
     glHot.geometry.attributes.position.needsUpdate = true;
 
     var lpos = glLinks.geometry.attributes.position.array;
     for (i = 0; i < glLinkPairs.length; i += 2) {
       var a = glLinkPairs[i], b = glLinkPairs[i + 1], o = (i / 2) * 6, fa = assembleFrac(glNodeDelay[a]), fb = assembleFrac(glNodeDelay[b]);
-      lerp3(lpos, o, glNodeStart[a * 3], glNodeStart[a * 3 + 1], glNodeStart[a * 3 + 2], glNodePos[a * 3], glNodePos[a * 3 + 1], glNodePos[a * 3 + 2], fa);
-      lerp3(lpos, o + 3, glNodeStart[b * 3], glNodeStart[b * 3 + 1], glNodeStart[b * 3 + 2], glNodePos[b * 3], glNodePos[b * 3 + 1], glNodePos[b * 3 + 2], fb);
+      lerp3(lpos, o, glNodeStart[a * 3], glNodeStart[a * 3 + 1], glNodeStart[a * 3 + 2], glTargetPos[a * 3], glTargetPos[a * 3 + 1], glTargetPos[a * 3 + 2], fa);
+      lerp3(lpos, o + 3, glNodeStart[b * 3], glNodeStart[b * 3 + 1], glNodeStart[b * 3 + 2], glTargetPos[b * 3], glTargetPos[b * 3 + 1], glTargetPos[b * 3 + 2], fb);
     }
     glLinks.geometry.attributes.position.needsUpdate = true;
     glLinks.material.opacity = .16 * Math.min(1, Math.max(0, (G.assemble - 0.5) / 0.4));
@@ -172,7 +236,8 @@
 
     if (glLight) { var pulse = 1.8 + Math.sin(performance.now() * 0.0012) * (motionLevel === 2 ? 0.9 : 0.4); glLight.intensity = pulse * e; }
     if (glSatL) {
-      var so = ringOp * (motionLevel === 2 ? 1.3 : 1), rot = performance.now() * (motionLevel === 2 ? 0.00035 : 0.00018);
+      var heroFrac = Math.max(0, Math.min(1, 1 - sy / Math.max(VH, 1)));
+      var so = ringOp * (motionLevel === 2 ? 1.3 : 1) * heroFrac, rot = performance.now() * (motionLevel === 2 ? 0.00035 : 0.00018);
       glSatL.ring.material.opacity = so; glSatL.dots.material.opacity = so * 3.2; glSatL.grp.rotation.y = rot; glSatL.grp.position.y = Math.sin(performance.now() * 0.0005) * 0.18;
       glSatR.ring.material.opacity = so; glSatR.dots.material.opacity = so * 3.2; glSatR.grp.rotation.y = -rot; glSatR.grp.position.y = Math.cos(performance.now() * 0.0005) * 0.18;
     }
@@ -187,6 +252,7 @@
   }
   function startGlobe() { if (!glSupported || !gl || G.running || !G.show || document.hidden) return; G.running = true; requestAnimationFrame(gframe); }
   buildGlobe(); sizeGlobe(); drawGlobe(); if (motion) startGlobe();
+  window.addEventListener('load', function () { computeSceneTops(); });
   window.addEventListener('resize', function () { sizeGlobe(); buildGlobe(); drawGlobe(); });
   document.addEventListener('visibilitychange', function () { if (document.hidden) G.running = false; else if (motion) startGlobe(); });
   window.addEventListener('pointermove', function (e) { if (e.pointerType === 'mouse') { G.mx = e.clientX / innerWidth - 0.5; G.my = e.clientY / innerHeight - 0.5; } }, { passive: true });
@@ -354,7 +420,7 @@
     var h = VH, k = Math.min(ssy / h, 1.4), fade = Math.max(0, 1 - ssy / (h * 0.7)).toFixed(3);
     if (copy) { copy.style.transform = 'translate3d(0,' + (-ssy * 0.14).toFixed(2) + 'px,0)'; copy.style.opacity = fade; }
     if (medalWrap) { medalWrap.style.transform = 'translate3d(0,' + (-ssy * 0.22).toFixed(2) + 'px,0) scale(' + Math.max(1 - k * 0.1, 0.75).toFixed(4) + ')'; medalWrap.style.opacity = fade; }
-    if (gl) gl.style.opacity = Math.max(0.5 - k * 0.5, motionLevel === 2 ? 0.26 : 0.12).toFixed(3);
+    if (gl) gl.style.opacity = Math.max(0.5 - k * 0.5, motionLevel === 2 ? 0.42 : 0.24).toFixed(3);
     requestAnimationFrame(plx);
   })();
 
