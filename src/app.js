@@ -180,7 +180,7 @@
       glNodePos[i * 3] = Math.cos(th) * Math.sin(phi); glNodePos[i * 3 + 1] = Math.cos(phi); glNodePos[i * 3 + 2] = Math.sin(th) * Math.sin(phi);
       var sr = 2.4 + Math.random() * 1.6, sth = Math.random() * 6.283, sph = Math.random() * 3.1416;
       glNodeStart[i * 3] = Math.cos(sth) * Math.sin(sph) * sr; glNodeStart[i * 3 + 1] = (Math.random() - 0.5) * sr * 1.4; glNodeStart[i * 3 + 2] = Math.sin(sth) * Math.sin(sph) * sr;
-      glNodeDelay[i] = Math.random() * 0.6;
+      glNodeDelay[i] = Math.random() * 0.15;
       var hot = i % 19 === 0; gp.push({ hot: hot }); if (hot) glHotIdx.push(i);
     }
     for (i = 0; i < n; i++) for (var q = i + 1; q < n; q++) {
@@ -215,7 +215,11 @@
     glCamera.aspect = innerWidth / Math.max(innerHeight, 1); glCamera.updateProjectionMatrix();
   }
 
-  function assembleFrac(delay) { return ease3(Math.min(1, Math.max(0, (G.assemble * 1.25 - delay) / 0.75))); }
+  /* nodes stay fully scattered until the load is well past halfway, then
+     visibly fly together and lock in only in the final stretch -- they
+     used to start drifting inward from the very first frame, which read
+     as "already joined" long before the loader was actually done. */
+  function assembleFrac(delay) { return ease3(Math.min(1, Math.max(0, (G.assemble - 0.55 - delay) / 0.3))); }
   function lerp3(out, oi, sx, sy2, sz, tx, ty, tz, f) { out[oi] = sx + (tx - sx) * f; out[oi + 1] = sy2 + (ty - sy2) * f; out[oi + 2] = sz + (tz - sz) * f; }
 
   function drawGlobe() {
@@ -240,7 +244,7 @@
       lerp3(lpos, o + 3, glNodeStart[b * 3], glNodeStart[b * 3 + 1], glNodeStart[b * 3 + 2], glNodePos[b * 3], glNodePos[b * 3 + 1], glNodePos[b * 3 + 2], fb);
     }
     glLinks.geometry.attributes.position.needsUpdate = true;
-    glLinks.material.opacity = .16 * Math.min(1, Math.max(0, (G.assemble - 0.5) / 0.4));
+    glLinks.material.opacity = .16 * Math.min(1, Math.max(0, (G.assemble - 0.6) / 0.35));
 
     var e = ease3(G.grow), ringOp = .22 * e;
     glRing1.material.opacity = ringOp; glRing2.material.opacity = ringOp * .85;
