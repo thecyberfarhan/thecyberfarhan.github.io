@@ -10,6 +10,8 @@ src/app.js             readable source for all the site's JS
 src/style.css           source mirror of the CSS overrides appended into index.html
 assets/app.js           minified build of src/app.js (esbuild), what the page actually loads
 assets/*.pdf             resume, sample pentest report, technical appendix
+writeups/               auto-generated pages for the medium/hard CTF writeups -- see scripts/README.md, don't hand-edit these
+scripts/sync-writeups.mjs  generates writeups/ from github.com/thecyberfarhan/CTF-Writeups; runs on a schedule via .github/workflows/sync-writeups.yml
 sw.js                    service worker; cache name = the version number
 manifest.webmanifest     PWA manifest
 llms.txt                 a short machine-readable summary, for agentic/LLM crawlers

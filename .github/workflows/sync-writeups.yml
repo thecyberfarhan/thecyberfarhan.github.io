@@ -1,0 +1,48 @@
+name: Sync writeups from CTF-Writeups
+
+# Keeps writeups/*.html, the writeup count stat, sitemap.xml and llms.txt in
+# sync with https://github.com/thecyberfarhan/CTF-Writeups. See
+# scripts/sync-writeups.mjs for what actually runs.
+#
+# Three ways this fires:
+#   1. schedule       -- every 3 hours, so a push to CTF-Writeups is reflected
+#                        here automatically within a few hours at most, with
+#                        zero setup required.
+#   2. workflow_dispatch -- manual "Run workflow" button for an on-demand sync.
+#   3. repository_dispatch (type: writeups-updated) -- near-instant sync, but
+#                        this one needs a one-time step in the CTF-Writeups
+#                        repo: see "Optional: instant sync" in scripts/README
+#                        in this repo for the exact workflow + token to add
+#                        there. Skip it if the 3-hour schedule is good enough.
+on:
+  schedule:
+    - cron: '17 */3 * * *'
+  workflow_dispatch: {}
+  repository_dispatch:
+    types: [writeups-updated]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-writeups
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node scripts/sync-writeups.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Commit if anything changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add writeups/ sitemap.xml llms.txt index.html
+          git diff --staged --quiet || git commit -m "Sync writeups from CTF-Writeups [automated]"
+          git push

