@@ -54,42 +54,98 @@
   var G = { assemble: 0, grow: 0, rot: 0, tilt: 0.35, mx: 0, my: 0, running: false, show: true, t0: performance.now(), links: 0 };
   function ease3(x) { return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; }
 
-  var glSupported = true, glRenderer, glScene, glCamera, glGroup, glNodes, glHot, glLinks, glRing1, glRing2, glLight, glSatL, glSatR;
-  var glNodePos, glNodeStart, glNodeDelay, glHotIdx = [], glLinkPairs = [];
+  var glSupported = true, glRenderer, glScene, glCamera, glGroup, glNodes, glHot, glLinks, glIconLinks, glRing1, glRing2, glLight, glSatL, glSatR;
+  var glNodePos, glNodeStart, glNodeDelay, glHotIdx = [], glLinkPairs = [], glIconPairs = [];
 
-  /* ---------- the globe morphs into a different shape per section as you scroll ---------- */
+  /* ---------- the globe morphs into a recognizable icon per section as you scroll ---------- */
   var SCENE_ORDER = ['hero', 'proof', 'about', 'tools', 'projects', 'journey', 'play', 'arch', 'contact'];
-  var glShapes = {}, glSceneTops = [], glTargetPos;
+  var glShapes = {}, glSceneTops = [], glTargetPos, glHeroAmt = 1;
+
+  function circlePoly(r, sides, cx, cy) {
+    var pts = []; cx = cx || 0; cy = cy || 0;
+    for (var i = 0; i < sides; i++) { var a = (i / sides) * 6.28319; pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); }
+    return pts;
+  }
+  function arcPoly(cx, cy, r, a0, a1, segs) {
+    var pts = [];
+    for (var i = 0; i <= segs; i++) { var t = i / segs, a = a0 + (a1 - a0) * t; pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); }
+    return pts;
+  }
+  function gearPoly(teeth, rOuter, rInner) {
+    var pts = [], n = teeth * 4;
+    for (var i = 0; i < n; i++) { var a = (i / n) * 6.28319, ph = i % 4, r = (ph === 0 || ph === 1) ? rOuter : rInner; pts.push([Math.cos(a) * r, Math.sin(a) * r]); }
+    return pts;
+  }
+  /* evenly distributes `count` points along a closed polygon's perimeter (anchors[last]->anchors[0] included) */
+  function sampleAlongPath(anchors, count, out, offset) {
+    var m = anchors.length, i; if (m < 2 || count <= 0) return;
+    var lens = [], total = 0;
+    for (i = 0; i < m; i++) { var a = anchors[i], b = anchors[(i + 1) % m], dx = b[0] - a[0], dy = b[1] - a[1], len = Math.sqrt(dx * dx + dy * dy) || 1e-6; lens.push(len); total += len; }
+    for (i = 0; i < count; i++) {
+      var dist = (i / count) * total, acc = 0, seg = 0;
+      while (seg < m - 1 && acc + lens[seg] < dist) { acc += lens[seg]; seg++; }
+      var a = anchors[seg], b = anchors[(seg + 1) % m], segLen = lens[seg] || 1e-6, t = (dist - acc) / segLen;
+      var oi = (offset + i) * 3;
+      out[oi] = a[0] + (b[0] - a[0]) * t; out[oi + 1] = a[1] + (b[1] - a[1]) * t; out[oi + 2] = (Math.random() - 0.5) * 0.12;
+    }
+  }
+  function scaleX(anchors, s) { return anchors.map(function (p) { return [p[0] * s, p[1]]; }); }
+
   function shapeSphere(n, out) {
     for (var i = 0; i < n; i++) { var k = (i + 0.5) / n, phi = Math.acos(1 - 2 * k), th = Math.PI * (1 + Math.sqrt(5)) * i; out[i * 3] = Math.cos(th) * Math.sin(phi); out[i * 3 + 1] = Math.cos(phi); out[i * 3 + 2] = Math.sin(th) * Math.sin(phi); }
   }
-  function shapeBadge(n, out) {
-    for (var i = 0; i < n; i++) { var ring = i % 4, t = i / n, radius = 0.32 + ring * 0.27, ang = t * 6.2832 * (ring + 1.6) + ring * 1.1; out[i * 3] = Math.cos(ang) * radius; out[i * 3 + 1] = Math.sin(ang) * radius * 0.92; out[i * 3 + 2] = (ring - 1.5) * 0.11; }
+  /* proof: a shield + a small seal ring, for "verified / certified" */
+  function shapeBadge(n, out, wx) {
+    var splitIdx = Math.round(n * 0.7), s = Math.min(wx, 1.3);
+    var shield = scaleX([[-0.55, 0.55], [0, 0.68], [0.55, 0.55], [0.55, 0.05], [0.3, -0.45], [0, -0.75], [-0.3, -0.45], [-0.55, 0.05]], s);
+    var seal = scaleX(circlePoly(0.2, 12, 0, -0.08), s);
+    sampleAlongPath(shield, splitIdx, out, 0); sampleAlongPath(seal, n - splitIdx, out, splitIdx);
   }
+  /* about: a head-and-shoulders bust silhouette, doubled for density */
   function shapeHelix(n, out, wx) {
-    var r = 0.5 * Math.min(wx, 1.3);
-    for (var i = 0; i < n; i++) { var t = i / n, strand = i % 2, ang = t * 8 * Math.PI + strand * Math.PI; out[i * 3] = Math.cos(ang) * r; out[i * 3 + 1] = (t - 0.5) * 2.1; out[i * 3 + 2] = Math.sin(ang) * r; }
+    var splitIdx = Math.round(n * 0.7), s = Math.min(wx, 1.15);
+    var bust = scaleX([[0, 0.75], [0.28, 0.55], [0.22, 0.32], [0.62, 0.05], [0.62, -0.55], [-0.62, -0.55], [-0.62, 0.05], [-0.22, 0.32], [-0.28, 0.55]], s);
+    sampleAlongPath(bust, splitIdx, out, 0); sampleAlongPath(bust, n - splitIdx, out, splitIdx);
   }
+  /* tools: a gear outline + its center hole */
   function shapeGrid(n, out, wx) {
-    var cols = Math.max(4, Math.round(Math.sqrt(n * wx))), rows = Math.ceil(n / cols);
-    for (var i = 0; i < n; i++) { var cx = i % cols, cy = Math.floor(i / cols) % rows; out[i * 3] = (cx / (cols - 1) - 0.5) * 2.1 * wx; out[i * 3 + 1] = (cy / Math.max(rows - 1, 1) - 0.5) * 1.5; out[i * 3 + 2] = ((i % 3) - 1) * 0.16; }
+    var splitIdx = Math.round(n * 0.7), s = Math.min(wx, 1.7);
+    var gear = scaleX(gearPoly(8, 0.64, 0.46), s), hole = scaleX(circlePoly(0.17, 10), s);
+    sampleAlongPath(gear, splitIdx, out, 0); sampleAlongPath(hole, n - splitIdx, out, splitIdx);
   }
+  /* projects: a folder with its tab + a small document inside it */
   function shapeProjects(n, out, wx) {
-    var clusters = 5, perC = Math.ceil(n / clusters);
-    for (var i = 0; i < n; i++) { var c = Math.floor(i / perC), cx = (c / (clusters - 1) - 0.5) * 2.5 * wx, local = i % perC, corner = local % 8; var bx = (corner & 1) ? 0.18 : -0.18, by = (corner & 2) ? 0.18 : -0.18, bz = (corner & 4) ? 0.18 : -0.18; out[i * 3] = cx + bx + (Math.random() - 0.5) * 0.04; out[i * 3 + 1] = by * 1.4 + (c % 2 ? 0.25 : -0.25); out[i * 3 + 2] = bz; }
+    var splitIdx = Math.round(n * 0.7), s = Math.min(wx, 1.6);
+    var folder = scaleX([[-0.75, -0.55], [0.75, -0.55], [0.75, 0.35], [0.15, 0.35], [0, 0.55], [-0.35, 0.55], [-0.5, 0.35], [-0.75, 0.35]], s);
+    var doc = scaleX([[-0.3, 0.15], [0.3, 0.15], [0.3, -0.3], [-0.3, -0.3]], s);
+    sampleAlongPath(folder, splitIdx, out, 0); sampleAlongPath(doc, n - splitIdx, out, splitIdx);
   }
-  function shapeJourney(n, out) {
-    for (var i = 0; i < n; i++) { var t = i / n, ang = t * 6 * Math.PI, r = 0.25 + t * 0.85; out[i * 3] = Math.cos(ang) * r; out[i * 3 + 1] = (t - 0.5) * 2.2; out[i * 3 + 2] = Math.sin(ang) * r * 0.6; }
+  /* journey: ascending stairs with a milestone flag at the top step */
+  function shapeJourney(n, out, wx) {
+    var splitIdx = Math.round(n * 0.7), s = Math.min(wx, 1.5);
+    var stairs = scaleX([[-0.7, -0.6], [-0.35, -0.6], [-0.35, -0.2], [0, -0.2], [0, 0.2], [0.35, 0.2], [0.35, 0.6], [0.7, 0.6]], s);
+    var flag = scaleX([[0.7, 0.6], [0.7, 1.0], [1.05, 0.85]], s);
+    sampleAlongPath(stairs, splitIdx, out, 0); sampleAlongPath(flag, n - splitIdx, out, splitIdx);
   }
+  /* play (Break In game): a padlock -- rectangular body + the shackle arc */
   function shapeRain(n, out, wx) {
-    var cols = Math.max(6, Math.round(10 * wx));
-    for (var i = 0; i < n; i++) { var col = i % cols, row = Math.floor(i / cols); out[i * 3] = (col / (cols - 1) - 0.5) * 2.4 * wx; out[i * 3 + 1] = ((row * 0.37) % 2) - 1; out[i * 3 + 2] = (col % 2 ? 0.1 : -0.1); }
+    var splitIdx = Math.round(n * 0.7), s = Math.min(wx, 1.15);
+    var body = scaleX([[-0.5, -0.15], [0.5, -0.15], [0.5, -0.75], [-0.5, -0.75]], s);
+    var shackle = scaleX(arcPoly(0, 0.05, 0.38, 200 * Math.PI / 180, -20 * Math.PI / 180, 10), s);
+    sampleAlongPath(body, splitIdx, out, 0); sampleAlongPath(shackle, n - splitIdx, out, splitIdx);
   }
+  /* arch: a hub-and-spoke network -- wide outer ring of nodes, tight inner hub cluster */
   function shapeHub(n, out, wx) {
-    for (var i = 0; i < n; i++) { var ring = i % 3, t = i / n, radius = (0.35 + ring * 0.42) * Math.min(wx, 1.6), ang = t * 6.2832 * (ring + 1); out[i * 3] = Math.cos(ang) * radius; out[i * 3 + 1] = Math.sin(ang) * radius * 0.5; out[i * 3 + 2] = (ring - 1) * 0.22; }
+    var splitIdx = Math.round(n * 0.7), s = Math.min(wx, 1.7);
+    var outer = scaleX(circlePoly(0.85, 14), s), inner = circlePoly(0.22, 10);
+    sampleAlongPath(outer, splitIdx, out, 0); sampleAlongPath(inner, n - splitIdx, out, splitIdx);
   }
-  function shapeFunnel(n, out) {
-    for (var i = 0; i < n; i++) { var t = i / n, ang = t * 10 * Math.PI, r = (1 - t) * 1.05 + 0.04; out[i * 3] = Math.cos(ang) * r; out[i * 3 + 1] = (t - 0.5) * 1.7; out[i * 3 + 2] = Math.sin(ang) * r; }
+  /* contact: a paper plane with a motion trail behind it */
+  function shapeFunnel(n, out, wx) {
+    var splitIdx = Math.round(n * 0.7), s = Math.min(wx, 1.4);
+    var plane = scaleX([[0.9, 0], [-0.7, 0.45], [-0.3, 0], [-0.7, -0.45]], s);
+    var trail = scaleX([[-1.0, 0.15], [-1.15, 0.15], [-1.1, -0.05], [-1.25, -0.05], [-1.2, 0.2], [-1.35, 0.2]], s);
+    sampleAlongPath(plane, splitIdx, out, 0); sampleAlongPath(trail, n - splitIdx, out, splitIdx);
   }
   function computeSceneTops() {
     var y = window.scrollY || 0;
@@ -98,14 +154,14 @@
   function buildShapes(n) {
     var wx = Math.min(Math.max(innerWidth / Math.max(innerHeight, 1), 1), 1.9);
     glShapes = { hero: glNodePos };
-    glShapes.proof = new Float32Array(n * 3); shapeBadge(n, glShapes.proof);
+    glShapes.proof = new Float32Array(n * 3); shapeBadge(n, glShapes.proof, wx);
     glShapes.about = new Float32Array(n * 3); shapeHelix(n, glShapes.about, wx);
     glShapes.tools = new Float32Array(n * 3); shapeGrid(n, glShapes.tools, wx);
     glShapes.projects = new Float32Array(n * 3); shapeProjects(n, glShapes.projects, wx);
-    glShapes.journey = new Float32Array(n * 3); shapeJourney(n, glShapes.journey);
+    glShapes.journey = new Float32Array(n * 3); shapeJourney(n, glShapes.journey, wx);
     glShapes.play = new Float32Array(n * 3); shapeRain(n, glShapes.play, wx);
     glShapes.arch = new Float32Array(n * 3); shapeHub(n, glShapes.arch, wx);
-    glShapes.contact = new Float32Array(n * 3); shapeFunnel(n, glShapes.contact);
+    glShapes.contact = new Float32Array(n * 3); shapeFunnel(n, glShapes.contact, wx);
     glTargetPos = new Float32Array(n * 3);
     computeSceneTops();
   }
@@ -115,6 +171,7 @@
     for (i = 0; i < m - 1; i++) { if (sy >= tops[i + 1]) idx = i + 1; }
     var bIdx = Math.min(idx + 1, m - 1), ta = tops[idx], tb = tops[bIdx];
     var frac = (bIdx > idx && tb > ta) ? Math.min(1, Math.max(0, (sy - ta) / (tb - ta))) : 0;
+    glHeroAmt = idx === 0 ? (1 - frac) : 0;
     var A = glShapes[SCENE_ORDER[idx]], B = glShapes[SCENE_ORDER[bIdx]];
     for (i = 0; i < glTargetPos.length; i++) glTargetPos[i] = A[i] + (B[i] - A[i]) * frac;
   }
@@ -170,6 +227,10 @@
     }
     G.links = pairs.length / 2; glLinkPairs = pairs;
     buildShapes(n);
+    var splitIdx = Math.round(n * 0.7), iconPairs = [];
+    for (i = 0; i < splitIdx; i++) iconPairs.push(i, (i + 1) % splitIdx);
+    for (i = splitIdx; i < n; i++) iconPairs.push(i, splitIdx + ((i - splitIdx + 1) % (n - splitIdx)));
+    glIconPairs = iconPairs;
     if (!glSupported) return;
     var P = pal();
     if (glNodes) { glGroup.remove(glNodes); glNodes.geometry.dispose(); glNodes.material.dispose(); }
@@ -188,6 +249,12 @@
     var lgeo = new THREE.BufferGeometry(); lgeo.setAttribute('position', new THREE.BufferAttribute(lpos, 3));
     glLinks = new THREE.LineSegments(lgeo, new THREE.LineBasicMaterial({ color: 'rgb(' + P.link + ')', transparent: true, opacity: .16 }));
     glGroup.add(glLinks);
+    if (glIconLinks) { glGroup.remove(glIconLinks); glIconLinks.geometry.dispose(); glIconLinks.material.dispose(); }
+    var ipos = new Float32Array(iconPairs.length * 3);
+    for (i = 0; i < iconPairs.length; i += 2) { var ia = iconPairs[i], ib = iconPairs[i + 1], io = (i / 2) * 6; ipos[io] = glNodeStart[ia * 3]; ipos[io + 1] = glNodeStart[ia * 3 + 1]; ipos[io + 2] = glNodeStart[ia * 3 + 2]; ipos[io + 3] = glNodeStart[ib * 3]; ipos[io + 4] = glNodeStart[ib * 3 + 1]; ipos[io + 5] = glNodeStart[ib * 3 + 2]; }
+    var igeo = new THREE.BufferGeometry(); igeo.setAttribute('position', new THREE.BufferAttribute(ipos, 3));
+    glIconLinks = new THREE.LineSegments(igeo, new THREE.LineBasicMaterial({ color: 'rgb(' + P.link + ')', transparent: true, opacity: 0 }));
+    glGroup.add(glIconLinks);
   }
 
   function sizeGlobe() {
@@ -207,6 +274,7 @@
     glNodes.material.color.setStyle('rgb(' + P.node + ')');
     glHot.material.color.setStyle('rgb(' + P.hot + ')');
     glLinks.material.color.setStyle('rgb(' + P.link + ')');
+    if (glIconLinks) glIconLinks.material.color.setStyle('rgb(' + P.link + ')');
 
     var npos = glNodes.geometry.attributes.position.array, n = npos.length / 3;
     for (i = 0; i < n; i++) { var f = assembleFrac(glNodeDelay[i]); lerp3(npos, i * 3, glNodeStart[i * 3], glNodeStart[i * 3 + 1], glNodeStart[i * 3 + 2], glTargetPos[i * 3], glTargetPos[i * 3 + 1], glTargetPos[i * 3 + 2], f); }
@@ -223,7 +291,19 @@
       lerp3(lpos, o + 3, glNodeStart[b * 3], glNodeStart[b * 3 + 1], glNodeStart[b * 3 + 2], glTargetPos[b * 3], glTargetPos[b * 3 + 1], glTargetPos[b * 3 + 2], fb);
     }
     glLinks.geometry.attributes.position.needsUpdate = true;
-    glLinks.material.opacity = .16 * Math.min(1, Math.max(0, (G.assemble - 0.5) / 0.4));
+
+    if (glIconLinks) {
+      var ipos = glIconLinks.geometry.attributes.position.array;
+      for (i = 0; i < glIconPairs.length; i += 2) {
+        var ia = glIconPairs[i], ib = glIconPairs[i + 1], io = (i / 2) * 6, fia = assembleFrac(glNodeDelay[ia]), fib = assembleFrac(glNodeDelay[ib]);
+        lerp3(ipos, io, glNodeStart[ia * 3], glNodeStart[ia * 3 + 1], glNodeStart[ia * 3 + 2], glTargetPos[ia * 3], glTargetPos[ia * 3 + 1], glTargetPos[ia * 3 + 2], fia);
+        lerp3(ipos, io + 3, glNodeStart[ib * 3], glNodeStart[ib * 3 + 1], glNodeStart[ib * 3 + 2], glTargetPos[ib * 3], glTargetPos[ib * 3 + 1], glTargetPos[ib * 3 + 2], fib);
+      }
+      glIconLinks.geometry.attributes.position.needsUpdate = true;
+    }
+    var linkBase = .16 * Math.min(1, Math.max(0, (G.assemble - 0.5) / 0.4));
+    glLinks.material.opacity = linkBase * glHeroAmt;
+    if (glIconLinks) glIconLinks.material.opacity = linkBase * (1 - glHeroAmt);
 
     var e = ease3(G.grow), ringOp = .22 * e;
     glRing1.material.opacity = ringOp; glRing2.material.opacity = ringOp * .85;
