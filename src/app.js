@@ -145,7 +145,26 @@
   /* ---------- loader: counter drives the percentage readout ---------- */
   var seen = false;
   try { seen = sessionStorage.getItem('seen') === '1'; if (localStorage.getItem('introAt')) seen = true; } catch (e) {}
-  var pctEl = $('.ld-pct'), barEl = $('.ld-bar span'), msgEl = $('.ld-msg'), ldSpans = $$('.ld-line span');
+  var pctEl = $('.ld-pct'), barEl = $('.ld-bar span'), msgEl = $('.ld-msg');
+  /* the loader's name builds letter by letter as real progress comes in (not a canned loop) -- it decrypts
+     into "Farhan" the same way the hero's own name does right after, so the same motif carries across the handoff */
+  var LD_GLYPHS = 'ABCDEF0123456789#/_:.', ldNameEl = $('.ld-name'), ldChars = [];
+  if (ldNameEl) {
+    var ldFinal = ldNameEl.textContent; ldNameEl.textContent = '';
+    ldFinal.split('').forEach(function (ch) {
+      var s = document.createElement('span'); s.className = 'ch'; s.dataset.final = ch; s.textContent = ch === ' ' ? ' ' : LD_GLYPHS[Math.floor(Math.random() * LD_GLYPHS.length)];
+      ldNameEl.appendChild(s); ldChars.push(s);
+    });
+  }
+  function updateLdName(p) {
+    var n = ldChars.length; if (!n) return;
+    for (var i = 0; i < n; i++) {
+      var s = ldChars[i], f = s.dataset.final; if (f === ' ') continue;
+      var revealed = p >= (i + 1) / n * 0.92;
+      if (revealed) { if (s.textContent !== f) { s.textContent = f; s.classList.add('lock'); } }
+      else if (Math.random() < 0.55) s.textContent = LD_GLYPHS[Math.floor(Math.random() * LD_GLYPHS.length)];
+    }
+  }
   function finishLoader() {
     root.classList.add('loaded');
     glitchUntil = performance.now() + 220; glitchCols = rainCols.filter(function () { return Math.random() < 0.35; });
@@ -161,7 +180,7 @@
     if (pctEl) pctEl.textContent = shown + '%';
     if (barEl) barEl.style.transform = 'scaleX(' + shown / 100 + ')';
     if (msgEl) msgEl.textContent = shown < 34 ? 'decrypting stream' : shown < 70 ? 'parsing glyphs' : shown < 100 ? 'syncing signal' : 'ready';
-    if (motion) ldSpans.forEach(function (s) { var a = s.getAnimations && s.getAnimations()[0]; if (a) a.playbackRate = 1 + p * 1.1; });
+    if (motion) updateLdName(p); else ldChars.forEach(function (s) { if (s.dataset.final !== ' ') s.textContent = s.dataset.final; });
     if (p >= 1 && loaded) finishLoader(); else requestAnimationFrame(tick);
   })(t0);
 
@@ -1141,6 +1160,16 @@
     lastN = performance.now(); /* give the page a moment of quiet before the next idle nudge */
     if (sleep) needMove = true; else ringPop();
   }
+  /* watchdog: a long background-tab suspension (or any state the fight's own logic doesn't cleanly unwind from)
+     can leave `roam`/`ST` alive with nothing left driving their frame loop -- so moving the mouse requests an
+     end (endRoam sets roam.back + ST.abort) but nothing ever finishes it. This guarantees it always clears:
+     a fight that's been running too long, or a retreat that's been asked for but hasn't resolved, gets force-ended. */
+  setInterval(function () {
+    if (!roam || !ST) return;
+    var now = performance.now();
+    if (roam.back && ST.abort && now - ST.abort > 3000) { finishStory(false); return; }
+    if (ST.born && now - ST.born > 120000) finishStory(false);
+  }, 2000);
 
   if (QS.get('debug')) window.__adv = function (ms) { if (!ST || !roam) return; var n = Math.ceil(ms / 40), P = pal(), i; for (i = 0; i < n && ST; i++) stepStory(roam, 40, performance.now(), P); };
   if (QS.get('debug')) window.__st = function () { return ST && { ph: ST.ph, round: ST.round, win: ST.win, pt: Math.round(ST.pt), rt: Math.round(ST.rt), ehp: ST.e && Math.round(ST.e.hp), fhp: Math.round(ST.f.hp), em: ST.e && +ST.e.m.toFixed(2), fm: +ST.f.m.toFixed(2), ftr: ST.f.tr && ST.f.tr.st, etr: ST.e && ST.e.tr && ST.e.tr.st, fy: Math.round(ST.f.y), ey: ST.e && Math.round(ST.e.y), fx: Math.round(ST.f.x), ex: ST.e && Math.round(ST.e.x), top: ST.pl && Math.round(ST.pl.getBoundingClientRect().top), fmode: ST.f.mode, emode: ST.e && ST.e.mode, fh: ST.f.hitNext, eh: ST.e && ST.e.hitNext, fafter: ST.f.after, fwant: Math.round(ST.f.want), burst: ST.f.burst, mt: Math.round(ST.f.mt), eair: ST.e && ST.e.air, fstag: Math.round(ST.f.stag), ns: ST.ns, nsp: ST.nsp, nclash: ST.nclash, nup: ST.nup, slow: ST.slow, nsd: ST.nsd, nsa: ST.nsa, move: ST.move, cap: ST.capKey, quiet: ST.quiet, nfire: ST.nfire, nhit: ST.nhit, ei: ST.plan && ST.plan.ei, en: ST.plan && ST.plan.e.length, killed: ST.killed, lasers: ST.lasers.length, l0: ST.lasers[0] && { x: Math.round(ST.lasers[0].x), y: Math.round(ST.lasers[0].y), mech: !!ST.lasers[0].mech }, parts: ST.parts.length, ast: AST.length, hidden: AST.filter(function (a) { return a.hide; }).length }; };
@@ -1602,7 +1631,8 @@
     if (navigator.vibrate && IS_TOUCH && navigator.userActivation && navigator.userActivation.hasBeenActive) navigator.vibrate([14, 40, 14]);
   }
   nBtns.addEventListener('click', function (e) { var bt = e.target.closest && e.target.closest('button'); if (bt && bt.hasAttribute('data-close')) hideNudge(); });
-  setInterval(function () {
+  /* idle nudges are a desktop/mouse-idle concept (and their anchored tooltip positioning doesn't translate well to a phone's layout/viewport chrome) -- skip them entirely on touch */
+  if (!IS_TOUCH) setInterval(function () {
     if (document.hidden || !root.classList.contains('done') || !motion || roam || nCount >= 3) return;
     var now = performance.now(), idle = now - lastAct, gap = +QS.get('nudgegap') || Math.min(150000 + nCount * 60000, 420000);
     if (idle > (+QS.get('nudgeidle') || 50000) && now - lastN > gap) showNudge();
@@ -1618,11 +1648,10 @@
     var cert = medalLink.getAttribute('data-cert'); if (!cert) return;
     (navigator.clipboard ? navigator.clipboard.writeText(cert) : Promise.reject()).then(function () { say('Cert copied: ' + cert); }, function () { say(cert); });
   });
-  var shareBtn = $('#share'), shareBtnM = $('#share-m'), sheet = $('#sheet'), sheetBg = $('#sheetbg'), shareData = { title: document.title, text: 'Farhan, CPENT-certified penetration tester. Tools, writeups and contact.', url: location.origin + location.pathname };
+  var shareBtn = $('#share'), sheet = $('#sheet'), sheetBg = $('#sheetbg'), shareData = { title: document.title, text: 'Farhan, CPENT-certified penetration tester. Tools, writeups and contact.', url: location.origin + location.pathname };
   function openSheet() { if (!sheet) return; var nat = $('.sh-native', sheet); if (nat) nat.style.display = navigator.share ? '' : 'none'; sheet.style.transform = ''; sheet.removeAttribute('inert'); sheet.setAttribute('aria-hidden', 'false'); root.classList.add('sheet-open'); }
   function closeSheet() { if (!sheet) return; root.classList.remove('sheet-open'); sheet.setAttribute('inert', ''); sheet.setAttribute('aria-hidden', 'true'); sheet.style.transform = ''; sheet.classList.remove('drag'); }
   if (shareBtn) shareBtn.addEventListener('click', openSheet);
-  if (shareBtnM) shareBtnM.addEventListener('click', openSheet);
   if (sheetBg) sheetBg.addEventListener('click', closeSheet);
   window.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeSheet(); });
   if (sheet) {
@@ -1636,7 +1665,7 @@
     sheet.addEventListener('touchmove', function (e) { if (!dragging) return; dY = Math.max(0, e.touches[0].clientY - sY); sheet.style.transform = 'translateY(' + dY + 'px)'; }, { passive: true });
     sheet.addEventListener('touchend', function () { if (!dragging) return; dragging = false; sheet.classList.remove('drag'); if (dY > 90) closeSheet(); else sheet.style.transform = ''; });
   }
-  $$('.tabbar a, .tabbar button, .share').forEach(function (el) { el.addEventListener('pointerdown', function () { if (navigator.vibrate && IS_TOUCH) navigator.vibrate(8); }); });
+  $$('.tabbar a, .share').forEach(function (el) { el.addEventListener('pointerdown', function () { if (navigator.vibrate && IS_TOUCH) navigator.vibrate(8); }); });
 
   /* the brand mark has its own tiny easter egg: it talks back once per visit, then goes quiet */
   (function brandSpeaks() {
