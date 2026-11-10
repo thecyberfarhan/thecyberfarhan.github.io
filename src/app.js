@@ -48,280 +48,97 @@
     });
   });
 
-  /* ---------- the globe: real WebGL (Three.js) now, assembles during loading, stays as the page background ---------- */
+  /* ---------- digital rain: the one persistent background, plain 2D canvas, no WebGL ---------- */
   var sy = 0;
-  var gl = $('#globe'), gp = [];
-  var G = { assemble: 0, grow: 0, rot: 0, tilt: 0.35, mx: 0, my: 0, running: false, show: true, t0: performance.now(), links: 0 };
-  function ease3(x) { return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; }
-
-  var glSupported = true, glRenderer, glScene, glCamera, glGroup, glNodes, glHot, glLinks, glIconLinks, glRing1, glRing2, glLight, glSatL, glSatR, glSpriteTex;
-  var glNodePos, glNodeStart, glNodeDelay, glHotIdx = [], glLinkPairs = [], glIconPairs = [];
-
-  /* ---------- the globe morphs into a recognizable icon per section as you scroll ---------- */
-  var SCENE_ORDER = ['hero', 'proof', 'about', 'tools', 'projects', 'journey', 'play', 'arch', 'contact'];
-  var glShapes = {}, glSceneTops = [], glTargetPos, glHeroAmt = 1;
-
-  var TAU = 6.283185307;
-  function shapeSphere(n, out) {
-    for (var i = 0; i < n; i++) { var k = (i + 0.5) / n, phi = Math.acos(1 - 2 * k), th = Math.PI * (1 + Math.sqrt(5)) * i; out[i * 3] = Math.cos(th) * Math.sin(phi); out[i * 3 + 1] = Math.cos(phi); out[i * 3 + 2] = Math.sin(th) * Math.sin(phi); }
-  }
-  /* proof: a (2,3) torus knot -- an unbroken ribbon, like an infinity/achievement loop */
-  function shapeBadge(n, out, wx) {
-    var s = Math.min(wx, 1.4), R = 0.55, r = 0.22;
-    for (var i = 0; i < n; i++) { var t = i / n * TAU; out[i * 3] = (R + r * Math.cos(3 * t)) * Math.cos(2 * t) * s; out[i * 3 + 1] = (R + r * Math.cos(3 * t)) * Math.sin(2 * t); out[i * 3 + 2] = r * Math.sin(3 * t); }
-  }
-  /* about: a woven 3D lissajous curve -- intricate, personal, never quite repeating */
-  function shapeHelix(n, out, wx) {
-    var s = Math.min(wx, 1.2);
-    for (var i = 0; i < n; i++) { var t = i / n * TAU; out[i * 3] = Math.sin(3 * t + Math.PI / 2) * 0.62 * s; out[i * 3 + 1] = Math.sin(2 * t) * 0.62; out[i * 3 + 2] = Math.sin(5 * t) * 0.3; }
-  }
-  /* tools: a five-petal rose curve -- precise, mechanical, gear-like */
-  function shapeGrid(n, out, wx) {
-    var s = Math.min(wx, 1.7);
-    for (var i = 0; i < n; i++) { var t = i / n * TAU, rad = Math.cos(5 * t) * 0.72; out[i * 3] = rad * Math.cos(t) * s; out[i * 3 + 1] = rad * Math.sin(t); out[i * 3 + 2] = Math.sin(t * 3) * 0.12; }
-  }
-  /* projects: a double spiral galaxy, spread wide -- many bodies, one system */
-  function shapeProjects(n, out, wx) {
-    var s = Math.min(wx, 1.85);
-    for (var i = 0; i < n; i++) { var t = i / n, arm = i % 2, ang = t * TAU * 3 + arm * Math.PI, rad = 0.12 + t * 0.95; out[i * 3] = Math.cos(ang) * rad * s; out[i * 3 + 1] = Math.sin(ang) * rad * 0.62; out[i * 3 + 2] = (arm - 0.5) * 0.25; }
-  }
-  /* journey: a climbing helix with a gentle breathing radius -- ascent, not a straight line */
-  function shapeJourney(n, out, wx) {
-    var s = Math.min(wx, 1.3);
-    for (var i = 0; i < n; i++) { var t = i / n, ang = t * TAU * 5, rad = (0.46 + Math.sin(t * TAU * 0.5) * 0.1) * s; out[i * 3] = Math.cos(ang) * rad; out[i * 3 + 1] = (t - 0.5) * 2.3; out[i * 3 + 2] = Math.sin(ang) * rad; }
-  }
-  /* play (Break In game): a sphere mid-shatter -- nodes blown outward along their own normal, sheared by a twist */
-  function shapeRain(n, out, wx) {
-    var s = Math.min(wx, 1.55);
-    for (var i = 0; i < n; i++) {
-      var k = (i + 0.5) / n, phi = Math.acos(1 - 2 * k), th = Math.PI * (1 + Math.sqrt(5)) * i;
-      var bx = Math.cos(th) * Math.sin(phi), by = Math.cos(phi), bz = Math.sin(th) * Math.sin(phi);
-      var dist = 0.45 + Math.random() * 1.15, twist = dist * 1.8, ct = Math.cos(twist), st = Math.sin(twist);
-      var rx = bx * ct - bz * st, rz = bx * st + bz * ct;
-      out[i * 3] = rx * dist * s; out[i * 3 + 1] = by * dist * 0.8; out[i * 3 + 2] = rz * dist;
-    }
-  }
-  /* arch: a woven torus network -- major ring of nodes, each wandering a minor orbit */
-  function shapeHub(n, out, wx) {
-    var s = Math.min(wx, 1.85), majorR = 0.68, minorR = 0.3;
-    for (var i = 0; i < n; i++) { var major = i / n * TAU, minor = (i * 2.399963) % TAU; out[i * 3] = (majorR + minorR * Math.cos(minor)) * Math.cos(major) * s; out[i * 3 + 1] = (majorR + minorR * Math.cos(minor)) * Math.sin(major) * 0.62; out[i * 3 + 2] = minorR * Math.sin(minor); }
-  }
-  /* contact: a vortex spiraling down to a point -- a signal being pulled through and sent */
-  function shapeFunnel(n, out, wx) {
-    var s = Math.min(wx, 1.25);
-    for (var i = 0; i < n; i++) { var t = i / n, ang = t * TAU * 8, rad = ((1 - t) * 1.0 + 0.03) * s; out[i * 3] = Math.cos(ang) * rad; out[i * 3 + 1] = (t - 0.5) * 1.9; out[i * 3 + 2] = Math.sin(ang) * rad; }
-  }
-  function computeSceneTops() {
-    var y = window.scrollY || 0;
-    glSceneTops = SCENE_ORDER.map(function (id) { var el = document.getElementById(id); return el ? el.getBoundingClientRect().top + y : 0; });
-  }
-  function buildShapes(n) {
-    var wx = Math.min(Math.max(innerWidth / Math.max(innerHeight, 1), 1), 1.9);
-    glShapes = { hero: glNodePos };
-    glShapes.proof = new Float32Array(n * 3); shapeBadge(n, glShapes.proof, wx);
-    glShapes.about = new Float32Array(n * 3); shapeHelix(n, glShapes.about, wx);
-    glShapes.tools = new Float32Array(n * 3); shapeGrid(n, glShapes.tools, wx);
-    glShapes.projects = new Float32Array(n * 3); shapeProjects(n, glShapes.projects, wx);
-    glShapes.journey = new Float32Array(n * 3); shapeJourney(n, glShapes.journey, wx);
-    glShapes.play = new Float32Array(n * 3); shapeRain(n, glShapes.play, wx);
-    glShapes.arch = new Float32Array(n * 3); shapeHub(n, glShapes.arch, wx);
-    glShapes.contact = new Float32Array(n * 3); shapeFunnel(n, glShapes.contact, wx);
-    glTargetPos = new Float32Array(n * 3);
-    computeSceneTops();
-  }
-  function updateMorphTarget() {
-    if (!glTargetPos || !glSceneTops.length) return;
-    var tops = glSceneTops, m = SCENE_ORDER.length, idx = 0, i;
-    for (i = 0; i < m - 1; i++) { if (sy >= tops[i + 1]) idx = i + 1; }
-    var bIdx = Math.min(idx + 1, m - 1), ta = tops[idx], tb = tops[bIdx];
-    var frac = (bIdx > idx && tb > ta) ? Math.min(1, Math.max(0, (sy - ta) / (tb - ta))) : 0;
-    glHeroAmt = idx === 0 ? (1 - frac) : 0;
-    var A = glShapes[SCENE_ORDER[idx]], B = glShapes[SCENE_ORDER[bIdx]];
-    for (i = 0; i < glTargetPos.length; i++) glTargetPos[i] = A[i] + (B[i] - A[i]) * frac;
-    if (motion) {
-      var wob = motionLevel === 2 ? 0.045 : 0.025, tt = performance.now() * 0.0006, pn = glTargetPos.length / 3;
-      for (i = 0; i < pn; i++) { glTargetPos[i * 3] += Math.sin(tt + i * 0.7) * wob; glTargetPos[i * 3 + 2] += Math.cos(tt * 1.3 + i * 0.5) * wob; }
-    }
-  }
-
-  (function initGL() {
-    if (!gl || !window.THREE) { glSupported = false; return; }
-    try { glRenderer = new THREE.WebGLRenderer({ canvas: gl, alpha: true, antialias: true }); }
-    catch (e) { glSupported = false; return; }
-    if (!glRenderer.getContext()) { glSupported = false; return; }
-    glScene = new THREE.Scene();
-    glCamera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
-    glCamera.position.z = 4.6;
-    glGroup = new THREE.Group();
-    glScene.add(glGroup);
-    glScene.add(new THREE.AmbientLight('#7FA8CC', 0.5));
-    (function glowTex() {
-      var c = document.createElement('canvas'); c.width = c.height = 64;
-      var cx = c.getContext('2d'), g = cx.createRadialGradient(32, 32, 0, 32, 32, 32);
-      g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(255,255,255,.55)'); g.addColorStop(1, 'rgba(255,255,255,0)');
-      cx.fillStyle = g; cx.fillRect(0, 0, 64, 64);
-      glSpriteTex = new THREE.CanvasTexture(c);
-    })();
-    glLight = new THREE.PointLight('#C2686C', 2.2, 12, 1.4); glLight.position.set(1.4, 0.9, 2.2); glScene.add(glLight);
-    function ring(radius, tiltX, tiltZ, color) {
-      var m = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.006, 8, 96), new THREE.MeshStandardMaterial({ color: color, transparent: true, opacity: 0, roughness: 0.35, metalness: 0.6, emissive: color, emissiveIntensity: 0.3 }));
-      m.rotation.x = tiltX; m.rotation.z = tiltZ; return m;
-    }
-    glRing1 = ring(1.32, 1.15, 0.5, '#7FA8CC'); glGroup.add(glRing1);
-    glRing2 = ring(1.58, 0.55, -0.9, '#B4232C'); glGroup.add(glRing2);
-    function satellite(x, scale) {
-      var grp = new THREE.Group(); grp.position.set(x, 0, -0.6); grp.scale.setScalar(scale);
-      var ring = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.004, 6, 48), new THREE.MeshStandardMaterial({ color: '#C79A66', transparent: true, opacity: 0, roughness: 0.4, metalness: 0.5, emissive: '#C79A66', emissiveIntensity: 0.25 }));
-      ring.rotation.x = 1.1; grp.add(ring);
-      var dotGeo = new THREE.BufferGeometry(); var dp = new Float32Array(10 * 3);
-      for (var i = 0; i < 10; i++) { var a = (i / 10) * 6.283; dp[i * 3] = Math.cos(a) * 0.42; dp[i * 3 + 1] = Math.sin(a) * 0.42 * 0.35; dp[i * 3 + 2] = Math.sin(a) * 0.12; }
-      dotGeo.setAttribute('position', new THREE.BufferAttribute(dp, 3));
-      var dots = new THREE.Points(dotGeo, new THREE.PointsMaterial({ color: '#7FA8CC', size: .045, transparent: true, opacity: 0, sizeAttenuation: true, depthWrite: false }));
-      dots.rotation.x = 1.1; grp.add(dots);
-      glScene.add(grp); return { grp: grp, ring: ring, dots: dots };
-    }
-    if (innerWidth >= 900) { glSatL = satellite(-2.35, 0.8); glSatR = satellite(2.35, 0.8); }
+  var gl = $('#globe'), gctx = gl && gl.getContext && gl.getContext('2d');
+  var GW = 0, GH = 0, rainCols = [];
+  var RAIN_CHARS = '0123456789ABCDEF/\\#:_.>-'.split('');
+  var SECTION_ORDER = ['hero', 'proof', 'about', 'tools', 'projects', 'journey', 'play', 'arch', 'contact'];
+  var SECTION_TINT = { hero: 'steel', proof: 'lav', about: 'steel', tools: 'bronze', projects: 'bronze', journey: 'steel', play: 'red', arch: 'steel', contact: 'steel' };
+  var sectionTops = [], tintRGB = {}, curTintRGB = [127, 168, 204];
+  (function cacheTints() {
+    var cs = getComputedStyle(root), seen = {};
+    SECTION_ORDER.forEach(function (id) {
+      var key = SECTION_TINT[id]; if (seen[key]) return; seen[key] = 1;
+      var hex = cs.getPropertyValue('--' + key).trim(), m = /^#([0-9a-f]{6})$/i.exec(hex);
+      tintRGB[key] = m ? [parseInt(m[1].substr(0, 2), 16), parseInt(m[1].substr(2, 2), 16), parseInt(m[1].substr(4, 2), 16)] : [127, 168, 204];
+    });
   })();
-
-  function buildGlobe() {
-    var n = Math.round((innerWidth < 760 ? 70 : 120) * (motionLevel === 2 ? 1.4 : 1)), i;
-    gp = []; glHotIdx = [];
-    glNodePos = new Float32Array(n * 3); glNodeStart = new Float32Array(n * 3); glNodeDelay = new Float32Array(n);
-    var pairs = [];
-    for (i = 0; i < n; i++) {
-      var k = (i + 0.5) / n, phi = Math.acos(1 - 2 * k), th = Math.PI * (1 + Math.sqrt(5)) * i;
-      glNodePos[i * 3] = Math.cos(th) * Math.sin(phi); glNodePos[i * 3 + 1] = Math.cos(phi); glNodePos[i * 3 + 2] = Math.sin(th) * Math.sin(phi);
-      var sr = 2.4 + Math.random() * 1.6, sth = Math.random() * 6.283, sph = Math.random() * 3.1416;
-      glNodeStart[i * 3] = Math.cos(sth) * Math.sin(sph) * sr; glNodeStart[i * 3 + 1] = (Math.random() - 0.5) * sr * 1.4; glNodeStart[i * 3 + 2] = Math.sin(sth) * Math.sin(sph) * sr;
-      glNodeDelay[i] = Math.random() * 0.6;
-      var hot = i % 19 === 0; gp.push({ hot: hot }); if (hot) glHotIdx.push(i);
-    }
-    for (i = 0; i < n; i++) for (var q = i + 1; q < n; q++) {
-      var dx = glNodePos[i * 3] - glNodePos[q * 3], dy = glNodePos[i * 3 + 1] - glNodePos[q * 3 + 1], dz = glNodePos[i * 3 + 2] - glNodePos[q * 3 + 2];
-      if (dx * dx + dy * dy + dz * dz < 0.36) { pairs.push(i, q); }
-    }
-    G.links = pairs.length / 2; glLinkPairs = pairs;
-    buildShapes(n);
-    var iconPairs = [];
-    for (i = 0; i < n; i++) iconPairs.push(i, (i + 1) % n);
-    glIconPairs = iconPairs;
-    if (!glSupported) return;
-    var P = pal();
-    if (glNodes) { glGroup.remove(glNodes); glNodes.geometry.dispose(); glNodes.material.dispose(); }
-    var ngeo = new THREE.BufferGeometry(); ngeo.setAttribute('position', new THREE.BufferAttribute(glNodeStart.slice(), 3));
-    glNodes = new THREE.Points(ngeo, new THREE.PointsMaterial({ color: 'rgb(' + P.node + ')', size: .09, map: glSpriteTex, transparent: true, opacity: .85, sizeAttenuation: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-    glGroup.add(glNodes);
-    if (glHot) { glGroup.remove(glHot); glHot.geometry.dispose(); glHot.material.dispose(); }
-    var hotStart = new Float32Array(glHotIdx.length * 3);
-    for (i = 0; i < glHotIdx.length; i++) { var hi = glHotIdx[i]; hotStart[i * 3] = glNodeStart[hi * 3]; hotStart[i * 3 + 1] = glNodeStart[hi * 3 + 1]; hotStart[i * 3 + 2] = glNodeStart[hi * 3 + 2]; }
-    var hgeo = new THREE.BufferGeometry(); hgeo.setAttribute('position', new THREE.BufferAttribute(hotStart, 3));
-    glHot = new THREE.Points(hgeo, new THREE.PointsMaterial({ color: 'rgb(' + P.hot + ')', size: .19, map: glSpriteTex, transparent: true, opacity: 1, sizeAttenuation: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-    glGroup.add(glHot);
-    if (glLinks) { glGroup.remove(glLinks); glLinks.geometry.dispose(); glLinks.material.dispose(); }
-    var lpos = new Float32Array(pairs.length * 3);
-    for (i = 0; i < pairs.length; i += 2) { var a = pairs[i], b = pairs[i + 1], o = (i / 2) * 6; lpos[o] = glNodeStart[a * 3]; lpos[o + 1] = glNodeStart[a * 3 + 1]; lpos[o + 2] = glNodeStart[a * 3 + 2]; lpos[o + 3] = glNodeStart[b * 3]; lpos[o + 4] = glNodeStart[b * 3 + 1]; lpos[o + 5] = glNodeStart[b * 3 + 2]; }
-    var lgeo = new THREE.BufferGeometry(); lgeo.setAttribute('position', new THREE.BufferAttribute(lpos, 3));
-    glLinks = new THREE.LineSegments(lgeo, new THREE.LineBasicMaterial({ color: 'rgb(' + P.link + ')', transparent: true, opacity: .16 }));
-    glGroup.add(glLinks);
-    if (glIconLinks) { glGroup.remove(glIconLinks); glIconLinks.geometry.dispose(); glIconLinks.material.dispose(); }
-    var ipos = new Float32Array(iconPairs.length * 3);
-    for (i = 0; i < iconPairs.length; i += 2) { var ia = iconPairs[i], ib = iconPairs[i + 1], io = (i / 2) * 6; ipos[io] = glNodeStart[ia * 3]; ipos[io + 1] = glNodeStart[ia * 3 + 1]; ipos[io + 2] = glNodeStart[ia * 3 + 2]; ipos[io + 3] = glNodeStart[ib * 3]; ipos[io + 4] = glNodeStart[ib * 3 + 1]; ipos[io + 5] = glNodeStart[ib * 3 + 2]; }
-    var igeo = new THREE.BufferGeometry(); igeo.setAttribute('position', new THREE.BufferAttribute(ipos, 3));
-    glIconLinks = new THREE.LineSegments(igeo, new THREE.LineBasicMaterial({ color: 'rgb(' + P.link + ')', transparent: true, opacity: 0 }));
-    glGroup.add(glIconLinks);
+  function computeSectionTops() {
+    var y = window.scrollY || 0;
+    sectionTops = SECTION_ORDER.map(function (id) { var el = document.getElementById(id); return el ? el.getBoundingClientRect().top + y : 0; });
+  }
+  function updateTint() {
+    if (!sectionTops.length) return;
+    var m = SECTION_ORDER.length, idx = 0, i;
+    for (i = 0; i < m - 1; i++) { if (sy >= sectionTops[i + 1]) idx = i + 1; }
+    var bIdx = Math.min(idx + 1, m - 1), ta = sectionTops[idx], tb = sectionTops[bIdx];
+    var frac = (bIdx > idx && tb > ta) ? Math.min(1, Math.max(0, (sy - ta) / (tb - ta))) : 0;
+    var A = tintRGB[SECTION_TINT[SECTION_ORDER[idx]]], B = tintRGB[SECTION_TINT[SECTION_ORDER[bIdx]]];
+    curTintRGB = [A[0] + (B[0] - A[0]) * frac, A[1] + (B[1] - A[1]) * frac, A[2] + (B[2] - A[2]) * frac];
   }
 
-  function sizeGlobe() {
-    if (!gl || !glSupported || !glRenderer) return;
-    var d = Math.min(window.devicePixelRatio || 1, innerWidth < 760 ? 1.25 : 1.5);
-    glRenderer.setPixelRatio(d); glRenderer.setSize(innerWidth, innerHeight, false);
-    glCamera.aspect = innerWidth / Math.max(innerHeight, 1); glCamera.updateProjectionMatrix();
+  function rainSpeed() { return (motionLevel === 2 ? 1.25 : motionLevel === 0 ? 0.65 : 0.95) * (0.5 + Math.random() * 0.6); }
+  function buildRain() {
+    if (!gctx) return;
+    var colW = innerWidth < 760 ? 20 : 24, cols = Math.ceil(innerWidth / colW), density = motionLevel === 0 ? 0.4 : motionLevel === 2 ? 0.6 : 0.5, i;
+    rainCols = [];
+    for (i = 0; i < cols; i++) {
+      if (Math.random() > density) continue;
+      var len = 5 + Math.floor(Math.random() * 7), glyphs = [];
+      for (var k = 0; k < len; k++) glyphs.push(RAIN_CHARS[Math.floor(Math.random() * RAIN_CHARS.length)]);
+      rainCols.push({ x: i * colW + colW / 2, y: -Math.random() * innerHeight, speed: rainSpeed(), len: len, glyphs: glyphs, hot: Math.random() < 0.1 });
+    }
+  }
+  function sizeRain() {
+    if (!gl || !gctx) return;
+    var d = Math.min(window.devicePixelRatio || 1, 1.5);
+    GW = innerWidth; GH = innerHeight;
+    gl.width = GW * d; gl.height = GH * d; gctx.setTransform(d, 0, 0, d, 0, 0);
+    buildRain(); computeSectionTops();
   }
 
-  function assembleFrac(delay) { return ease3(Math.min(1, Math.max(0, (G.assemble * 1.25 - delay) / 0.75))); }
-  function lerp3(out, oi, sx, sy2, sz, tx, ty, tz, f) { out[oi] = sx + (tx - sx) * f; out[oi + 1] = sy2 + (ty - sy2) * f; out[oi + 2] = sz + (tz - sz) * f; }
-
-  function drawGlobe() {
-    if (!glSupported || !glRenderer || !glNodes) return;
-    var P = pal(), i;
-    updateMorphTarget();
-    glNodes.material.color.setStyle('rgb(' + P.node + ')');
-    glHot.material.color.setStyle('rgb(' + P.hot + ')');
-    glLinks.material.color.setStyle('rgb(' + P.link + ')');
-    if (glIconLinks) glIconLinks.material.color.setStyle('rgb(' + P.link + ')');
-
-    var npos = glNodes.geometry.attributes.position.array, n = npos.length / 3;
-    for (i = 0; i < n; i++) { var f = assembleFrac(glNodeDelay[i]); lerp3(npos, i * 3, glNodeStart[i * 3], glNodeStart[i * 3 + 1], glNodeStart[i * 3 + 2], glTargetPos[i * 3], glTargetPos[i * 3 + 1], glTargetPos[i * 3 + 2], f); }
-    glNodes.geometry.attributes.position.needsUpdate = true;
-
-    var hpos = glHot.geometry.attributes.position.array;
-    for (i = 0; i < glHotIdx.length; i++) { var hi = glHotIdx[i], f2 = assembleFrac(glNodeDelay[hi]); lerp3(hpos, i * 3, glNodeStart[hi * 3], glNodeStart[hi * 3 + 1], glNodeStart[hi * 3 + 2], glTargetPos[hi * 3], glTargetPos[hi * 3 + 1], glTargetPos[hi * 3 + 2], f2); }
-    glHot.geometry.attributes.position.needsUpdate = true;
-
-    var lpos = glLinks.geometry.attributes.position.array;
-    for (i = 0; i < glLinkPairs.length; i += 2) {
-      var a = glLinkPairs[i], b = glLinkPairs[i + 1], o = (i / 2) * 6, fa = assembleFrac(glNodeDelay[a]), fb = assembleFrac(glNodeDelay[b]);
-      lerp3(lpos, o, glNodeStart[a * 3], glNodeStart[a * 3 + 1], glNodeStart[a * 3 + 2], glTargetPos[a * 3], glTargetPos[a * 3 + 1], glTargetPos[a * 3 + 2], fa);
-      lerp3(lpos, o + 3, glNodeStart[b * 3], glNodeStart[b * 3 + 1], glNodeStart[b * 3 + 2], glTargetPos[b * 3], glTargetPos[b * 3 + 1], glTargetPos[b * 3 + 2], fb);
-    }
-    glLinks.geometry.attributes.position.needsUpdate = true;
-
-    if (glIconLinks) {
-      var ipos = glIconLinks.geometry.attributes.position.array;
-      for (i = 0; i < glIconPairs.length; i += 2) {
-        var ia = glIconPairs[i], ib = glIconPairs[i + 1], io = (i / 2) * 6, fia = assembleFrac(glNodeDelay[ia]), fib = assembleFrac(glNodeDelay[ib]);
-        lerp3(ipos, io, glNodeStart[ia * 3], glNodeStart[ia * 3 + 1], glNodeStart[ia * 3 + 2], glTargetPos[ia * 3], glTargetPos[ia * 3 + 1], glTargetPos[ia * 3 + 2], fia);
-        lerp3(ipos, io + 3, glNodeStart[ib * 3], glNodeStart[ib * 3 + 1], glNodeStart[ib * 3 + 2], glTargetPos[ib * 3], glTargetPos[ib * 3 + 1], glTargetPos[ib * 3 + 2], fib);
+  var rainGlyphSize = 14, scanT = 0, glitchUntil = 0, glitchCols = [];
+  function drawRain() {
+    if (!gctx || !GW) return;
+    updateTint();
+    gctx.clearRect(0, 0, GW, GH);
+    gctx.font = rainGlyphSize + 'px var(--mono)';
+    gctx.textBaseline = 'middle';
+    var tr = curTintRGB, hotRGB = [194, 104, 108], now = performance.now();
+    if (motion && now > glitchUntil && Math.random() < 0.002) { glitchUntil = now + 140; glitchCols = rainCols.filter(function () { return Math.random() < 0.08; }); }
+    rainCols.forEach(function (c) {
+      for (var k = 0; k < c.len; k++) {
+        var gy = c.y - k * rainGlyphSize;
+        if (gy < -rainGlyphSize || gy > GH + rainGlyphSize) continue;
+        var fade = 1 - k / c.len, op = Math.pow(fade, 1.4) * (c.hot ? 0.6 : 0.38);
+        var rgb = c.hot && k < 2 ? hotRGB : tr;
+        if (k === 0 && Math.random() < 0.04) c.glyphs[0] = RAIN_CHARS[Math.floor(Math.random() * RAIN_CHARS.length)];
+        gctx.fillStyle = 'rgba(' + rgb[0].toFixed(0) + ',' + rgb[1].toFixed(0) + ',' + rgb[2].toFixed(0) + ',' + op.toFixed(3) + ')';
+        gctx.fillText(c.glyphs[k], c.x, gy);
       }
-      glIconLinks.geometry.attributes.position.needsUpdate = true;
-    }
-    var loadIn = Math.min(1, Math.max(0, (G.assemble - 0.5) / 0.4));
-    glLinks.material.opacity = .16 * loadIn * glHeroAmt;
-    if (glIconLinks) glIconLinks.material.opacity = .34 * loadIn * (1 - glHeroAmt);
-
-    var e = ease3(G.grow), ringOp = .22 * e;
-    glRing1.material.opacity = ringOp; glRing2.material.opacity = ringOp * .85;
-    glRing1.rotation.y += 0.0008; glRing2.rotation.y -= 0.0006;
-
-    var scale = (0.78 + 0.22 * e) * (1 + Math.min(sy / Math.max(VH, 1), 1.4) * 0.12);
-    glGroup.scale.setScalar(scale);
-    glGroup.rotation.y = G.rot; glGroup.rotation.x = G.tilt - 0.35;
-    glCamera.position.x = G.mx * 0.6; glCamera.position.y = -G.my * 0.4; glCamera.lookAt(0, 0, 0);
-
-    if (glLight) { var pulse = 1.8 + Math.sin(performance.now() * 0.0012) * (motionLevel === 2 ? 0.9 : 0.4); glLight.intensity = pulse * e; }
-    if (glSatL) {
-      var heroFrac = Math.max(0, Math.min(1, 1 - sy / Math.max(VH, 1)));
-      var so = ringOp * (motionLevel === 2 ? 1.3 : 1) * heroFrac, rot = performance.now() * (motionLevel === 2 ? 0.00035 : 0.00018);
-      glSatL.ring.material.opacity = so; glSatL.dots.material.opacity = so * 3.2; glSatL.grp.rotation.y = rot; glSatL.grp.position.y = Math.sin(performance.now() * 0.0005) * 0.18;
-      glSatR.ring.material.opacity = so; glSatR.dots.material.opacity = so * 3.2; glSatR.grp.rotation.y = -rot; glSatR.grp.position.y = Math.cos(performance.now() * 0.0005) * 0.18;
-    }
-    glRenderer.render(glScene, glCamera);
+      if (motion) { c.y += c.speed * (motionScale > 1 ? 1.15 : 1); if (c.y - c.len * rainGlyphSize > GH) { c.y = -Math.random() * innerHeight * 0.3; c.speed = rainSpeed(); } }
+    });
+    if (now < glitchUntil) { glitchCols.forEach(function (c) { gctx.fillStyle = 'rgba(' + hotRGB.join(',') + ',.5)'; gctx.fillText(c.glyphs[0], c.x + (Math.random() - 0.5) * 3, c.y + (Math.random() - 0.5) * 3); }); }
+    scanT = (scanT + 0.12) % (GH + 160);
+    var sg = gctx.createLinearGradient(0, scanT - 80, 0, scanT + 80);
+    sg.addColorStop(0, 'rgba(255,255,255,0)'); sg.addColorStop(0.5, 'rgba(255,255,255,.035)'); sg.addColorStop(1, 'rgba(255,255,255,0)');
+    gctx.fillStyle = sg; gctx.fillRect(0, scanT - 80, GW, 160);
   }
+  var rainRunning = false;
+  function rainFrame() { if (!rainRunning) return; drawRain(); requestAnimationFrame(rainFrame); }
+  function startRain() { if (!gctx || rainRunning || document.hidden) return; rainRunning = true; requestAnimationFrame(rainFrame); }
+  sizeRain(); drawRain(); if (motion) startRain();
+  window.addEventListener('load', computeSectionTops);
+  window.addEventListener('resize', function () { sizeRain(); drawRain(); });
+  document.addEventListener('visibilitychange', function () { if (document.hidden) rainRunning = false; else if (motion) startRain(); });
 
-  function gframe() {
-    if (!G.running) return;
-    var spin = motionLevel === 2 ? 1.5 : 1;
-    G.rot += (0.0016 + sy * 0.0000012 + G.mx * 0.002) * spin; G.tilt += ((0.35 + G.my * 0.5) - G.tilt) * 0.04;
-    drawGlobe(); requestAnimationFrame(gframe);
-  }
-  function startGlobe() { if (!glSupported || !gl || G.running || !G.show || document.hidden) return; G.running = true; requestAnimationFrame(gframe); }
-  buildGlobe(); sizeGlobe(); drawGlobe(); if (motion) startGlobe();
-  window.addEventListener('load', function () { computeSceneTops(); });
-  window.addEventListener('resize', function () { sizeGlobe(); buildGlobe(); drawGlobe(); });
-  document.addEventListener('visibilitychange', function () { if (document.hidden) G.running = false; else if (motion) startGlobe(); });
-  window.addEventListener('pointermove', function (e) { if (e.pointerType === 'mouse') { G.mx = e.clientX / innerWidth - 0.5; G.my = e.clientY / innerHeight - 0.5; } }, { passive: true });
-
-  /* ---------- loader: counter drives the globe assembling ---------- */
+  /* ---------- loader: counter drives the percentage readout ---------- */
   var seen = false;
   try { seen = sessionStorage.getItem('seen') === '1'; if (localStorage.getItem('introAt')) seen = true; } catch (e) {}
   var pctEl = $('.ld-pct'), barEl = $('.ld-bar span'), msgEl = $('.ld-msg');
-  function growGlobe() {
-    var g0 = null, dur = seen ? 1300 : 1700;
-    (function step(t) { if (!g0) g0 = t; G.grow = Math.min((t - g0) / dur, 1); if (G.grow < 1) requestAnimationFrame(step); })(performance.now());
-  }
   function finishLoader() {
-    root.classList.add('loaded'); G.assemble = 1;
-    if (motion) growGlobe(); else { G.grow = 1; drawGlobe(); }
+    root.classList.add('loaded');
     try { sessionStorage.setItem('seen', '1'); localStorage.setItem('introAt', String(Date.now())); } catch (e) {}
     setTimeout(begin, seen ? 550 : 650);
     setTimeout(function () { root.classList.remove('loading'); root.classList.add('done'); }, seen ? 1500 : 1700);
@@ -330,7 +147,6 @@
   window.addEventListener('load', function () { loaded = true; });
   (function tick(now) {
     var p = Math.min((now - t0) / minMs, 1), shown = Math.round((loaded ? p : Math.min(p, 0.92)) * 100);
-    G.assemble = shown / 100;
     if (pctEl) pctEl.textContent = shown + '%';
     if (barEl) barEl.style.transform = 'scaleX(' + shown / 100 + ')';
     if (msgEl) msgEl.textContent = shown < 34 ? 'scanning network' : shown < 70 ? 'mapping nodes' : shown < 100 ? 'locking on' : 'ready';
@@ -351,9 +167,24 @@
       }, { threshold: 0.08, rootMargin: '0px 0px -3% 0px' });
       els.forEach(function (el) { io.observe(el); });
     } else { els.forEach(function (el) { el.classList.add('is-in'); countUp(el); }); }
-    roleCycle(); termDemo(); hudTick();
+    roleCycle(); termDemo(); hudTick(); decodeHero();
   }
   if (!motion) begin();
+
+  /* ---------- hero name: letters scramble through glyphs before settling, like a signal decoding ---------- */
+  function decodeHero() {
+    var h1 = $('h1.split'); if (!h1 || !motion) return;
+    var chars = $$('.ch', h1), glyphs = 'ABCDEF0123456789#/_:.';
+    chars.forEach(function (span, i) {
+      var final = span.textContent; if (!final || final === ' ') return;
+      var steps = 6 + Math.floor(Math.random() * 4), delay = i * 40;
+      setTimeout(function tick() {
+        steps--;
+        span.textContent = steps > 0 ? glyphs[Math.floor(Math.random() * glyphs.length)] : final;
+        if (steps > 0) setTimeout(tick, 45);
+      }, delay);
+    });
+  }
 
   function countUp(scope) {
     var list = $$('[data-count]', scope); if (scope.hasAttribute && scope.hasAttribute('data-count')) list.push(scope);
@@ -388,7 +219,7 @@
   var upT0 = performance.now();
   function hudTick() {
     var n = $('#hud-nodes'), l = $('#hud-links'), u = $('#hud-up'); if (!n) return;
-    n.textContent = gp.length; l.textContent = G.links;
+    n.textContent = rainCols.length; l.textContent = rainCols.reduce(function (s, c) { return s + c.len; }, 0);
     (function t() { var s = Math.floor((performance.now() - upT0) / 1000); u.textContent = ('0' + Math.floor(s / 60)).slice(-2) + ':' + ('0' + s % 60).slice(-2); setTimeout(t, 1000); })();
   }
 
@@ -458,8 +289,7 @@
     nav.classList.toggle('scrolled', y > 30);
     nav.style.transform = (performance.now() > navHold && y > lastY && y > 500 && !pill.classList.contains('open')) ? 'translateY(-90px)' : '';
     if (medal && !fineMouse) medal.style.setProperty('--my', Math.min(y / 14, 24) + 'deg');
-    G.show = true; if (motion) startGlobe(); else G.running = false;
-    if (!motion && gl) { drawGlobe(); gl.style.opacity = y < VH * 0.7 ? '' : '0'; }
+    if (motion) startRain(); else drawRain();
     lastY = y;
     var nxt = cur ? cur.a : null;
     if (nxt !== active) { active = nxt; links.forEach(function (a) { a.classList.toggle('on', a === active); }); moveInd(active); $$('.tabbar a').forEach(function (a) { a.classList.toggle('on', !!active && a.dataset.nav === active.dataset.nav); }); setTitle(active ? active.dataset.nav : ''); moveTabInd(); }
@@ -474,7 +304,6 @@
     var h = VH, k = Math.min(ssy / h, 1.4), fade = Math.max(0, 1 - ssy / (h * 0.7)).toFixed(3);
     if (copy) { copy.style.transform = 'translate3d(0,' + (-ssy * 0.14).toFixed(2) + 'px,0)'; copy.style.opacity = fade; }
     if (medalWrap) { medalWrap.style.transform = 'translate3d(0,' + (-ssy * 0.22).toFixed(2) + 'px,0) scale(' + Math.max(1 - k * 0.1, 0.75).toFixed(4) + ')'; medalWrap.style.opacity = fade; }
-    if (gl) gl.style.opacity = Math.max(0.5 - k * 0.5, motionLevel === 2 ? 0.42 : 0.24).toFixed(3);
     requestAnimationFrame(plx);
   })();
 
