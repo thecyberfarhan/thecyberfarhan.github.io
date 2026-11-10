@@ -26,6 +26,26 @@ npx esbuild@0.21.5 src/app.js --minify --target=es2018 --outfile=assets/app.js
 
 Then bump the version number in two places — the `?v=` query string on the `assets/app.js` script tag in `index.html`, and `var V = '...'` in `sw.js` — so the service worker picks up the new build. The cache name in `sw.js` is that same version number.
 
+### `assets/vendor/three.min.js`
+
+This is a **custom tree-shaken build**, not the stock Three.js download. The stock classic UMD build is 656KB (WebGLRenderer alone pulls in nearly the whole renderer regardless of which materials/geometries you use, so this is close to the practical floor) — tree-shaking it down to just the APIs the loading globe actually uses (`WebGLRenderer`, `Scene`, `PerspectiveCamera`, `Group`, `Mesh`, `TorusGeometry`, `MeshBasicMaterial`, `Points`, `PointsMaterial`, `LineSegments`, `LineBasicMaterial`, `BufferGeometry`, `BufferAttribute`) gets it to ~460KB (~120KB gzipped, vs ~167KB gzipped stock). To rebuild after bumping the Three.js version or using a new API:
+
+```bash
+mkdir /tmp/three-build && cd /tmp/three-build
+npm init -y && npm install three@0.160.0
+cat > entry.js <<'EOF'
+import { WebGLRenderer, Scene, PerspectiveCamera, Group, Mesh, TorusGeometry,
+  MeshBasicMaterial, Points, PointsMaterial, LineSegments, LineBasicMaterial,
+  BufferGeometry, BufferAttribute } from 'three';
+window.THREE = { WebGLRenderer, Scene, PerspectiveCamera, Group, Mesh, TorusGeometry,
+  MeshBasicMaterial, Points, PointsMaterial, LineSegments, LineBasicMaterial,
+  BufferGeometry, BufferAttribute };
+EOF
+npx esbuild entry.js --bundle --minify --format=iife --target=es2018 --outfile=three.custom.min.js
+```
+
+Also bump the `?v=` query string on its `<script>` tag in `index.html` and its entry in `sw.js`'s `CORE` list, same as `app.js`.
+
 ### No build step for HTML/CSS
 
 `index.html` is edited directly; its inline `<style>` block is the source of truth, mirrored into `src/style.css` for readability. There's no CSS pipeline — new rules get appended before the closing `</style>` tag.
