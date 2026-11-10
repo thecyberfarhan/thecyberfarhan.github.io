@@ -54,98 +54,62 @@
   var G = { assemble: 0, grow: 0, rot: 0, tilt: 0.35, mx: 0, my: 0, running: false, show: true, t0: performance.now(), links: 0 };
   function ease3(x) { return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; }
 
-  var glSupported = true, glRenderer, glScene, glCamera, glGroup, glNodes, glHot, glLinks, glIconLinks, glRing1, glRing2, glLight, glSatL, glSatR;
+  var glSupported = true, glRenderer, glScene, glCamera, glGroup, glNodes, glHot, glLinks, glIconLinks, glRing1, glRing2, glLight, glSatL, glSatR, glSpriteTex;
   var glNodePos, glNodeStart, glNodeDelay, glHotIdx = [], glLinkPairs = [], glIconPairs = [];
 
   /* ---------- the globe morphs into a recognizable icon per section as you scroll ---------- */
   var SCENE_ORDER = ['hero', 'proof', 'about', 'tools', 'projects', 'journey', 'play', 'arch', 'contact'];
   var glShapes = {}, glSceneTops = [], glTargetPos, glHeroAmt = 1;
 
-  function circlePoly(r, sides, cx, cy) {
-    var pts = []; cx = cx || 0; cy = cy || 0;
-    for (var i = 0; i < sides; i++) { var a = (i / sides) * 6.28319; pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); }
-    return pts;
-  }
-  function arcPoly(cx, cy, r, a0, a1, segs) {
-    var pts = [];
-    for (var i = 0; i <= segs; i++) { var t = i / segs, a = a0 + (a1 - a0) * t; pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]); }
-    return pts;
-  }
-  function gearPoly(teeth, rOuter, rInner) {
-    var pts = [], n = teeth * 4;
-    for (var i = 0; i < n; i++) { var a = (i / n) * 6.28319, ph = i % 4, r = (ph === 0 || ph === 1) ? rOuter : rInner; pts.push([Math.cos(a) * r, Math.sin(a) * r]); }
-    return pts;
-  }
-  /* evenly distributes `count` points along a closed polygon's perimeter (anchors[last]->anchors[0] included) */
-  function sampleAlongPath(anchors, count, out, offset) {
-    var m = anchors.length, i; if (m < 2 || count <= 0) return;
-    var lens = [], total = 0;
-    for (i = 0; i < m; i++) { var a = anchors[i], b = anchors[(i + 1) % m], dx = b[0] - a[0], dy = b[1] - a[1], len = Math.sqrt(dx * dx + dy * dy) || 1e-6; lens.push(len); total += len; }
-    for (i = 0; i < count; i++) {
-      var dist = (i / count) * total, acc = 0, seg = 0;
-      while (seg < m - 1 && acc + lens[seg] < dist) { acc += lens[seg]; seg++; }
-      var a = anchors[seg], b = anchors[(seg + 1) % m], segLen = lens[seg] || 1e-6, t = (dist - acc) / segLen;
-      var oi = (offset + i) * 3;
-      out[oi] = a[0] + (b[0] - a[0]) * t; out[oi + 1] = a[1] + (b[1] - a[1]) * t; out[oi + 2] = (Math.random() - 0.5) * 0.12;
-    }
-  }
-  function scaleX(anchors, s) { return anchors.map(function (p) { return [p[0] * s, p[1]]; }); }
-
+  var TAU = 6.283185307;
   function shapeSphere(n, out) {
     for (var i = 0; i < n; i++) { var k = (i + 0.5) / n, phi = Math.acos(1 - 2 * k), th = Math.PI * (1 + Math.sqrt(5)) * i; out[i * 3] = Math.cos(th) * Math.sin(phi); out[i * 3 + 1] = Math.cos(phi); out[i * 3 + 2] = Math.sin(th) * Math.sin(phi); }
   }
-  /* proof: a shield + a small seal ring, for "verified / certified" */
+  /* proof: a (2,3) torus knot -- an unbroken ribbon, like an infinity/achievement loop */
   function shapeBadge(n, out, wx) {
-    var splitIdx = Math.round(n * 0.7), s = Math.min(wx, 1.3);
-    var shield = scaleX([[-0.55, 0.55], [0, 0.68], [0.55, 0.55], [0.55, 0.05], [0.3, -0.45], [0, -0.75], [-0.3, -0.45], [-0.55, 0.05]], s);
-    var seal = scaleX(circlePoly(0.2, 12, 0, -0.08), s);
-    sampleAlongPath(shield, splitIdx, out, 0); sampleAlongPath(seal, n - splitIdx, out, splitIdx);
+    var s = Math.min(wx, 1.4), R = 0.55, r = 0.22;
+    for (var i = 0; i < n; i++) { var t = i / n * TAU; out[i * 3] = (R + r * Math.cos(3 * t)) * Math.cos(2 * t) * s; out[i * 3 + 1] = (R + r * Math.cos(3 * t)) * Math.sin(2 * t); out[i * 3 + 2] = r * Math.sin(3 * t); }
   }
-  /* about: a head-and-shoulders bust silhouette, doubled for density */
+  /* about: a woven 3D lissajous curve -- intricate, personal, never quite repeating */
   function shapeHelix(n, out, wx) {
-    var splitIdx = Math.round(n * 0.7), s = Math.min(wx, 1.15);
-    var bust = scaleX([[0, 0.75], [0.28, 0.55], [0.22, 0.32], [0.62, 0.05], [0.62, -0.55], [-0.62, -0.55], [-0.62, 0.05], [-0.22, 0.32], [-0.28, 0.55]], s);
-    sampleAlongPath(bust, splitIdx, out, 0); sampleAlongPath(bust, n - splitIdx, out, splitIdx);
+    var s = Math.min(wx, 1.2);
+    for (var i = 0; i < n; i++) { var t = i / n * TAU; out[i * 3] = Math.sin(3 * t + Math.PI / 2) * 0.62 * s; out[i * 3 + 1] = Math.sin(2 * t) * 0.62; out[i * 3 + 2] = Math.sin(5 * t) * 0.3; }
   }
-  /* tools: a gear outline + its center hole */
+  /* tools: a five-petal rose curve -- precise, mechanical, gear-like */
   function shapeGrid(n, out, wx) {
-    var splitIdx = Math.round(n * 0.7), s = Math.min(wx, 1.7);
-    var gear = scaleX(gearPoly(8, 0.64, 0.46), s), hole = scaleX(circlePoly(0.17, 10), s);
-    sampleAlongPath(gear, splitIdx, out, 0); sampleAlongPath(hole, n - splitIdx, out, splitIdx);
+    var s = Math.min(wx, 1.7);
+    for (var i = 0; i < n; i++) { var t = i / n * TAU, rad = Math.cos(5 * t) * 0.72; out[i * 3] = rad * Math.cos(t) * s; out[i * 3 + 1] = rad * Math.sin(t); out[i * 3 + 2] = Math.sin(t * 3) * 0.12; }
   }
-  /* projects: a folder with its tab + a small document inside it */
+  /* projects: a double spiral galaxy, spread wide -- many bodies, one system */
   function shapeProjects(n, out, wx) {
-    var splitIdx = Math.round(n * 0.7), s = Math.min(wx, 1.6);
-    var folder = scaleX([[-0.75, -0.55], [0.75, -0.55], [0.75, 0.35], [0.15, 0.35], [0, 0.55], [-0.35, 0.55], [-0.5, 0.35], [-0.75, 0.35]], s);
-    var doc = scaleX([[-0.3, 0.15], [0.3, 0.15], [0.3, -0.3], [-0.3, -0.3]], s);
-    sampleAlongPath(folder, splitIdx, out, 0); sampleAlongPath(doc, n - splitIdx, out, splitIdx);
+    var s = Math.min(wx, 1.85);
+    for (var i = 0; i < n; i++) { var t = i / n, arm = i % 2, ang = t * TAU * 3 + arm * Math.PI, rad = 0.12 + t * 0.95; out[i * 3] = Math.cos(ang) * rad * s; out[i * 3 + 1] = Math.sin(ang) * rad * 0.62; out[i * 3 + 2] = (arm - 0.5) * 0.25; }
   }
-  /* journey: ascending stairs with a milestone flag at the top step */
+  /* journey: a climbing helix with a gentle breathing radius -- ascent, not a straight line */
   function shapeJourney(n, out, wx) {
-    var splitIdx = Math.round(n * 0.7), s = Math.min(wx, 1.5);
-    var stairs = scaleX([[-0.7, -0.6], [-0.35, -0.6], [-0.35, -0.2], [0, -0.2], [0, 0.2], [0.35, 0.2], [0.35, 0.6], [0.7, 0.6]], s);
-    var flag = scaleX([[0.7, 0.6], [0.7, 1.0], [1.05, 0.85]], s);
-    sampleAlongPath(stairs, splitIdx, out, 0); sampleAlongPath(flag, n - splitIdx, out, splitIdx);
+    var s = Math.min(wx, 1.3);
+    for (var i = 0; i < n; i++) { var t = i / n, ang = t * TAU * 5, rad = (0.46 + Math.sin(t * TAU * 0.5) * 0.1) * s; out[i * 3] = Math.cos(ang) * rad; out[i * 3 + 1] = (t - 0.5) * 2.3; out[i * 3 + 2] = Math.sin(ang) * rad; }
   }
-  /* play (Break In game): a padlock -- rectangular body + the shackle arc */
+  /* play (Break In game): a sphere mid-shatter -- nodes blown outward along their own normal, sheared by a twist */
   function shapeRain(n, out, wx) {
-    var splitIdx = Math.round(n * 0.7), s = Math.min(wx, 1.15);
-    var body = scaleX([[-0.5, -0.15], [0.5, -0.15], [0.5, -0.75], [-0.5, -0.75]], s);
-    var shackle = scaleX(arcPoly(0, 0.05, 0.38, 200 * Math.PI / 180, -20 * Math.PI / 180, 10), s);
-    sampleAlongPath(body, splitIdx, out, 0); sampleAlongPath(shackle, n - splitIdx, out, splitIdx);
+    var s = Math.min(wx, 1.55);
+    for (var i = 0; i < n; i++) {
+      var k = (i + 0.5) / n, phi = Math.acos(1 - 2 * k), th = Math.PI * (1 + Math.sqrt(5)) * i;
+      var bx = Math.cos(th) * Math.sin(phi), by = Math.cos(phi), bz = Math.sin(th) * Math.sin(phi);
+      var dist = 0.45 + Math.random() * 1.15, twist = dist * 1.8, ct = Math.cos(twist), st = Math.sin(twist);
+      var rx = bx * ct - bz * st, rz = bx * st + bz * ct;
+      out[i * 3] = rx * dist * s; out[i * 3 + 1] = by * dist * 0.8; out[i * 3 + 2] = rz * dist;
+    }
   }
-  /* arch: a hub-and-spoke network -- wide outer ring of nodes, tight inner hub cluster */
+  /* arch: a woven torus network -- major ring of nodes, each wandering a minor orbit */
   function shapeHub(n, out, wx) {
-    var splitIdx = Math.round(n * 0.7), s = Math.min(wx, 1.7);
-    var outer = scaleX(circlePoly(0.85, 14), s), inner = circlePoly(0.22, 10);
-    sampleAlongPath(outer, splitIdx, out, 0); sampleAlongPath(inner, n - splitIdx, out, splitIdx);
+    var s = Math.min(wx, 1.85), majorR = 0.68, minorR = 0.3;
+    for (var i = 0; i < n; i++) { var major = i / n * TAU, minor = (i * 2.399963) % TAU; out[i * 3] = (majorR + minorR * Math.cos(minor)) * Math.cos(major) * s; out[i * 3 + 1] = (majorR + minorR * Math.cos(minor)) * Math.sin(major) * 0.62; out[i * 3 + 2] = minorR * Math.sin(minor); }
   }
-  /* contact: a paper plane with a motion trail behind it */
+  /* contact: a vortex spiraling down to a point -- a signal being pulled through and sent */
   function shapeFunnel(n, out, wx) {
-    var splitIdx = Math.round(n * 0.7), s = Math.min(wx, 1.4);
-    var plane = scaleX([[0.9, 0], [-0.7, 0.45], [-0.3, 0], [-0.7, -0.45]], s);
-    var trail = scaleX([[-1.0, 0.15], [-1.15, 0.15], [-1.1, -0.05], [-1.25, -0.05], [-1.2, 0.2], [-1.35, 0.2]], s);
-    sampleAlongPath(plane, splitIdx, out, 0); sampleAlongPath(trail, n - splitIdx, out, splitIdx);
+    var s = Math.min(wx, 1.25);
+    for (var i = 0; i < n; i++) { var t = i / n, ang = t * TAU * 8, rad = ((1 - t) * 1.0 + 0.03) * s; out[i * 3] = Math.cos(ang) * rad; out[i * 3 + 1] = (t - 0.5) * 1.9; out[i * 3 + 2] = Math.sin(ang) * rad; }
   }
   function computeSceneTops() {
     var y = window.scrollY || 0;
@@ -174,6 +138,10 @@
     glHeroAmt = idx === 0 ? (1 - frac) : 0;
     var A = glShapes[SCENE_ORDER[idx]], B = glShapes[SCENE_ORDER[bIdx]];
     for (i = 0; i < glTargetPos.length; i++) glTargetPos[i] = A[i] + (B[i] - A[i]) * frac;
+    if (motion) {
+      var wob = motionLevel === 2 ? 0.045 : 0.025, tt = performance.now() * 0.0006, pn = glTargetPos.length / 3;
+      for (i = 0; i < pn; i++) { glTargetPos[i * 3] += Math.sin(tt + i * 0.7) * wob; glTargetPos[i * 3 + 2] += Math.cos(tt * 1.3 + i * 0.5) * wob; }
+    }
   }
 
   (function initGL() {
@@ -187,6 +155,13 @@
     glGroup = new THREE.Group();
     glScene.add(glGroup);
     glScene.add(new THREE.AmbientLight('#7FA8CC', 0.5));
+    (function glowTex() {
+      var c = document.createElement('canvas'); c.width = c.height = 64;
+      var cx = c.getContext('2d'), g = cx.createRadialGradient(32, 32, 0, 32, 32, 32);
+      g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(255,255,255,.55)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      cx.fillStyle = g; cx.fillRect(0, 0, 64, 64);
+      glSpriteTex = new THREE.CanvasTexture(c);
+    })();
     glLight = new THREE.PointLight('#C2686C', 2.2, 12, 1.4); glLight.position.set(1.4, 0.9, 2.2); glScene.add(glLight);
     function ring(radius, tiltX, tiltZ, color) {
       var m = new THREE.Mesh(new THREE.TorusGeometry(radius, 0.006, 8, 96), new THREE.MeshStandardMaterial({ color: color, transparent: true, opacity: 0, roughness: 0.35, metalness: 0.6, emissive: color, emissiveIntensity: 0.3 }));
@@ -227,21 +202,20 @@
     }
     G.links = pairs.length / 2; glLinkPairs = pairs;
     buildShapes(n);
-    var splitIdx = Math.round(n * 0.7), iconPairs = [];
-    for (i = 0; i < splitIdx; i++) iconPairs.push(i, (i + 1) % splitIdx);
-    for (i = splitIdx; i < n; i++) iconPairs.push(i, splitIdx + ((i - splitIdx + 1) % (n - splitIdx)));
+    var iconPairs = [];
+    for (i = 0; i < n; i++) iconPairs.push(i, (i + 1) % n);
     glIconPairs = iconPairs;
     if (!glSupported) return;
     var P = pal();
     if (glNodes) { glGroup.remove(glNodes); glNodes.geometry.dispose(); glNodes.material.dispose(); }
     var ngeo = new THREE.BufferGeometry(); ngeo.setAttribute('position', new THREE.BufferAttribute(glNodeStart.slice(), 3));
-    glNodes = new THREE.Points(ngeo, new THREE.PointsMaterial({ color: 'rgb(' + P.node + ')', size: .05, transparent: true, opacity: .75, sizeAttenuation: true, depthWrite: false }));
+    glNodes = new THREE.Points(ngeo, new THREE.PointsMaterial({ color: 'rgb(' + P.node + ')', size: .09, map: glSpriteTex, transparent: true, opacity: .85, sizeAttenuation: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     glGroup.add(glNodes);
     if (glHot) { glGroup.remove(glHot); glHot.geometry.dispose(); glHot.material.dispose(); }
     var hotStart = new Float32Array(glHotIdx.length * 3);
     for (i = 0; i < glHotIdx.length; i++) { var hi = glHotIdx[i]; hotStart[i * 3] = glNodeStart[hi * 3]; hotStart[i * 3 + 1] = glNodeStart[hi * 3 + 1]; hotStart[i * 3 + 2] = glNodeStart[hi * 3 + 2]; }
     var hgeo = new THREE.BufferGeometry(); hgeo.setAttribute('position', new THREE.BufferAttribute(hotStart, 3));
-    glHot = new THREE.Points(hgeo, new THREE.PointsMaterial({ color: 'rgb(' + P.hot + ')', size: .1, transparent: true, opacity: .95, sizeAttenuation: true, depthWrite: false }));
+    glHot = new THREE.Points(hgeo, new THREE.PointsMaterial({ color: 'rgb(' + P.hot + ')', size: .19, map: glSpriteTex, transparent: true, opacity: 1, sizeAttenuation: true, depthWrite: false, blending: THREE.AdditiveBlending }));
     glGroup.add(glHot);
     if (glLinks) { glGroup.remove(glLinks); glLinks.geometry.dispose(); glLinks.material.dispose(); }
     var lpos = new Float32Array(pairs.length * 3);
@@ -301,9 +275,9 @@
       }
       glIconLinks.geometry.attributes.position.needsUpdate = true;
     }
-    var linkBase = .16 * Math.min(1, Math.max(0, (G.assemble - 0.5) / 0.4));
-    glLinks.material.opacity = linkBase * glHeroAmt;
-    if (glIconLinks) glIconLinks.material.opacity = linkBase * (1 - glHeroAmt);
+    var loadIn = Math.min(1, Math.max(0, (G.assemble - 0.5) / 0.4));
+    glLinks.material.opacity = .16 * loadIn * glHeroAmt;
+    if (glIconLinks) glIconLinks.material.opacity = .34 * loadIn * (1 - glHeroAmt);
 
     var e = ease3(G.grow), ringOp = .22 * e;
     glRing1.material.opacity = ringOp; glRing2.material.opacity = ringOp * .85;
