@@ -168,6 +168,18 @@
   function finishLoader() {
     root.classList.add('loaded');
     glitchUntil = performance.now() + 220; glitchCols = rainCols.filter(function () { return Math.random() < 0.35; });
+    /* the loader's name doesn't just fade in place -- it flies to and lands on the hero's own name, so the
+       loader reads as becoming part of the page instead of a separate screen that gets thrown away */
+    var heroH1 = $('h1.split');
+    if (ldNameEl && heroH1 && motion) {
+      var lr = ldNameEl.getBoundingClientRect(), hr = heroH1.getBoundingClientRect();
+      if (lr.width && hr.width) {
+        var scale = hr.width / lr.width, dx = (hr.left + hr.width / 2) - (lr.left + lr.width / 2), dy = (hr.top + hr.height / 2) - (lr.top + lr.height / 2);
+        ldNameEl.style.transformOrigin = '50% 50%';
+        ldNameEl.style.transition = 'transform .75s cubic-bezier(.3,.9,.2,1), opacity .6s ease .15s';
+        requestAnimationFrame(function () { ldNameEl.style.transform = 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px) scale(' + scale.toFixed(3) + ')'; ldNameEl.style.opacity = '0'; });
+      }
+    }
     try { sessionStorage.setItem('seen', '1'); localStorage.setItem('introAt', String(Date.now())); } catch (e) {}
     setTimeout(begin, seen ? 350 : 450);
     setTimeout(function () { root.classList.remove('loading'); root.classList.add('done'); }, seen ? 900 : 1050);
