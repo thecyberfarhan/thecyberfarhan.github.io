@@ -173,16 +173,16 @@
   function finishLoader() {
     root.classList.add('loaded');
     try { sessionStorage.setItem('seen', '1'); localStorage.setItem('introAt', String(Date.now())); } catch (e) {}
-    setTimeout(begin, seen ? 550 : 650);
-    setTimeout(function () { root.classList.remove('loading'); root.classList.add('done'); }, seen ? 1500 : 1700);
+    setTimeout(begin, seen ? 350 : 450);
+    setTimeout(function () { root.classList.remove('loading'); root.classList.add('done'); }, seen ? 900 : 1050);
   }
-  var minMs = seen ? (innerWidth < 760 ? 1300 : 1700) : (innerWidth < 760 ? 1300 : 2000), t0 = performance.now(), loaded = document.readyState === 'complete';
+  var minMs = seen ? (innerWidth < 760 ? 900 : 1150) : (innerWidth < 760 ? 1100 : 1500), t0 = performance.now(), loaded = document.readyState === 'complete';
   window.addEventListener('load', function () { loaded = true; });
   (function tick(now) {
     var p = Math.min((now - t0) / minMs, 1), shown = Math.round((loaded ? p : Math.min(p, 0.92)) * 100);
     if (pctEl) pctEl.textContent = shown + '%';
     if (barEl) barEl.style.transform = 'scaleX(' + shown / 100 + ')';
-    if (msgEl) msgEl.textContent = shown < 34 ? 'scanning network' : shown < 70 ? 'mapping nodes' : shown < 100 ? 'locking on' : 'ready';
+    if (msgEl) msgEl.textContent = shown < 34 ? 'decrypting stream' : shown < 70 ? 'parsing glyphs' : shown < 100 ? 'syncing signal' : 'ready';
     if (p >= 1 && loaded) finishLoader(); else requestAnimationFrame(tick);
   })(t0);
 
