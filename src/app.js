@@ -1217,8 +1217,10 @@
     var k = 1 - Math.pow(1 - 0.18, dt / 16.667), k2 = 1 - Math.pow(1 - 0.3, dt / 16.667);
     var lockRect = lockEl ? lockEl.getBoundingClientRect() : null;
     var tgx = mx, tgy = my;
-    if (lockRect) { var lcx = lockRect.left + lockRect.width / 2, lcy = lockRect.top + lockRect.height / 2; tgx = lcx + (mx - lcx) * 0.26; tgy = lcy + (my - lcy) * 0.26; }
-    rx += (tgx - rx) * k; ry += (tgy - ry) * k;
+    if (lockRect) {
+      var lcx = lockRect.left + lockRect.width / 2, lcy = lockRect.top + lockRect.height / 2; tgx = lcx + (mx - lcx) * 0.26; tgy = lcy + (my - lcy) * 0.26;
+      rx += (tgx - rx) * k; ry += (tgy - ry) * k;
+    } else { rx = tgx; ry = tgy; }
     var p0 = 'translate3d(' + rx.toFixed(2) + 'px,' + ry.toFixed(2) + 'px,0)';
     ring.style.transform = p0;
     tag.style.transform = 'translate3d(' + (rx + 34).toFixed(2) + 'px,' + (ry + 28).toFixed(2) + 'px,0)';
