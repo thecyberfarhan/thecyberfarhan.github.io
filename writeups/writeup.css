@@ -141,14 +141,17 @@ footer a{color:var(--steel)}
 }
 .f-search input:focus{outline:none;border-color:var(--steel)}
 .f-search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--muted);pointer-events:none}
-.f-group{display:flex;gap:6px;flex-wrap:wrap}
-.f-chip{
-  font:600 .78rem var(--mono);padding:6px 12px;border-radius:20px;cursor:pointer;
-  border:1px solid var(--border);background:transparent;color:var(--muted);
-  transition:border-color .2s,color .2s,background .2s;white-space:nowrap;
+.f-select-wrap{position:relative;display:inline-flex;align-items:center}
+.f-select{
+  appearance:none;-webkit-appearance:none;-moz-appearance:none;cursor:pointer;
+  font:600 .82rem var(--mono);padding:9px 34px 9px 14px;border-radius:8px;
+  border:1px solid var(--border);background:var(--surface);color:var(--text);
+  transition:border-color .2s;white-space:nowrap;
 }
-.f-chip:hover{color:var(--soft);border-color:var(--muted)}
-.f-chip.active{color:var(--text);border-color:var(--steel);background:#7fa8cc14}
+.f-select:hover{border-color:var(--muted)}
+.f-select:focus{outline:none;border-color:var(--steel)}
+.f-select option{background:var(--surface);color:var(--text)}
+.f-chevron{position:absolute;right:11px;width:14px;height:14px;color:var(--muted);pointer-events:none}
 .f-empty{display:none;color:var(--muted);padding:30px 0;text-align:center;font-size:.9rem}
 .f-empty.show{display:block}
 

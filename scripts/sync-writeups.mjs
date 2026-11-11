@@ -273,6 +273,7 @@ function difficultyClass(difficulty) {
   if (key === 'easy') return 'l-easy';
   if (key === 'medium') return 'l-medium';
   if (key === 'hard') return 'l-hard';
+  if (key === 'insane') return 'l-insane';
   if (key === 'challenge') return 'l-challenge';
   return 'l-written';
 }
@@ -399,9 +400,15 @@ function pageHtml(w, slug) {
 </html>`;
 }
 
+const DIFFICULTY_ORDER = ['very easy', 'easy', 'medium', 'hard', 'insane', 'challenge'];
+
 function hubHtml(writeups) {
   const platforms = [...new Set(writeups.map((w) => w.platform))];
-  const difficulties = [...new Set(writeups.map((w) => w.difficulty).filter(Boolean))];
+  const difficulties = [...new Set(writeups.map((w) => w.difficulty).filter(Boolean))]
+    .sort((a, b) => {
+      const ia = DIFFICULTY_ORDER.indexOf(a.toLowerCase()), ib = DIFFICULTY_ORDER.indexOf(b.toLowerCase());
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+    });
 
   const cards = writeups.map((w, i) => {
     // data-search holds a pre-lowercased, HTML-escaped haystack -- the filter
@@ -421,8 +428,8 @@ function hubHtml(writeups) {
     </li>`;
   }).join('\n');
 
-  const platChips = platforms.map((p) => `<button type="button" class="f-chip" data-filter="platform" data-value="${esc(p)}">${esc(p)}</button>`).join('');
-  const diffChips = difficulties.map((d) => `<button type="button" class="f-chip" data-filter="difficulty" data-value="${esc(d)}">${esc(d)}</button>`).join('');
+  const platOptions = platforms.map((p) => `<option value="${esc(p)}">${esc(p)}</option>`).join('');
+  const diffOptions = difficulties.map((d) => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
 
   const filterScript = `
 (function () {
@@ -441,15 +448,11 @@ function hubHtml(writeups) {
     });
     if (empty) empty.classList.toggle('show', visible === 0);
   }
-  document.querySelectorAll('.f-chip').forEach(function (chip) {
-    chip.addEventListener('click', function () {
-      var group = chip.dataset.filter;
-      var isAll = chip.classList.contains('f-all');
-      document.querySelectorAll('.f-chip[data-filter="' + group + '"], .f-all[data-filter="' + group + '"]').forEach(function (c) { c.classList.remove('active'); });
-      chip.classList.add('active');
-      state[group] = isAll ? 'all' : chip.dataset.value;
-      apply();
-    });
+  // <select> values are the browser's own option values, read via .value --
+  // never routed through innerHTML, a selector, or eval, so there's nothing
+  // an injected option value could reach even if one were somehow added.
+  document.querySelectorAll('.f-select').forEach(function (sel) {
+    sel.addEventListener('change', function () { state[sel.dataset.filter] = sel.value; apply(); });
   });
   var search = document.querySelector('.f-search input');
   if (search) {
@@ -469,7 +472,7 @@ function hubHtml(writeups) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Writeups — Farhan Hussain</title>
-<meta name="description" content="Medium and hard TryHackMe and Hack The Box writeups: recon, foothold, escalation and fixes, written the way I'd hand a report over on an engagement.">
+<meta name="description" content="Every TryHackMe and Hack The Box writeup -- recon, foothold, escalation and fixes, written the way I'd hand a report over on an engagement. Filterable by platform and difficulty.">
 <link rel="canonical" href="${SITE_URL}/writeups/">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="writeup.css">
@@ -481,23 +484,29 @@ function hubHtml(writeups) {
     <a class="brand" href="${SITE_URL}/">Farhan<span>.</span></a>
   </div>
   <p class="eyebrow" data-reveal>Writeups</p>
-  <h1 data-reveal>Medium and hard rooms, written up properly</h1>
-  <p class="hub-lead" data-reveal>The easy ones stay on GitHub. These are the ones with an actual chain worth reading: recon, foothold, escalation, the dead ends, and how I'd fix each hole.</p>
+  <h1 data-reveal>Every room, written up</h1>
+  <p class="hub-lead" data-reveal>Recon, foothold, escalation, the dead ends, and how I'd fix each hole -- filter by platform or difficulty, or search by name.</p>
   <div class="filters" data-reveal>
     <div class="f-search">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
       <input type="search" placeholder="Search writeups…" maxlength="100" autocomplete="off" spellcheck="false">
     </div>
-    <div class="f-group">
-      <button type="button" class="f-chip f-all active" data-filter="platform">All platforms</button>${platChips}
+    <div class="f-select-wrap">
+      <select class="f-select" data-filter="platform" aria-label="Filter by platform">
+        <option value="all">All platforms</option>${platOptions}
+      </select>
+      <svg class="f-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
     </div>
-    <div class="f-group">
-      <button type="button" class="f-chip f-all active" data-filter="difficulty">All levels</button>${diffChips}
+    <div class="f-select-wrap">
+      <select class="f-select" data-filter="difficulty" aria-label="Filter by difficulty">
+        <option value="all">All levels</option>${diffOptions}
+      </select>
+      <svg class="f-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
     </div>
   </div>
   <ul class="wu-list">${cards}</ul>
   <p class="f-empty">No writeups match those filters.</p>
-  <footer>${writeups.length} featured here, out of the full set on <a href="https://github.com/${OWNER}/${REPO}">github.com/${OWNER}/${REPO}</a>.</footer>
+  <footer>${writeups.length} writeups here, mirrored from <a href="https://github.com/${OWNER}/${REPO}">github.com/${OWNER}/${REPO}</a>.</footer>
 </div>
 <script>${filterScript}${REVEAL_SCRIPT}</script>
 </body>
@@ -518,22 +527,24 @@ async function main() {
   }
 
   const totalCount = all.length;
-  const featured = all.filter((w) => !w.difficulty || !EXCLUDE_DIFFICULTY.includes(w.difficulty.toLowerCase()));
-  featured.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-  featured.forEach((w) => { w.onSite = true; });
+  // Every writeup gets an on-site page now -- Easy/Very Easy included. The hub
+  // is a full, filterable index, not a curated "medium/hard only" subset; only
+  // the main-site ledger below still curates toward the harder ones.
+  const pages = [...all];
+  pages.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  pages.forEach((w) => { w.onSite = true; });
 
   // the main site's "Selected writeups" ledger: mostly medium/hard, with one or
   // two easy ones mixed in just to fill out the row count -- not a separate
   // hand-maintained list, so it can never drift the way the old hardcoded one did
   const LEDGER_SIZE = 8, LEDGER_EASY_SLOTS = 2;
-  const difficultyRank = (w) => ({ hard: 3, medium: 2, challenge: 1 })[(w.difficulty || '').toLowerCase()] ?? 0;
-  const byDifficultyThenDate = [...featured].sort((a, b) => {
+  const difficultyRank = (w) => ({ insane: 5, hard: 4, medium: 3, challenge: 2, easy: 1, 'very easy': 0 })[(w.difficulty || '').toLowerCase()] ?? 2;
+  const isEasyTier = (w) => EXCLUDE_DIFFICULTY.includes((w.difficulty || '').toLowerCase());
+  const byDifficultyThenDate = pages.filter((w) => !isEasyTier(w)).sort((a, b) => {
     const d = difficultyRank(b) - difficultyRank(a);
     return d !== 0 ? d : (b.date || '').localeCompare(a.date || '');
   });
-  const easyPool = all
-    .filter((w) => !featured.includes(w))
-    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const easyPool = pages.filter(isEasyTier).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   const ledgerItems = [
     ...byDifficultyThenDate.slice(0, LEDGER_SIZE - LEDGER_EASY_SLOTS),
     ...easyPool.slice(0, LEDGER_EASY_SLOTS)
@@ -543,15 +554,15 @@ async function main() {
   mkdirSync(outDir, { recursive: true });
 
   const existing = readdirSync(outDir).filter((f) => f.endsWith('.html') && f !== 'index.html');
-  const keepFiles = new Set(featured.map((w) => `${w.slug}.html`));
+  const keepFiles = new Set(pages.map((w) => `${w.slug}.html`));
   for (const f of existing) if (!keepFiles.has(f)) unlinkSync(path.join(outDir, f));
 
-  for (const w of featured) {
+  for (const w of pages) {
     const tldr = stripHr(w.sections['tldr'] || w.sections['tl;dr'] || '');
     w.summary = truncate(tldr, 110);
     writeFileSync(path.join(outDir, `${w.slug}.html`), pageHtml(w, w.slug));
   }
-  writeFileSync(path.join(outDir, 'index.html'), hubHtml(featured));
+  writeFileSync(path.join(outDir, 'index.html'), hubHtml(pages));
 
   // sitemap
   const sitemapPath = path.join(SITE_ROOT, 'sitemap.xml');
@@ -559,7 +570,7 @@ async function main() {
   const urls = [
     `  <url><loc>${SITE_URL}/</loc><lastmod>${today}</lastmod><changefreq>monthly</changefreq><priority>1.0</priority></url>`,
     `  <url><loc>${SITE_URL}/writeups/</loc><lastmod>${today}</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>`,
-    ...featured.map((w) => `  <url><loc>${SITE_URL}/writeups/${w.slug}.html</loc><lastmod>${w.date || today}</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>`)
+    ...pages.map((w) => `  <url><loc>${SITE_URL}/writeups/${w.slug}.html</loc><lastmod>${w.date || today}</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>`)
   ];
   writeFileSync(sitemapPath, `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`);
 
@@ -587,8 +598,7 @@ async function main() {
   llms = llms.replace(/\d+ structured writeups/, `${totalCount} structured writeups`);
   writeFileSync(llmsPath, llms);
 
-  console.log(`Synced ${totalCount} total writeups (${featured.length} featured on-site).`);
-  featured.forEach((w) => console.log(` - [${w.difficulty || '?'}] ${w.title} (${w.platform})`));
+  console.log(`Synced ${totalCount} total writeups, all on-site. Ledger picks: ${ledgerItems.map((w) => w.title).join(', ')}`);
 }
 
 main().catch((err) => { console.error(err); process.exit(1); });

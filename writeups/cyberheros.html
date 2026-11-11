@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CyberHeroes — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="The entire challenge lives in a single JavaScript authenticate() function left fully exposed in the browser's page source. Credentials were hardcoded in…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/cyberheros.html">
+<meta property="og:title" content="CyberHeroes — TryHackMe writeup">
+<meta property="og:description" content="The entire challenge lives in a single JavaScript authenticate() function left fully exposed in the browser's page source. Credentials were hardcoded in…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/cyberheros.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"CyberHeroes — TryHackMe writeup","description":"The entire challenge lives in a single JavaScript authenticate() function left fully exposed in the browser's page source. Credentials were hardcoded in…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-06","url":"https://thecyberfarhan.github.io/writeups/cyberheros.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/cyberheros.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>CyberHeroes</h1>
+  <div class="meta" data-reveal>
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Easy</span>
+    <span>June 6, 2026</span>
+  </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>The entire challenge lives in a single JavaScript <code>authenticate()</code> function left fully exposed in the browser's page source. Credentials were hardcoded in plain text — one of them just reversed — and the flag's file path was constructed client-side and equally readable. No exploitation required. Just <code>Ctrl+U</code>. </div>
+  <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">🕷 Feroxbuster</span><span class="chip">🌐 Browser DevTools (View Source)</span></div>
+  <h2 data-reveal>Introduction</h2>
+<p>Today's subject is <strong>CyberHeroes</strong> — a box that has the audacity to call itself a challenge while leaving its front door not just unlocked, but labelled "FRONT DOOR" in neon letters. It's a single-page portfolio site with a login form that genuinely believes security is a server-side problem. Spoiler: they didn't check with the server. If this box were a bank, the vault combination would be written on the outside of the vault in permanent marker. It's that kind of day.</p>
+<h3>Prerequisites</h3>
+<p>Readers are assumed to know:</p>
+<ul><li>Basic HTML/JavaScript reading ability</li><li>How browser View Source (<code>Ctrl+U</code>) and DevTools work</li><li>What client-side vs. server-side authentication means</li></ul>
+<h2 data-reveal>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<h3>Port Scan</h3>
+<p>Same opening move as always — RustScan for speed, Nmap for detail.</p>
+<p class="aside">Full port sweep, handing off to Nmap scripts for version and service detection:</p>
+<pre><code>rustscan -a 10.49.154.83 -r 1-65535 --ulimit 5000 -- -Pn -sC -sV</code></pre>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version</th></tr></thead><tbody><tr><td>22/tcp</td><td>SSH</td><td>OpenSSH 8.2p1 Ubuntu 4ubuntu0.4</td></tr><tr><td>80/tcp</td><td>HTTP</td><td>Apache httpd 2.4.48 (Ubuntu)</td></tr></tbody></table>
+<p>Two ports, nothing exotic. Apache 2.4.48 is not ancient like the last box — this one isn't about outdated services. The HTTP title comes back as <code>CyberHeros : Index</code>. Typo in the page title is always a great sign of quality software engineering.</p>
+<h3>Web Directory Enumeration</h3>
+<p class="aside">(~3 mins into the box)</p>
+<p class="aside">Feroxbuster with PHP, TXT, and HTML extensions across the medium wordlist:</p>
+<pre><code>feroxbuster -u http://10.49.154.83/ \
+  -w /usr/share/wordlists/seclists/Discovery/Web-Content/DirBuster-2007_directory-list-2.3-medium.txt \
+  -x php,txt,html</code></pre>
+
+<pre><code># output (relevant hits only)
+200  http://10.49.154.83/index.html
+200  http://10.49.154.83/login.html     # ^^^ this is where the fun is
+200  http://10.49.154.83/changelog.txt</code></pre>
+<p class="aside">(truncated — the rest was asset files: images, vendor JS/CSS, nothing actionable)</p>
+<p><code>login.html</code> is the obvious next stop. <code>changelog.txt</code> is worth a read — *it appeared to be a generic template changelog with no sensitive information* — so the login page it is.</p>
+<h2 data-reveal>Foothold</h2>
+<p class="aside">(~5 mins into the box)</p>
+<h3>Client-Side Authentication — The Anti-Pattern</h3>
+<p><strong>What's the problem here?</strong> Authentication is supposed to be validated on the *server* — a system the attacker cannot directly inspect or manipulate. When a developer moves that logic into *client-side JavaScript*, they've handed the attacker the padlock, the key, the combination, and a handwritten note explaining how the lock works. The browser must download and execute all JavaScript to render the page — which means the attacker can read every line of it before touching a single input field.</p>
+<p>Navigating to <code>login.html</code> and hitting <code>Ctrl+U</code> (View Source) immediately reveals the <code>authenticate()</code> function:</p>
+<p class="aside">The full JavaScript function embedded in login.html, exactly as found in source:</p>
+<pre><code>function authenticate() {
+  a = document.getElementById('uname')
+  b = document.getElementById('pass')
+  const RevereString = str =&gt; [...str].reverse().join('');
+  if (a.value=="h3ck3rBoi" &amp; b.value==RevereString("54321@terceSrepuS")) {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 &amp;&amp; this.status == 200) {
+        document.getElementById("flag").innerHTML = this.responseText ;
+        document.getElementById("todel").innerHTML = "";
+        document.getElementById("rm").remove() ;
+      }
+    };
+    xhttp.open("GET", "RandomLo0o0o0o0o0o0o0o0o0o0gpath12345_Flag_"+a.value+"_"+b.value+".txt", true);
+    xhttp.send();
+  }
+  else {
+    alert("Incorrect Password, try again.. you got this hacker !")
+  }
+}</code></pre>
+<p>Breaking this down:</p>
+<ul><li><strong>Username</strong> is hardcoded in the comparison: <code>h3ck3rBoi</code></li><li><strong>Password</strong> is the string <code>54321@terceSrepuS</code> passed through <code>RevereString()</code>, which reverses it character by character — yielding <code>SuperSecret@12345</code></li><li>On success, the script constructs a GET request to a <code>.txt</code> file at an "obscure" path that's... right there in the source, assembled from the username and password values</li></ul>
+<p>The credentials, the reversal algorithm, and the flag's file path are all completely readable before submitting a single form field.</p>
+<h3>Extracted Credentials</h3>
+<table><thead><tr><th>Username</th><th>Password</th><th>Where Found</th></tr></thead><tbody><tr><td><code>h3ck3rBoi</code></td><td><code>SuperSecret@12345</code></td><td><code>login.html</code> JavaScript source</td></tr></tbody></table>
+<h3>Reconstructed Flag File Path</h3>
+<p>Substituting the known credential values into the path template from the JS:</p>
+<pre><code>RandomLo0o0o0o0o0o0o0o0o0o0gpath12345_Flag_h3ck3rBoi_SuperSecret@12345.txt</code></pre>
+<p>This file can be fetched directly without ever touching the login form:</p>
+<p class="aside">Direct retrieval of the flag file — no form submission required:</p>
+<pre><code>curl "http://10.49.154.83/RandomLo0o0o0o0o0o0o0o0o0o0gpath12345_Flag_h3ck3rBoi_SuperSecret@12345.txt"</code></pre>
+<p>Or simply by entering the credentials into the login form, which triggers the XHR fetch and injects the response into the page.</p>
+<h2 data-reveal>Shell / Access</h2>
+<p>No shell required for this challenge. Access to the flag was achieved entirely via browser interaction with the login page after reading the client-side source.</p>
+<h2 data-reveal>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Hardcoded credentials in client-side JavaScript</td><td class="sev-critical">Critical</td><td>Move all authentication logic server-side; never compare credentials in the browser</td></tr><tr><td>Plaintext (reversed) password obfuscation</td><td class="sev-critical">Critical</td><td>String reversal is not encryption — use proper server-side password hashing (bcrypt, Argon2)</td></tr><tr><td>Predictable flag file path assembled client-side</td><td class="sev-high">High</td><td>Flag delivery should be gated by a server-side session check, not a client-constructed URL</td></tr></tbody></table>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>Anything that runs in the browser is readable by the user — no amount of string reversal, obfuscation, or "obscure" path names changes that. Authentication logic belongs on the server, full stop.</div>
+  <h2 data-reveal>If I Did It Again</h2>
+<p>Skip Feroxbuster entirely — <code>Ctrl+U</code> on the homepage link to <code>login.html</code> would have gotten here in thirty seconds.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/cyberheros_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
+</body>
+</html>

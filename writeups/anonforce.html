@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anonforce — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="Anonymous FTP served the entire server filesystem. The user flag was readable directly from /home/melodias/. A world-readable /notread/ directory…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/anonforce.html">
+<meta property="og:title" content="Anonforce — TryHackMe writeup">
+<meta property="og:description" content="Anonymous FTP served the entire server filesystem. The user flag was readable directly from /home/melodias/. A world-readable /notread/ directory…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/anonforce.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Anonforce — TryHackMe writeup","description":"Anonymous FTP served the entire server filesystem. The user flag was readable directly from /home/melodias/. A world-readable /notread/ directory…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-09","url":"https://thecyberfarhan.github.io/writeups/anonforce.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/anonforce.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>Anonforce</h1>
+  <div class="meta" data-reveal>
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Easy</span>
+    <span>June 9, 2026</span>
+  </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>Anonymous FTP served the entire server filesystem. The user flag was readable directly from <code>/home/melodias/</code>. A world-readable <code>/notread/</code> directory contained a GPG-encrypted shadow file backup and the private key needed to decrypt it — passphrase cracked with John (<code>xbox360</code>). Decrypting the backup revealed the root sha512crypt hash, cracked with Hashcat to <code>hikari</code>. SSH directly as root. </div>
+  <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">📂 FTP client</span><span class="chip">🔐 GPG</span><span class="chip">🔑 gpg2john + John the Ripper</span><span class="chip">🔓 Hashcat</span><span class="chip">🔑 SSH</span></div>
+  <h2 data-reveal>Introduction</h2>
+<p>Today's target is <strong>Anonforce</strong> — a box that achieves the remarkable feat of skipping the entire "web application with subtle vulnerabilities" phase and going straight to "here is the entire filesystem, help yourself." Anonymous FTP doesn't just expose a note or a key this time. It exposes everything: <code>/etc</code>, <code>/home</code>, <code>/root</code> — the whole hierarchy, readable and navigable like any other directory. The only thing standing between <code>anonymous</code> and root credentials is a GPG passphrase that John cracks in seconds. This is less a penetration test and more a guided tour. The door is labelled FTP and it was left wide open.</p>
+<h3>Prerequisites</h3>
+<p>Readers are assumed to know:</p>
+<ul><li>What anonymous FTP is and why exposing a filesystem root through it is catastrophic</li><li>What GPG / PGP encryption is and how private keys relate to encrypted files</li><li>What <code>/etc/shadow</code> contains and why its exposure is critical</li><li>Basic Hashcat mode selection for Linux shadow hash formats</li></ul>
+<h2 data-reveal>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<h3>Port Scan</h3>
+<p class="aside">Full-range sweep with RustScan, Nmap for service and version fingerprinting:</p>
+<pre><code>rustscan -a 10.49.164.9 -r 1-65535 --ulimit 5000 -- -Pn -sC -sV</code></pre>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version</th></tr></thead><tbody><tr><td>21/tcp</td><td>FTP</td><td>vsftpd 3.0.3 — <strong>anonymous login allowed</strong></td></tr><tr><td>22/tcp</td><td>SSH</td><td>OpenSSH 7.2p2 Ubuntu 4ubuntu2.8</td></tr></tbody></table>
+<p>No HTTP port — confirmed by a Feroxbuster attempt that immediately failed to connect. This is a two-service box and the story begins and ends with FTP.</p>
+<p>Nmap's <code>ftp-anon</code> script does something unusual here: it doesn't just flag anonymous login as allowed, it lists the root directory of the FTP share:</p>
+<pre><code>| drwxr-xr-x   85 0        0            4096 Aug 13  2019 etc
+| drwxr-xr-x    3 0        0            4096 Aug 11  2019 home
+| drwxrwxrwx    2 1000     1000         4096 Aug 11  2019 notread  [NSE: writeable]
+| drwx------    3 0        0            4096 Aug 11  2019 root</code></pre>
+<p>That's not a subdirectory of FTP storage. That's <code>/bin</code>, <code>/boot</code>, <code>/etc</code>, <code>/home</code> — the server's actual root filesystem, mounted as the FTP root. The <code>notread</code> directory stands out: world-readable and world-writable, owned by uid 1000. The <code>root</code> directory is listed too, though <code>drwx------</code> suggests it may not be readable by <code>ftp</code>. One thing at a time.</p>
+<h2 data-reveal>Foothold</h2>
+<p class="aside">(~3 mins into the box)</p>
+<h3>Anonymous FTP — Full Filesystem Access</h3>
+<p class="aside">Connecting with anonymous login:</p>
+<pre><code>ftp 10.49.164.9
+# Name: anonymous
+# Password: (blank)
+# 230 Login successful.</code></pre>
+<p class="aside">The FTP root is the server's <code>/</code>:</p>
+<pre><code>ftp&gt; ls
+# bin  boot  dev  etc  home  lib  notread  opt  root  tmp  usr  var ...</code></pre>
+<p><strong>What makes this so severe?</strong> When FTP is configured with the server's filesystem root as the FTP chroot (rather than a dedicated, restricted directory), every file the FTP service user can read becomes accessible to any anonymous visitor. This is the difference between leaving a note on the doorstep and leaving the front door open with a map to the safe inside.</p>
+<h3>User Flag — Direct FTP Download</h3>
+<p class="aside">Navigating to melodias's home directory:</p>
+<pre><code>ftp&gt; cd /home/melodias
+ftp&gt; ls
+# -rw-rw-r--    1 1000     1000           33 Aug 11  2019 user.txt
+ftp&gt; get user.txt</code></pre>
+
+<pre><code>cat user.txt</code></pre>
+
+<pre><code>606083fd33beb1284fc51f411a706af8</code></pre>
+<p>User flag collected without touching SSH. No credentials, no shell, no escalation required at this stage — just FTP navigation.</p>
+<h3>The <code>/notread/</code> Directory</h3>
+<p class="aside">Investigating the world-readable directory flagged by Nmap:</p>
+<pre><code>ftp&gt; cd /notread
+ftp&gt; ls
+# -rwxrwxrwx    1 1000     1000          524 Aug 11  2019 backup.pgp
+# -rwxrwxrwx    1 1000     1000         3762 Aug 11  2019 private.asc
+ftp&gt; mget backup.pgp private.asc</code></pre>
+<p>Two files: <code>backup.pgp</code> is a PGP-encrypted archive; <code>private.asc</code> is an ASCII-armoured PGP private key. The pairing is obvious — the private key decrypts the backup. The slightly surreal part is that both are in the same directory, world-readable, with permissions <code>rwxrwxrwx</code>. Whoever set this up was not particularly worried about defence in depth.</p>
+<h3>PGP Key Passphrase Cracking — John the Ripper</h3>
+<p><strong>What is PGP encryption?</strong> Pretty Good Privacy (PGP) uses asymmetric key pairs — a public key to encrypt, a private key to decrypt. The private key itself is protected by a passphrase. Even if an attacker has the private key file, they need the passphrase to use it. <code>gpg2john</code> extracts the passphrase hash from the key file in a format John the Ripper understands.</p>
+<p class="aside">Importing the private key and converting it for cracking:</p>
+<pre><code>gpg --import private.asc
+gpg2john private.asc &gt; hash.txt</code></pre>
+<p>John silently returned no results on the first run — the hash was already in the potfile from a prior session (same John behaviour seen on the Mustacchio box). Checking the potfile immediately:</p>
+<pre><code>john hash.txt --show</code></pre>
+
+<pre><code>anonforce:xbox360:::anonforce &lt;melodias@anonforce.nsa&gt;::private.asc
+
+1 password hash cracked, 0 left</code></pre>
+<p>PGP passphrase: <code>xbox360</code>. The key identity <code>anonforce &lt;melodias@anonforce.nsa&gt;</code> is a nice bit of box flavour — the NSA dot nsa domain is doing a lot of thematic work here.</p>
+<h3>Decrypting the Shadow Backup</h3>
+<p class="aside">Decrypting <code>backup.pgp</code> using the imported private key:</p>
+<pre><code>gpg --decrypt backup.pgp</code></pre>
+
+<pre><code>gpg: encrypted with elg512 key, ID AA6268D1E6612967
+gpg: WARNING: cipher algorithm CAST5 not found in recipient preferences</code></pre>
+
+<pre><code># decrypted output (relevant entries)
+root:$6$07nYFaYf$F4VMaegmz7dKjsTukBLh6cP01iMmL7CiQDt1ycIm6a.bsOIBp0DwXVb9XI2EtULXJzBtaMZMNd2tV4uob5RVM0:18120:0:99999:7:::
+melodias:$1$xDhc6S6G$IQHUW5ZtMkBQ5pUMjEQtL1:18120:0:99999:7:::</code></pre>
+<p><code>backup.pgp</code> is a backup of <code>/etc/shadow</code> — encrypted, but now decrypted. Root's hash format is <code>$6$</code> — sha512crypt. The CAST5 warning is harmless: it's a cipher mismatch advisory between the key's preference list and the encryption algorithm used on the file.</p>
+<h2 data-reveal>Shell / Access</h2>
+<p class="aside">(~15 mins into the box)</p>
+<h3>Root Hash Cracking — Hashcat</h3>
+<p><strong>Hash identification:</strong> <code>$6$</code> = sha512crypt = Hashcat mode 1800. This is a slow, properly iterated hash — 5000 rounds by default. Hashcat estimated 7+ hours at ~514 H/s on CPU, but the password appeared in rockyou.txt early enough to crack in 12 seconds.</p>
+<p class="aside">Saving the root hash and cracking it:</p>
+<pre><code>echo '$6$07nYFaYf$F4VMaegmz7dKjsTukBLh6cP01iMmL7CiQDt1ycIm6a.bsOIBp0DwXVb9XI2EtULXJzBtaMZMNd2tV4uob5RVM0' &gt; root_hash.txt
+hashcat -m 1800 -a 0 root_hash.txt /usr/share/wordlists/rockyou.txt</code></pre>
+
+<pre><code>$6$07nYFaYf$...:hikari
+
+Status: Cracked
+Progress: 6720/14344385 (0.05%)
+Time: 12 seconds</code></pre>
+<p>Root password: <code>hikari</code>. Only 6720 candidates into the wordlist. For a box whose entire premise is that you have root's shadow hash, this is an appropriately swift ending.</p>
+<p class="aside">SSH directly as root:</p>
+<pre><code>ssh root@10.49.164.9
+# Password: hikari</code></pre>
+
+<pre><code>root@ubuntu:~# cat root.txt
+f706456440c7af4187810c31c6cebdce</code></pre>
+
+<h2 data-reveal>The Full Chain</h2>
+<p>The complete attack chain:</p>
+<ol><li><strong>Anonymous FTP</strong> with filesystem root exposed → navigated directly to <code>/home/melodias/user.txt</code> → user flag</li><li><strong><code>/notread/</code></strong> contained <code>backup.pgp</code> (encrypted shadow) + <code>private.asc</code> (PGP private key)</li><li><strong>gpg2john + John</strong> cracked PGP passphrase → <code>xbox360</code></li><li><strong><code>gpg --decrypt backup.pgp</code></strong> → plaintext <code>/etc/shadow</code> backup with root's sha512crypt hash</li><li><strong>Hashcat mode 1800</strong> cracked root hash → <code>hikari</code></li><li><strong>SSH as root</strong> → root flag</li></ol>
+<h2 data-reveal>Rabbit Holes</h2>
+<h3>John the Ripper Silent Skip</h3>
+<p><code>john --wordlist=rockyou.txt hash.txt</code> returned "No password hashes left to crack" on both attempts. The hash had already been cracked and was sitting in John's potfile from a prior run (or the key had been imported previously). <code>john hash.txt --show</code> revealed the answer immediately. This is the same gotcha from the Mustacchio writeup — John's silence always means "check <code>--show</code>", not "uncrackable."</p>
+<h3>melodias Hash (<code>$1$</code>)</h3>
+<p>The shadow backup also contains melodias's hash — <code>$1$</code> (MD5crypt, Hashcat mode 500). This is a weaker hash than root's <code>$6$</code> and could theoretically be cracked as well, but there's no need: the root path is already open and SSH as root bypasses any need for the user account. Noted for completeness.</p>
+<h2 data-reveal>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Anonymous FTP with filesystem root as FTP root</td><td class="sev-critical">Critical</td><td>Never configure FTP with <code>/</code> as the chroot; use a dedicated, isolated FTP directory with only intended files; disable anonymous access entirely if not required</td></tr><tr><td>Sensitive PGP-encrypted backup exposed in world-readable directory</td><td class="sev-critical">Critical</td><td>Store backups outside the FTP tree; apply strict permissions (<code>700</code> or <code>600</code>); do not co-locate a private key with the data it protects</td></tr><tr><td>Weak PGP key passphrase (<code>xbox360</code>) in rockyou.txt</td><td class="sev-high">High</td><td>Use a long, randomly generated passphrase for any key protecting sensitive data</td></tr><tr><td>Root's shadow hash in an accessible backup</td><td class="sev-critical">Critical</td><td>Never back up <code>/etc/shadow</code> to an FTP-accessible location; restrict shadow file access to root only and audit backup procedures regularly</td></tr><tr><td>Weak root password (<code>hikari</code>) cracked in 12 seconds</td><td class="sev-critical">Critical</td><td>Use a long, randomly generated root password; consider disabling direct root SSH login (<code>PermitRootLogin no</code>) and requiring <code>sudo</code> from a non-root account</td></tr></tbody></table>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>Anonymous FTP is almost never appropriate for production systems — but it's especially catastrophic when the FTP root is the server's filesystem root. The combination turns an unauthenticated network service into a complete read-access backdoor to every world-readable file on the machine. Always scope FTP shares to the minimum necessary directory, never <code>/</code>.</div>
+  <h2 data-reveal>If I Did It Again</h2>
+<p>Skip checking <code>/root/</code> via FTP (it's <code>drwx------</code> and not readable by the FTP service user anyway) and go straight to <code>/notread/</code> after grabbing the user flag — the two files there are the entire path to root, and spending time exploring the rest of the filesystem is satisfying but not necessary.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/anonforce_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
+</body>
+</html>

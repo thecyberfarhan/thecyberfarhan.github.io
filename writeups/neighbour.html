@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neighbour — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="A PHP login page left guest credentials in an HTML comment. Logging in as guest revealed a profile page controlled by a ?user= URL parameter with zero…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/neighbour.html">
+<meta property="og:title" content="Neighbour — TryHackMe writeup">
+<meta property="og:description" content="A PHP login page left guest credentials in an HTML comment. Logging in as guest revealed a profile page controlled by a ?user= URL parameter with zero…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/neighbour.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Neighbour — TryHackMe writeup","description":"A PHP login page left guest credentials in an HTML comment. Logging in as guest revealed a profile page controlled by a ?user= URL parameter with zero…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-06","url":"https://thecyberfarhan.github.io/writeups/neighbour.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/neighbour.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>Neighbour</h1>
+  <div class="meta" data-reveal>
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Easy</span>
+    <span>June 6, 2026</span>
+  </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>A PHP login page left guest credentials in an HTML comment. Logging in as <code>guest</code> revealed a profile page controlled by a <code>?user=</code> URL parameter with zero server-side authorisation check. Changing <code>guest</code> to <code>admin</code> in the URL handed over the admin profile — and the flag — immediately. </div>
+  <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">🕷 Feroxbuster</span><span class="chip">🌐 Browser (View Source + URL bar)</span></div>
+  <h2 data-reveal>Introduction</h2>
+<p>Meet <strong>Neighbour</strong> — a box whose entire security model rests on the assumption that users won't look at the URL bar after logging in. It's a PHP web app with a login form, a profile page, and all the authorisation rigor of an honour system at an unmanned farm stall. The login page even helpfully leaves guest credentials in an HTML comment with a winking <code>Ctrl+U</code> hint. The developer wanted you to find it. What they perhaps didn't intend was for <code>?user=admin</code> to work just as smoothly right afterwards.</p>
+<h3>Prerequisites</h3>
+<p>Readers are assumed to know:</p>
+<ul><li>Basic HTTP request/response flow</li><li>What URL query parameters are and how to modify them</li><li>The concept of server-side vs. client-side access control</li></ul>
+<h2 data-reveal>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<h3>Port Scan</h3>
+<p class="aside">Full-range scan with RustScan, detailed service fingerprinting via Nmap:</p>
+<pre><code>rustscan -a 10.49.169.236 -r 1-65535 --ulimit 5000 -- -Pn -sC -sV</code></pre>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version</th></tr></thead><tbody><tr><td>22/tcp</td><td>SSH</td><td>OpenSSH 8.2p1 Ubuntu 4ubuntu0.5</td></tr><tr><td>80/tcp</td><td>HTTP</td><td>Apache httpd 2.4.53 (Debian)</td></tr></tbody></table>
+<p>One detail worth flagging from the Nmap output: the <code>PHPSESSID</code> cookie is missing the <code>HttpOnly</code> flag. A small note, but it confirms this is a PHP application and hints that session security wasn't a top priority here either.</p>
+<h3>Web Directory Enumeration</h3>
+<p class="aside">(~3 mins into the box)</p>
+<p class="aside">Feroxbuster scanning with PHP, TXT, and HTML extensions:</p>
+<pre><code>feroxbuster -u http://10.49.169.236/ \
+  -w /usr/share/wordlists/seclists/Discovery/Web-Content/DirBuster-2007_directory-list-2.3-medium.txt \
+  -x php,txt,html</code></pre>
+
+<pre><code># output (relevant hits only)
+200  http://10.49.169.236/index.php
+200  http://10.49.169.236/login.php
+302  http://10.49.169.236/profile.php  =&gt;  login.php   # ^^^ redirects unauthenticated users
+301  http://10.49.169.236/db           =&gt;  /db/
+200  http://10.49.169.236/db.php                       # ^^^ exists but returns empty body
+302  http://10.49.169.236/logout.php   =&gt;  login.php</code></pre>
+<p><code>profile.php</code> bounces unauthenticated visitors straight to <code>login.php</code> — so there *is* some kind of session check at the door. The question is whether that check extends to *which* user's profile you can view once you're inside. Spoiler: it doesn't.</p>
+<p><code>db.php</code> returns a blank response, *which likely means it's a database connection include file rather than a standalone page* — not directly exploitable here but useful to know the database layer is PHP-based.</p>
+<h3>HTML Source — Credentials in a Comment</h3>
+<p>The login page itself drops a hint in plain HTML: <code>Ctrl+U</code> is called out right in the UI. Taking the bait:</p>
+<p class="aside">Viewing the raw HTML source of the login page:</p>
+<pre><code>view-source:http://10.49.169.236/</code></pre>
+
+<pre><code>&lt;!-- use guest:guest credentials until registration is fixed. "admin" user account is off limits!!!!! --&gt;</code></pre>
+<p>Guest credentials, giftwrapped in an HTML comment. The five exclamation marks on "off limits" are doing a lot of emotional heavy lifting for what is ultimately a URL parameter.</p>
+<h3>Credentials Found</h3>
+<table><thead><tr><th>Username</th><th>Password</th><th>Where Found</th></tr></thead><tbody><tr><td><code>guest</code></td><td><code>guest</code></td><td>HTML comment in <code>index.php</code> source</td></tr></tbody></table>
+<h2 data-reveal>Foothold</h2>
+<p class="aside">(~5 mins into the box)</p>
+<h3>IDOR — Insecure Direct Object Reference</h3>
+<p><strong>What is IDOR?</strong> An Insecure Direct Object Reference occurs when an application uses a user-supplied value — a filename, a username, a numeric ID — to directly look up and return a resource, without checking whether the requesting user is actually *authorised* to access that specific resource. It's one of the most common and most impactful web vulnerabilities: the server trusts the client to only ask for things it's allowed to see, which is precisely the one thing a client should never be trusted to do.</p>
+<p>After logging in with <code>guest:guest</code>, the application lands here:</p>
+<pre><code>http://10.49.169.236/profile.php?user=guest</code></pre>
+<p>The page greets us with:</p>
+<pre><code>Hi, guest. Welcome to our site. Try not to peep your neighbor's profile.</code></pre>
+<p>That message is either a warning or an instruction depending on your disposition. The <code>?user=</code> parameter is server-side rendered — the PHP backend is looking up whatever username value is passed and returning that profile. The question is whether it checks that the logged-in session matches the requested username.</p>
+<p class="aside">Modifying the URL parameter directly in the browser address bar:</p>
+<pre><code>http://10.49.169.236/profile.php?user=admin</code></pre>
+<p>The server doesn't check. It just looks up <code>admin</code> and returns:</p>
+<pre><code>Hi, admin. Welcome to your site. The flag is: flag{66be95c478473d91a5358f2440c7af1f}</code></pre>
+<p>No re-authentication. No access control check. One URL edit.</p>
+<h2 data-reveal>Shell / Access</h2>
+<p>No shell required. The flag was delivered directly in the HTTP response body after the IDOR parameter manipulation.</p>
+<h2 data-reveal>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>IDOR on <code>profile.php?user=</code></td><td class="sev-high">High</td><td>Validate server-side that the authenticated session user matches the requested profile; never trust user-supplied object references for access control</td></tr><tr><td>Guest credentials hardcoded in HTML comment</td><td class="sev-medium">Medium</td><td>Remove all credentials from client-deliverable files; use environment variables or a proper user registration flow</td></tr><tr><td>Missing <code>HttpOnly</code> flag on <code>PHPSESSID</code></td><td>Low</td><td>Set <code>session.cookie_httponly = 1</code> in <code>php.ini</code> to prevent JavaScript access to the session cookie</td></tr></tbody></table>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>A session cookie proves you're *logged in* — it doesn't automatically prove you're allowed to access every resource on the server. Always verify server-side that the authenticated user owns or has permission to access the specific object being requested, not just that they're authenticated at all.</div>
+  <h2 data-reveal>If I Did It Again</h2>
+<p>Skip Feroxbuster — <code>Ctrl+U</code> on the login page gives the credentials, logging in reveals the <code>?user=</code> parameter, and the whole thing is over in under two minutes. The directory scan added noise but no signal here.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/neighbour_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
+</body>
+</html>

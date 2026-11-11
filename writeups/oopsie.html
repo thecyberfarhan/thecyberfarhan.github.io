@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Oopsie — Hack The Box writeup | Farhan Hussain</title>
+<meta name="description" content="Apache box running a repair management web app. Guest login is available but the upload feature is locked behind an authorization check that trusts…">
+<link rel="canonical" href="https://thecyberfarhan.github.io/writeups/oopsie.html">
+<meta property="og:title" content="Oopsie — Hack The Box writeup">
+<meta property="og:description" content="Apache box running a repair management web app. Guest login is available but the upload feature is locked behind an authorization check that trusts…">
+<meta property="og:type" content="article">
+<meta property="og:url" content="https://thecyberfarhan.github.io/writeups/oopsie.html">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Crect x='1' y='1' width='30' height='30' rx='6' fill='none' stroke='%23B4232C' stroke-width='2'/%3E%3Ctext x='16' y='22' font-family='Arial' font-size='18' font-weight='700' text-anchor='middle' fill='%23e6edf3'%3EF%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="writeup.css">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Oopsie — Hack The Box writeup","description":"Apache box running a repair management web app. Guest login is available but the upload feature is locked behind an authorization check that trusts…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"url":"https://thecyberfarhan.github.io/writeups/oopsie.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/oopsie.html"}</script>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="back" href="./">&larr; All writeups</a>
+    <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
+  </div>
+  <p class="eyebrow" data-reveal>Hack The Box writeup</p>
+  <h1 data-reveal>Oopsie</h1>
+  <div class="meta" data-reveal>
+    <span class="plat">Hack The Box</span>
+    <span class="diff">Very Easy</span>
+    
+  </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>Apache box running a repair management web app. Guest login is available but the upload feature is locked behind an authorization check that trusts client-supplied cookies. IDOR on the Accounts page leaks the admin's numeric user ID (34322). Swapping your cookie from <code>user=2233</code> to <code>user=34322</code> bypasses the check and exposes the file upload form — no password needed. Upload a PHP reverse shell, trigger it from <code>/uploads/</code>, land as <code>www-data</code>. Read <code>db.php</code> in the webroot for <code>robert:M3g4C0rpUs3r!</code>, SSH in, grab the user flag. A SUID binary (<code>/usr/bin/bugtracker</code>) calls <code>cat</code> without a full path, making it trivially hijackable via PATH manipulation — drop a fake <code>cat</code> in <code>/tmp</code>, prepend <code>/tmp</code> to <code>$PATH</code>, run the binary, get a root shell. </div>
+  <div class="tools"></div>
+  <h2 data-reveal>Introduction</h2>
+<p>Oopsie is the second box in HTB's Starting Point track and it's basically a masterclass in "trusting the client is a terrible idea." The web app hands you a guest session cookie and then assumes you'd never dream of editing it. One IDOR plus a cookie tweak later and you've got the admin's file upload form. From there it's classic PHP shell upload → credential reuse → SUID PATH hijack. No CVEs, no exotic exploits — just the application doing exactly what you tell it to, because it never learned to question you.</p>
+<p>The attack chain touches three distinct vulnerability classes: broken access control (IDOR + cookie manipulation), insecure file upload, and a SUID binary with an unsafe <code>system()</code> call — a greatest-hits anthology for web pentesting fundamentals.</p>
+<h2 data-reveal>Recon</h2>
+<h3>Port Scan</h3>
+<pre><code>rustscan -a 10.129.29.145 --ulimit 5000 -b 2000 -t 2000 -- -sV -sC</code></pre>
+<p>Two open ports, nothing exotic:</p>
+<table><thead><tr><th>Port</th><th>Service</th><th>Version</th></tr></thead><tbody><tr><td>22/tcp</td><td>SSH</td><td>OpenSSH 7.6p1 Ubuntu 4ubuntu0.3</td></tr><tr><td>80/tcp</td><td>HTTP</td><td>Apache httpd 2.4.29 (Ubuntu)</td></tr></tbody></table>
+<p>SSH is Ubuntu 18.04-era (kernel 4.15.0-76-generic, confirmed later from the shell banner). The web title returned as "Welcome" — nondescript, which usually means there's something worth finding inside.</p>
+<h3>Web Enumeration</h3>
+<pre><code>feroxbuster -u http://10.129.29.145/ \
+  -w /usr/share/seclists/Discovery/Web-Content/raft-medium-directories.txt \
+  -t 50 -x php,html,txt,bak,js,json \
+  -s 200,204,301,302,307,401,403,405 -k --no-state</code></pre>
+<p>Key discoveries:</p>
+<table><thead><tr><th>URL</th><th>Status</th><th>Notes</th></tr></thead><tbody><tr><td><code>/cdn-cgi/login/</code></td><td>200</td><td>Login panel</td></tr><tr><td><code>/cdn-cgi/login/index.php</code></td><td>200</td><td>Same login page</td></tr><tr><td><code>/cdn-cgi/login/admin.php</code></td><td>302 → login</td><td>Admin panel (redirects unauthenticated)</td></tr><tr><td><code>/cdn-cgi/login/db.php</code></td><td>200</td><td>Empty response body — suspicious</td></tr><tr><td><code>/uploads/</code></td><td>301</td><td>Directory exists, likely upload destination</td></tr></tbody></table>
+<p>The <code>/cdn-cgi/</code> path is worth a note: in production this path is Cloudflare's namespace. Someone thought it was a clever hiding spot, or just grabbed a template. Either way, feroxbuster found it anyway.</p>
+<p>Also ran <code>searchsploit Apache 2.4.29</code> — nothing useful remotely exploitable without credentials. Dead end confirmed early, time to move on to the application logic.</p>
+<h2 data-reveal>Foothold</h2>
+<h3>Login Panel — Guest Access</h3>
+<p>Browsing to <code>http://10.129.29.145/cdn-cgi/login/</code> revealed a login form with a convenient "Login as Guest" link at the bottom. Clicking it set the session cookies:</p>
+<pre><code>user=2233
+role=guest</code></pre>
+<p>The app loaded a "Repair Management System" for MegaCorp Automotive with four navigation items: Account, Branding, Clients, and Uploads.</p>
+<h3>IDOR — Leaking the Admin Access ID</h3>
+<p>The Accounts page URL pattern was immediately telling:</p>
+<pre><code>/cdn-cgi/login/admin.php?content=accounts&amp;id=2</code></pre>
+<p>That <code>id=2</code> is a sequential integer — the single most reliable thing in web pentesting to try decrementing. Changing it to <code>id=1</code>:</p>
+<pre><code>http://10.129.29.145/cdn-cgi/login/admin.php?content=accounts&amp;id=1</code></pre>
+<p>Returned the admin account record, leaking:</p>
+<ul><li><strong>Name:</strong> admin  </li><li><strong>Email:</strong> (admin email)  </li><li><strong>Access ID:</strong> <strong>34322</strong></li></ul>
+<p>No authentication required to view someone else's account record. Classic IDOR — the app checked that you were logged in as *a* user, not that you were asking about *your* user.</p>
+<h3>Cookie Manipulation — Bypassing Upload Authorization</h3>
+<p>The Uploads page responded with "This action require super admin rights" for the guest session. Testing cookie variations confirmed the check was on the <code>user</code> value, not <code>role</code>:</p>
+<table><thead><tr><th>Cookie</th><th>Uploads page result</th></tr></thead><tbody><tr><td><code>user=2233; role=guest</code></td><td>"This action require super admin rights."</td></tr><tr><td><code>user=2233; role=admin</code></td><td>Same block — role alone doesn't matter</td></tr><tr><td><code>user=34322; role=guest</code></td><td><strong>Upload form appeared</strong></td></tr><tr><td><code>user=34322; role=admin</code></td><td>Upload form appeared</td></tr></tbody></table>
+<p>The server was comparing the <code>user</code> cookie value against a database of authorized user IDs for the uploads feature. Since that value came straight from the client cookie with no signature or session binding, swapping it in Firefox DevTools (or Burp) was all it took.</p>
+<p>The page still showed "Logged in as Guest" in the navbar — the app's identity display and its authorization check were reading from different sources. A wonderful reminder that authorization bugs don't always announce themselves.</p>
+<h2 data-reveal>The Full Chain</h2>
+<h3>PATH Hijack — SUID Privilege Escalation</h3>
+<p>The plan: drop a fake <code>cat</code> script in <code>/tmp</code> that spawns a shell, then make sure <code>/tmp</code> is first in <code>$PATH</code> before running the SUID binary.</p>
+<pre><code>cd /tmp
+echo '/bin/sh' &gt; cat
+chmod +x cat
+export PATH=/tmp:$PATH
+/usr/bin/bugtracker</code></pre>
+
+<pre><code>------------------
+: EV Bug Tracker :
+------------------
+
+Provide Bug ID: 1
+---------------
+
+# id
+uid=0(root) gid=1000(robert) groups=1000(robert),1001(bugtracker)</code></pre>
+<p>Root shell. The fake <code>cat</code> was executed by <code>system()</code> inside the SUID process, so <code>uid=0</code> — even though <code>gid</code> and group memberships still show <code>robert</code>'s values (the effective UID was elevated by SUID; the groups weren't).</p>
+<h3>Root Flag</h3>
+<p>The fake <code>cat</code> had replaced the real one in <code>$PATH</code>, so reading the flag with just <code>cat</code> in the root shell would recurse into our payload. Two options: call the real binary by full path, or just <code>ls /root</code> first and use a different read method.</p>
+<pre><code>/bin/cat /root/root.txt</code></pre>
+
+<pre><code>af13b0bee69f8a877c3faf667f7beacf</code></pre>
+
+<h2 data-reveal>Rabbit Holes</h2>
+<p><strong>Trying to escalate via role=admin cookie alone:</strong> The intuitive first guess after seeing <code>role=guest</code> in the cookie was to change it to <code>role=admin</code>. Tested it. The upload restriction persisted. The authorization check on the server side didn't actually read the <code>role</code> cookie value for the uploads endpoint — only <code>user</code>. Spent a few curl iterations on this before confirming the pattern from the accounts IDOR.</p>
+<p><strong>searchsploit on Apache 2.4.29:</strong> Went down the CVE rabbit hole looking for an unauthenticated Apache exploit. Nothing applicable — the relevant CVEs (path traversal 2.4.49/50) were for later versions. The application-layer vulnerabilities were always the entry point, not the web server itself.</p>
+<p><strong>python pty spawn failing:</strong> First instinct after getting the <code>www-data</code> shell was <code>python -c 'import pty; ...'</code> — the standard PTY upgrade. Got <code>python: not found</code>. The box is Ubuntu 18.04 with Python 3 only, and even that required <code>python3</code>. Switched to <code>/usr/bin/script -qc /bin/bash /dev/null</code> which gave a functional shell without the full readline/job control experience, but was stable enough.</p>
+<h2 data-reveal>Mitigations</h2>
+<p><strong>IDOR on Account Records:</strong> The accounts page should validate that the requesting user's session ID matches the <code>id</code> parameter they're querying. A user should only be able to view their own account record. At minimum, sensitive fields (access IDs, internal user identifiers) shouldn't be exposed to authenticated but unprivileged users at all.</p>
+<p><strong>Client-Side Cookie Authorization:</strong> Session state must never be trusted from the client. The <code>user</code> cookie value should be derived server-side from a cryptographically signed session token (e.g., a proper session ID tied to server-stored state). If a user modifies their cookie, the server should reject the tampered session, not obey it.</p>
+<p><strong>Unrestricted File Upload:</strong> The upload endpoint accepted any file type, including executable PHP. File uploads should:</p>
+<ul><li>Validate MIME type server-side (not from <code>Content-Type</code> header alone)</li><li>Rename uploaded files to strip dangerous extensions</li><li>Store uploads outside the web root, or configure the upload directory to deny PHP execution (<code>php_flag engine off</code> in <code>.htaccess</code>)</li></ul>
+<p><strong>Plaintext Credentials in Source Code:</strong> <code>db.php</code> contained a hardcoded database password in cleartext. Credentials should be loaded from environment variables or a secrets manager, never committed to or stored in application source files. File permissions should also prevent web server processes from reading config files unnecessarily.</p>
+<p><strong>SUID Binary with Unsafe PATH-Dependent Command:</strong> The <code>bugtracker</code> binary called <code>cat</code> via <code>system()</code> without specifying an absolute path. Any SUID binary that calls external commands must:</p>
+<ul><li>Use absolute paths (<code>/bin/cat</code>)</li><li>Reset <code>$PATH</code> to a known-safe value before calling <code>system()</code></li><li>Or avoid <code>system()</code> entirely in favor of safer alternatives (<code>exec*</code> family with explicit argument arrays)</li></ul>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>Authorization in web applications has to live on the server — never in a cookie the user controls. The entire Oopsie attack chain ran on one assumption the developers got wrong: that a client-supplied <code>user</code> value is trustworthy. Fix that one mistake and there's no IDOR, no cookie manipulation, and no path to the upload form. The rest of the chain (credential in db.php, SUID PATH hijack) are compounding mistakes that wouldn't have mattered without that first door open.  The escalation is also a good reminder that SUID binaries are permanently in scope for PATH hijack analysis. If <code>strings</code> on a SUID binary shows a bare command name — <code>cat</code>, <code>find</code>, <code>ls</code>, anything — and you control <code>$PATH</code>, you control what runs as root.</div>
+  <h2 data-reveal>If I Did It Again</h2>
+<p>I'd hit the accounts IDOR before even touching the cookie manipulation. The URL pattern (<code>?content=accounts&amp;id=2</code>) is immediately suspicious and decrementing the ID is a two-second test — should have been the first thing tried rather than the second.</p>
+<p>For the privesc, I'd run <code>strings</code> on every SUID binary as a first pass before even trying LinPEAS. The <code>bugtracker</code> binary analysis took about 30 seconds and the PATH hijack became immediately obvious. When <code>strings</code> shows <code>system</code> and a bare command name in the same binary, you already have the write-up.</p>
+<p>Also worth noting for future boxes: when <code>python</code> isn't available for PTY upgrade, <code>script -qc /bin/bash /dev/null</code> is a reliable fallback. Worth having that in muscle memory.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/HackTheBox/oopsie_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
+    <a class="btn" href="./">More writeups</a>
+  </div>
+  <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
+</div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
+</body>
+</html>
