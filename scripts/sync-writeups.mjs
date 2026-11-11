@@ -686,7 +686,7 @@ async function main() {
     [/<li>\d+ writeups<\/li>/, `<li>${totalCount} writeups</li>`],
     [/<b data-count="\d+">\d+<\/b><span>published writeups<\/span>/, `<b data-count="${totalCount}">${totalCount}</b><span>published writeups</span>`],
     [/<ol class="ledger">[\s\S]*?<\/ol>/, `<ol class="ledger">\n${ledgerHtml(ledgerItems)}\n  </ol>`],
-    [/CTF-Writeups, \d+ and counting/, `CTF-Writeups, ${totalCount} and counting`]
+    [/\d+ on this site, filter by platform or level/, `${totalCount} on this site, filter by platform or level`]
   ];
   for (const [pattern, replacement] of indexReplacements) {
     if (!pattern.test(indexHtml)) throw new Error(`writeup-count anchor not found, site markup changed: ${pattern}`);
