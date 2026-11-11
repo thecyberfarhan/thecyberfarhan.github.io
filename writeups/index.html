@@ -15,118 +15,201 @@
     <a class="back" href="https://thecyberfarhan.github.io/">&larr; thecyberfarhan.github.io</a>
     <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
   </div>
-  <p class="eyebrow">Writeups</p>
-  <h1>Medium and hard rooms, written up properly</h1>
-  <p class="hub-lead">The easy ones stay on GitHub. These are the ones with an actual chain worth reading: recon, foothold, escalation, the dead ends, and how I'd fix each hole.</p>
+  <p class="eyebrow" data-reveal>Writeups</p>
+  <h1 data-reveal>Medium and hard rooms, written up properly</h1>
+  <p class="hub-lead" data-reveal>The easy ones stay on GitHub. These are the ones with an actual chain worth reading: recon, foothold, escalation, the dead ends, and how I'd fix each hole.</p>
+  <div class="filters" data-reveal>
+    <div class="f-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="search" placeholder="Search writeups…" maxlength="100" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="f-group">
+      <button type="button" class="f-chip f-all active" data-filter="platform">All platforms</button><button type="button" class="f-chip" data-filter="platform" data-value="TryHackMe">TryHackMe</button>
+    </div>
+    <div class="f-group">
+      <button type="button" class="f-chip f-all active" data-filter="difficulty">All levels</button><button type="button" class="f-chip" data-filter="difficulty" data-value="Medium">Medium</button><button type="button" class="f-chip" data-filter="difficulty" data-value="Hard">Hard</button><button type="button" class="f-chip" data-filter="difficulty" data-value="Challenge">Challenge</button>
+    </div>
+  </div>
   <ul class="wu-list">
-    <a class="wu-card" href="./red.html">
-      <h3>Red</h3>
-      <p>An LFI in a "free business template" PHP app leaks its own source code via php://filter, exposing a…</p>
-      <div class="meta">
-        <span class="plat">TryHackMe</span>
-        <span class="diff">Medium</span>
-      </div>
-    </a>
+    <li class="wu-card" data-reveal style="--d:0ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="red an lfi in a "free business template" php app leaks its own source code via php://filter, exposing a…">
+      <a href="./red.html">
+        <h3>Red</h3>
+        <p>An LFI in a "free business template" PHP app leaks its own source code via php://filter, exposing a…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Medium</span>
+        </div>
+      </a>
+    </li>
 
-    <a class="wu-card" href="./billing.html">
-      <h3>Billing</h3>
-      <p>MagnusBilling's icepay.php accepts a democ parameter that gets passed unsanitised into a shell context — a…</p>
-      <div class="meta">
-        <span class="plat">TryHackMe</span>
-        <span class="diff">Medium</span>
-      </div>
-    </a>
+    <li class="wu-card" data-reveal style="--d:40ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="billing magnusbilling's icepay.php accepts a democ parameter that gets passed unsanitised into a shell context — a…">
+      <a href="./billing.html">
+        <h3>Billing</h3>
+        <p>MagnusBilling's icepay.php accepts a democ parameter that gets passed unsanitised into a shell context — a…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Medium</span>
+        </div>
+      </a>
+    </li>
 
-    <a class="wu-card" href="./chillhack.html">
-      <h3>Chill Hack</h3>
-      <p>A command execution panel filtered most shell commands but missed find, which was abused via -exec to spawn a…</p>
-      <div class="meta">
-        <span class="plat">TryHackMe</span>
-        <span class="diff">Medium</span>
-      </div>
-    </a>
+    <li class="wu-card" data-reveal style="--d:80ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="chill hack a command execution panel filtered most shell commands but missed find, which was abused via -exec to spawn a…">
+      <a href="./chillhack.html">
+        <h3>Chill Hack</h3>
+        <p>A command execution panel filtered most shell commands but missed find, which was abused via -exec to spawn a…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Medium</span>
+        </div>
+      </a>
+    </li>
 
-    <a class="wu-card" href="./boilerctf.html">
-      <h3>Boiler CTF</h3>
-      <p>A multi-layer decoding puzzle in robots.txt (ASCII → Base64 → MD5, cracked to kidding) turned out to be a…</p>
-      <div class="meta">
-        <span class="plat">TryHackMe</span>
-        <span class="diff">Medium</span>
-      </div>
-    </a>
+    <li class="wu-card" data-reveal style="--d:120ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="boiler ctf a multi-layer decoding puzzle in robots.txt (ascii → base64 → md5, cracked to kidding) turned out to be a…">
+      <a href="./boilerctf.html">
+        <h3>Boiler CTF</h3>
+        <p>A multi-layer decoding puzzle in robots.txt (ASCII → Base64 → MD5, cracked to kidding) turned out to be a…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Medium</span>
+        </div>
+      </a>
+    </li>
 
-    <a class="wu-card" href="./mrrobot.html">
-      <h3>Mr Robot CTF</h3>
-      <p>robots.txt leaked both key 1 and a custom wordlist. Deduplication shrunk the wordlist from 858K to 11K words…</p>
-      <div class="meta">
-        <span class="plat">TryHackMe</span>
-        <span class="diff">Medium</span>
-      </div>
-    </a>
+    <li class="wu-card" data-reveal style="--d:160ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="mr robot ctf robots.txt leaked both key 1 and a custom wordlist. deduplication shrunk the wordlist from 858k to 11k words…">
+      <a href="./mrrobot.html">
+        <h3>Mr Robot CTF</h3>
+        <p>robots.txt leaked both key 1 and a custom wordlist. Deduplication shrunk the wordlist from 858K to 11K words…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Medium</span>
+        </div>
+      </a>
+    </li>
 
-    <a class="wu-card" href="./watcher.html">
-      <h3>Watcher</h3>
-      <p>Six escalation hops from www-data to root, each building on the previous: LFI read FTP credentials → FTP…</p>
-      <div class="meta">
-        <span class="plat">TryHackMe</span>
-        <span class="diff">Medium</span>
-      </div>
-    </a>
+    <li class="wu-card" data-reveal style="--d:200ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="watcher six escalation hops from www-data to root, each building on the previous: lfi read ftp credentials → ftp…">
+      <a href="./watcher.html">
+        <h3>Watcher</h3>
+        <p>Six escalation hops from www-data to root, each building on the previous: LFI read FTP credentials → FTP…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Medium</span>
+        </div>
+      </a>
+    </li>
 
-    <a class="wu-card" href="./blog.html">
-      <h3>Blog</h3>
-      <p>WPScan fingered WordPress 5.0 and enumerated two users. Hydra cracked kwheel:cutiepie1. The WordPress 5.0…</p>
-      <div class="meta">
-        <span class="plat">TryHackMe</span>
-        <span class="diff">Medium</span>
-      </div>
-    </a>
+    <li class="wu-card" data-reveal style="--d:240ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="blog wpscan fingered wordpress 5.0 and enumerated two users. hydra cracked kwheel:cutiepie1. the wordpress 5.0…">
+      <a href="./blog.html">
+        <h3>Blog</h3>
+        <p>WPScan fingered WordPress 5.0 and enumerated two users. Hydra cracked kwheel:cutiepie1. The WordPress 5.0…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Medium</span>
+        </div>
+      </a>
+    </li>
 
-    <a class="wu-card" href="./silverplatter.html">
-      <h3>Silver Platter</h3>
-      <p>A contact form named a Silverpeas username. CeWL wordlist plus Hydra cracked the password. Inside Silverpeas,…</p>
-      <div class="meta">
-        <span class="plat">TryHackMe</span>
-        <span class="diff">Medium</span>
-      </div>
-    </a>
+    <li class="wu-card" data-reveal style="--d:280ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="silver platter a contact form named a silverpeas username. cewl wordlist plus hydra cracked the password. inside silverpeas,…">
+      <a href="./silverplatter.html">
+        <h3>Silver Platter</h3>
+        <p>A contact form named a Silverpeas username. CeWL wordlist plus Hydra cracked the password. Inside Silverpeas,…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Medium</span>
+        </div>
+      </a>
+    </li>
 
-    <a class="wu-card" href="./lianyu.html">
-      <h3>Lian Yu</h3>
-      <p>A layered reconnaissance trail: a white-text hidden word on a web page pointed to a directory, an HTML…</p>
-      <div class="meta">
-        <span class="plat">TryHackMe</span>
-        <span class="diff">Medium</span>
-      </div>
-    </a>
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="lian yu a layered reconnaissance trail: a white-text hidden word on a web page pointed to a directory, an html…">
+      <a href="./lianyu.html">
+        <h3>Lian Yu</h3>
+        <p>A layered reconnaissance trail: a white-text hidden word on a web page pointed to a directory, an HTML…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Medium</span>
+        </div>
+      </a>
+    </li>
 
-    <a class="wu-card" href="./0day.html">
-      <h3>0day Machine</h3>
-      <p>A web server leaking an encrypted SSH private key via an exposed /backup/ directory, combined with a…</p>
-      <div class="meta">
-        <span class="plat">TryHackMe</span>
-        <span class="diff">Medium</span>
-      </div>
-    </a>
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Medium" data-search="0day machine a web server leaking an encrypted ssh private key via an exposed /backup/ directory, combined with a…">
+      <a href="./0day.html">
+        <h3>0day Machine</h3>
+        <p>A web server leaking an encrypted SSH private key via an exposed /backup/ directory, combined with a…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Medium</span>
+        </div>
+      </a>
+    </li>
 
-    <a class="wu-card" href="./internal.html">
-      <h3>Internal</h3>
-      <p>An Apache default page hides a WordPress 5.4.2 install at /blog/. WPScan finds the admin username, Hydra…</p>
-      <div class="meta">
-        <span class="plat">TryHackMe</span>
-        <span class="diff">Hard</span>
-      </div>
-    </a>
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Hard" data-search="internal an apache default page hides a wordpress 5.4.2 install at /blog/. wpscan finds the admin username, hydra…">
+      <a href="./internal.html">
+        <h3>Internal</h3>
+        <p>An Apache default page hides a WordPress 5.4.2 install at /blog/. WPScan finds the admin username, Hydra…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Hard</span>
+        </div>
+      </a>
+    </li>
 
-    <a class="wu-card" href="./jackpot.html">
-      <h3>Jackpot</h3>
-      <p>The target runs a fake ATM web UI on port 8080 that serves a stripped x86-64 binary called jackpot. The…</p>
-      <div class="meta">
-        <span class="plat">TryHackMe</span>
-        <span class="diff">Challenge</span>
-      </div>
-    </a></ul>
+    <li class="wu-card" data-reveal style="--d:320ms" data-platform="TryHackMe" data-difficulty="Challenge" data-search="jackpot the target runs a fake atm web ui on port 8080 that serves a stripped x86-64 binary called jackpot. the…">
+      <a href="./jackpot.html">
+        <h3>Jackpot</h3>
+        <p>The target runs a fake ATM web UI on port 8080 that serves a stripped x86-64 binary called jackpot. The…</p>
+        <div class="meta">
+          <span class="plat">TryHackMe</span>
+          <span class="diff">Challenge</span>
+        </div>
+      </a>
+    </li></ul>
+  <p class="f-empty">No writeups match those filters.</p>
   <footer>12 featured here, out of the full set on <a href="https://github.com/thecyberfarhan/CTF-Writeups">github.com/thecyberfarhan/CTF-Writeups</a>.</footer>
 </div>
+<script>
+(function () {
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.wu-card'));
+  var state = { platform: 'all', difficulty: 'all', q: '' };
+  var empty = document.querySelector('.f-empty');
+  function apply() {
+    var visible = 0;
+    cards.forEach(function (card) {
+      var matchP = state.platform === 'all' || card.dataset.platform === state.platform;
+      var matchD = state.difficulty === 'all' || card.dataset.difficulty === state.difficulty;
+      var matchQ = !state.q || card.dataset.search.indexOf(state.q) !== -1;
+      var show = matchP && matchD && matchQ;
+      card.classList.toggle('wu-hide', !show);
+      if (show) visible++;
+    });
+    if (empty) empty.classList.toggle('show', visible === 0);
+  }
+  document.querySelectorAll('.f-chip').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      var group = chip.dataset.filter;
+      var isAll = chip.classList.contains('f-all');
+      document.querySelectorAll('.f-chip[data-filter="' + group + '"], .f-all[data-filter="' + group + '"]').forEach(function (c) { c.classList.remove('active'); });
+      chip.classList.add('active');
+      state[group] = isAll ? 'all' : chip.dataset.value;
+      apply();
+    });
+  });
+  var search = document.querySelector('.f-search input');
+  if (search) {
+    // plain substring match against a pre-escaped, pre-lowercased dataset
+    // string -- never fed to innerHTML/eval/a selector, so there's nothing
+    // here for an injected value to reach regardless of what's typed
+    search.addEventListener('input', function () {
+      state.q = search.value.toLowerCase().slice(0, 100);
+      apply();
+    });
+  }
+})();
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
 </body>
 </html>

@@ -21,18 +21,18 @@
     <a class="back" href="./">&larr; All writeups</a>
     <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
   </div>
-  <p class="eyebrow">TryHackMe writeup</p>
-  <h1>0day Machine</h1>
-  <div class="meta">
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>0day Machine</h1>
+  <div class="meta" data-reveal>
     <span class="plat">TryHackMe</span>
     <span class="diff">Medium</span>
     <span>June 5, 2026</span>
   </div>
-  <div class="tldr"><b>TL;DR</b>A web server leaking an encrypted SSH private key via an exposed <code>/backup/</code> directory, combined with a Shellshock-vulnerable CGI endpoint, gave initial access as <code>www-data</code>. From there, an unpatched Ubuntu 14.04 kernel (3.13.x) fell to CVE-2015-1328 (OverlayFS local privilege escalation), handing over root in under a minute of compile time. </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>A web server leaking an encrypted SSH private key via an exposed <code>/backup/</code> directory, combined with a Shellshock-vulnerable CGI endpoint, gave initial access as <code>www-data</code>. From there, an unpatched Ubuntu 14.04 kernel (3.13.x) fell to CVE-2015-1328 (OverlayFS local privilege escalation), handing over root in under a minute of compile time. </div>
   <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">🕷 Feroxbuster</span><span class="chip">🔍 Nikto</span><span class="chip">🔑 ssh2john + John the Ripper</span><span class="chip">🐚 Metasploit</span><span class="chip">🐍 LinPEAS</span><span class="chip">⚙ GCC</span></div>
-  <h2>Introduction</h2>
+  <h2 data-reveal>Introduction</h2>
 <p>Today's victim is a nostalgic little box named <strong>0day</strong> — a name that promises drama and, to its credit, actually delivers. Running an antique Apache version on an equally vintage Ubuntu kernel, it wears its vulnerabilities like badges of honour. The machine greets you with a suspiciously minimal homepage, a suspicious <code>/backup/</code> directory that really shouldn't exist, and a CGI endpoint that hasn't heard of Bash's security patches from 2014. It's the kind of target that makes you feel like a time traveler — except the time you're traveling to is a sysadmin's worst nightmare.</p>
-<h2>Recon</h2>
+<h2 data-reveal>Recon</h2>
 <p class="aside">(~0 mins into the box)</p>
 <h3>Port Scan</h3>
 <p>Starting with RustScan for speed, then handing off to Nmap for the details. Two ports, clean and quiet — exactly the kind of attack surface that makes you look harder at what's there.</p>
@@ -74,7 +74,7 @@ DEK-Info: AES-128-CBC,82823EE792E75948EE2DE731AF1A0547
 + /secret/: This might be interesting.        # ^^^ worth noting for later
 + /cgi-bin/: present</code></pre>
 <p>The presence of <code>/cgi-bin/</code> on an outdated Apache combined with Bash on Ubuntu 14.04 is a flashing neon sign for one specific vulnerability: <strong>Shellshock (CVE-2014-6271)</strong>.</p>
-<h2>Foothold</h2>
+<h2 data-reveal>Foothold</h2>
 <p class="aside">(~10 mins into the box)</p>
 <h3>Shellshock — CVE-2014-6271</h3>
 <p><strong>What is Shellshock?</strong> A critical vulnerability in GNU Bash discovered in 2014. Bash allows function definitions to be passed through environment variables — Shellshock occurs because Bash also executes any commands appended *after* the function definition, before it should have any business running them. CGI scripts are particularly dangerous targets because the web server populates HTTP headers directly into environment variables before executing scripts. An attacker can inject a malicious header like <code>User-Agent: () { :;}; /bin/bash -i</code> and achieve remote code execution.</p>
@@ -95,7 +95,7 @@ msf exploit(...) &gt; exploit</code></pre>
 [*] Meterpreter session 1 opened (192.168.133.233:4444 -&gt; 10.49.181.37:41010)
 # ^^^ shell landed</code></pre>
 
-<h2>Shell / Access</h2>
+<h2 data-reveal>Shell / Access</h2>
 <p class="aside">Upgrading from Meterpreter to a proper interactive bash shell:</p>
 <pre><code>meterpreter &gt; shell</code></pre>
 
@@ -109,7 +109,7 @@ uid=33(www-data) gid=33(www-data) groups=33(www-data)</code></pre>
 
 <pre><code>THM{Sh3llSh0ck_r0ckz}</code></pre>
 
-<h2>Escalation</h2>
+<h2 data-reveal>Escalation</h2>
 <p class="aside">(~20 mins into the box)</p>
 <h3>LinPEAS — Kernel CVE Identification</h3>
 <p><strong>What is privilege escalation?</strong> As <code>www-data</code>, we have very limited permissions. The goal is to find a flaw that lets us execute code as <code>root</code> — the system's superuser. Kernel exploits are one avenue: bugs in the OS kernel itself that allow a low-privilege process to elevate its permissions.</p>
@@ -139,10 +139,10 @@ creating shared library
 
 <pre><code>uid=0(root) gid=0(root) groups=0(root),33(www-data)</code></pre>
 
-<h2>The Full Chain</h2>
+<h2 data-reveal>The Full Chain</h2>
 <p>Summary of the full exploit chain:</p>
 <ol><li><strong>Shellshock (CVE-2014-6271)</strong> — malicious HTTP <code>User-Agent</code> header injected via <code>/cgi-bin/test.cgi</code>, triggering Bash to execute attacker-controlled commands. Resulted in a reverse shell as <code>www-data</code>.</li><li><strong>OverlayFS LPE (CVE-2015-1328)</strong> — compiled C exploit abused a kernel permission validation flaw in OverlayFS to write to <code>/etc/ld.so.preload</code> and load a malicious shared library, spawning a root shell.</li></ol>
-<h2>Rabbit Holes</h2>
+<h2 data-reveal>Rabbit Holes</h2>
 <h3>The SSH Private Key from /backup/</h3>
 <p>Found an encrypted RSA private key at <code>/backup/index.html</code>. Converted it for cracking and found the passphrase almost immediately.</p>
 <p class="aside">Converting the key for John:</p>
@@ -155,10 +155,10 @@ id_rsa:letmein</code></pre>
 <pre><code>ssh 0day@10.49.181.37 -i id_rsa
 ssh ryan@10.49.181.37 -i id_rsa</code></pre>
 <p>Both failed with <code>sign_and_send_pubkey: no mutual signature supported</code> followed by password rejection. The server's OpenSSH 6.6.1 and the client's modern OpenSSH disagreed on acceptable signature algorithms — and even with the passphrase, the key simply didn't match any authorized user on this box. *The key was almost certainly left as deliberate misdirection.* Dropped it and moved on to Nikto.</p>
-<h2>Mitigations</h2>
+<h2 data-reveal>Mitigations</h2>
 <table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Shellshock (CVE-2014-6271)</td><td class="sev-critical">Critical</td><td>Update Bash to 4.3 patch 25+ and disable or restrict CGI script execution</td></tr><tr><td>OverlayFS LPE (CVE-2015-1328)</td><td class="sev-high">High</td><td>Apply kernel patches — Ubuntu Security Notice USN-2610-1 addresses this</td></tr><tr><td>Exposed <code>/backup/</code> directory</td><td class="sev-high">High</td><td>Never store key material in web-accessible directories; restrict with <code>.htaccess</code> or move outside the webroot entirely</td></tr><tr><td>Outdated Apache (2.4.7)</td><td class="sev-medium">Medium</td><td>Keep web server software patched to current release</td></tr><tr><td>Missing security headers</td><td>Low</td><td>Add <code>Strict-Transport-Security</code>, <code>Content-Security-Policy</code>, and <code>X-Content-Type-Options</code> headers to Apache config</td></tr></tbody></table>
-  <div class="takeaway"><b>Key takeaway</b>A <code>cgi-bin</code> directory on any server running a pre-2014 Bash is a Shellshock waiting to happen — always pair directory enumeration results with a vulnerability scan, because what looks like a boring CGI endpoint can be your entire foothold.</div>
-  <h2>If I Did It Again</h2>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>A <code>cgi-bin</code> directory on any server running a pre-2014 Bash is a Shellshock waiting to happen — always pair directory enumeration results with a vulnerability scan, because what looks like a boring CGI endpoint can be your entire foothold.</div>
+  <h2 data-reveal>If I Did It Again</h2>
 <p>Skip Metasploit for the Shellshock step and write the manual <code>curl</code> payload instead — it's a one-liner and better for understanding what's actually happening under the hood.</p>
   <div class="cta-row">
     <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/0day_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
@@ -166,5 +166,30 @@ ssh ryan@10.49.181.37 -i id_rsa</code></pre>
   </div>
   <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
 </div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
 </body>
 </html>

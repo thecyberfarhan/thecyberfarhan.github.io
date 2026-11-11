@@ -21,21 +21,21 @@
     <a class="back" href="./">&larr; All writeups</a>
     <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
   </div>
-  <p class="eyebrow">TryHackMe writeup</p>
-  <h1>Boiler CTF</h1>
-  <div class="meta">
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>Boiler CTF</h1>
+  <div class="meta" data-reveal>
     <span class="plat">TryHackMe</span>
     <span class="diff">Medium</span>
     <span>June 19, 2026</span>
   </div>
-  <div class="tldr"><b>TL;DR</b>A multi-layer decoding puzzle in <code>robots.txt</code> (ASCII → Base64 → MD5, cracked to <code>kidding</code>) turned out to be a taunt rather than a credential. The real path ran through anonymous FTP (a ROT13 hint about enumeration) and a Joomla test script vulnerable to command injection, which leaked SSH credentials for <code>basterd</code> from a log file. SSH wasn't on port 22 — a second full port scan found it on 55007. From <code>basterd</code>, a backup script with hardcoded credentials in a comment gave lateral access to <code>stoner</code>. The user flag was a misleadingly named <code>.secret</code> file. SUID <code>find</code> finished the job with a one-line GTFOBins escape to root. </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>A multi-layer decoding puzzle in <code>robots.txt</code> (ASCII → Base64 → MD5, cracked to <code>kidding</code>) turned out to be a taunt rather than a credential. The real path ran through anonymous FTP (a ROT13 hint about enumeration) and a Joomla test script vulnerable to command injection, which leaked SSH credentials for <code>basterd</code> from a log file. SSH wasn't on port 22 — a second full port scan found it on 55007. From <code>basterd</code>, a backup script with hardcoded credentials in a comment gave lateral access to <code>stoner</code>. The user flag was a misleadingly named <code>.secret</code> file. SUID <code>find</code> finished the job with a one-line GTFOBins escape to root. </div>
   <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">🕷 Feroxbuster</span><span class="chip">🔓 John the Ripper</span><span class="chip">💉 Command injection</span><span class="chip">🔑 SSH</span></div>
-  <h2>Introduction</h2>
+  <h2 data-reveal>Introduction</h2>
 <p>Today's target is <strong>Boiler CTF</strong> — a box that opens with one of the more elaborate red herrings in this entire series: a three-layer encoding puzzle in <code>robots.txt</code> that decodes to an MD5 hash, which cracks to the word <code>kidding</code>. It's not a password. It's the box laughing at you for falling for it. The real path runs quieter: anonymous FTP with a ROT13 riddle reminding you that "enumeration is the key," a Joomla test endpoint with a textbook command injection flaw, and SSH relocated to a five-digit port that costs you a moment of confusion before a second scan reveals it. The escalation chain ends on a misleadingly named flag file and a SUID <code>find</code> binary that's been on every escalation cheat sheet for a decade.</p>
 <h3>Prerequisites</h3>
 <p>Readers are assumed to know:</p>
 <ul><li>Multi-layer encoding (ASCII decimal, Base64, hex/MD5) and how to peel back each layer</li><li>What ROT13 is and why applying it twice returns the original text</li><li>What command injection is and how <code>;</code> chains commands in a vulnerable parameter</li><li>How to spot SSH on a non-standard port via a full port range scan</li><li>What SUID <code>find</code> grants via the <code>-exec</code> flag</li></ul>
-<h2>Recon</h2>
+<h2 data-reveal>Recon</h2>
 <p class="aside">(~0 mins into the box)</p>
 <h3>Port Scan — Pass 1</h3>
 <pre><code>rustscan -a 10.49.154.195 -r 1-65535 --ulimit 5000 -- -Pn -sC -sV</code></pre>
@@ -79,7 +79,7 @@ john --format=Raw-MD5 --wordlist=/usr/share/wordlists/rockyou.txt hash.txt</code
 
 <pre><code>kidding   (?)</code></pre>
 <p>The hash decodes to the word <code>kidding</code>. The box is explicitly telling you this entire puzzle was a joke — not a credential. Worth checking against FTP/SSH regardless (it wasn't), but the real path lies elsewhere.</p>
-<h2>Foothold</h2>
+<h2 data-reveal>Foothold</h2>
 <p class="aside">(~12 mins into the box)</p>
 <h3>Anonymous FTP — ROT13 Hint</h3>
 <pre><code>ftp 10.49.154.195
@@ -105,7 +105,7 @@ user basterd pass superduperp@$$ port 49824</code></pre>
 <p>Username <code>basterd</code>, password <code>superduperp@$$</code>, and a port number that turned out to be a red herring.</p>
 <h3>Credentials Found</h3>
 <table><thead><tr><th>Username</th><th>Password</th><th>Where Found</th></tr></thead><tbody><tr><td><code>basterd</code></td><td><code>superduperp@$$</code></td><td>Command injection → <code>log.txt</code></td></tr></tbody></table>
-<h2>Shell / Access</h2>
+<h2 data-reveal>Shell / Access</h2>
 <p class="aside">(~20 mins into the box)</p>
 <h3>SSH on a Non-Standard Port</h3>
 <p>The log file's mentioned port (49824) refused connections:</p>
@@ -139,7 +139,7 @@ user basterd pass superduperp@$$ port 49824</code></pre>
 <pre><code>stoner@Vulnerable:~$ cat .secret
 You made it till here, well done.</code></pre>
 <p><code>.secret</code> looked like flavour text at first glance — but it's actually the user flag, just unusually named and hidden as a dotfile rather than the expected <code>user.txt</code>.</p>
-<h2>Escalation</h2>
+<h2 data-reveal>Escalation</h2>
 <p class="aside">(~30 mins into the box)</p>
 <h3>SUID find — Classic GTFOBins</h3>
 <pre><code>find / -perm -4000 -type f 2&gt;/dev/null</code></pre>
@@ -153,20 +153,20 @@ You made it till here, well done.</code></pre>
 # cat /root/root.txt
 It wasn't that hard, was it?</code></pre>
 
-<h2>The Full Chain</h2>
+<h2 data-reveal>The Full Chain</h2>
 <p>The complete attack chain:</p>
 <ol><li><strong><code>robots.txt</code></strong> decoy puzzle (ASCII → Base64 → MD5) → <code>kidding</code> (red herring, confirmed not a credential)</li><li><strong>Anonymous FTP</strong> → <code>.info.txt</code> ROT13 hint about enumeration</li><li><strong>Joomla <code>_test</code> command injection</strong> → read <code>log.txt</code> → <code>basterd:superduperp@$$</code></li><li><strong>Second port scan</strong> found SSH on port 55007 (not 22, not the red-herring port in the log)</li><li><strong>SSH as <code>basterd</code></strong> → <code>backup.sh</code> comment leaked <code>stoner</code>'s password</li><li><strong>SSH as <code>stoner</code></strong> → <code>.secret</code> (the real, oddly-named user flag)</li><li><strong>SUID <code>find</code></strong> → <code>find . -exec /bin/sh -p \;</code> → root shell → root flag</li></ol>
-<h2>Rabbit Holes</h2>
+<h2 data-reveal>Rabbit Holes</h2>
 <h3>The robots.txt Decoding Puzzle Itself</h3>
 <p>The entire three-layer decode (ASCII → Base64 → MD5 → John) led to the word <code>kidding</code> — a deliberate troll by the box author. It cost real time (decoding plus a John run) for zero progress toward the actual foothold. The lesson generalises: an elaborate puzzle isn't proof it's load-bearing; sometimes a box wants you to spend twenty minutes proving to yourself it was a joke.</p>
 <h3>Wrong SSH Port from the Log File</h3>
 <p>The <code>log.txt</code> file explicitly stated "port 49824" right next to the credentials — and that port refused every connection. The actual SSH port (55007) only appeared in a full re-scan. The log's stated port was either stale, a separate red herring, or referred to a different, unused configuration. Trusting a discovered artefact's stated port without independently verifying it via a port scan cost a few minutes of confusion.</p>
 <h3>Searching for <code>user.txt</code> by Name</h3>
 <p><code>find / -iname "*user*.txt"</code> returned nothing because the real flag was named <code>.secret</code> — a dotfile with no relation to the expected naming convention. The lesson from Blog and Watcher repeats here: never assume a flag's filename; search broadly and read everything in a freshly accessed home directory, including dotfiles.</p>
-<h2>Mitigations</h2>
+<h2 data-reveal>Mitigations</h2>
 <table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Anonymous FTP enabled</td><td class="sev-medium">Medium</td><td>Disable anonymous FTP; restrict to authenticated users only</td></tr><tr><td>Joomla test script with command injection</td><td class="sev-critical">Critical</td><td>Never deploy test/debug scripts to a production server; validate and sanitise all user input passed to system calls; use parameterised execution, never string concatenation into a shell</td></tr><tr><td>SSH credentials logged in plaintext (<code>log.txt</code>)</td><td class="sev-critical">Critical</td><td>Never log credentials in any file; if logging authentication attempts, log only usernames and outcomes, never passwords</td></tr><tr><td>Password fragment exposed in a backup script comment</td><td class="sev-high">High</td><td>Remove all commented-out credentials from scripts before deployment; use a secrets manager or environment variables instead</td></tr><tr><td>SUID bit set on <code>find</code></td><td class="sev-critical">Critical</td><td>Remove the SUID bit from <code>find</code> — it has no legitimate need for it; audit all SUID binaries regularly against GTFOBins</td></tr></tbody></table>
-  <div class="takeaway"><b>Key takeaway</b>Not every encoded string or elaborate puzzle is a critical clue — sometimes the box is testing whether you'll waste twenty minutes decoding a joke instead of moving on to broader enumeration. Decode it, note the result, and don't let sunk cost convince you it must lead somewhere just because it took effort to get there.</div>
-  <h2>If I Did It Again</h2>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>Not every encoded string or elaborate puzzle is a critical clue — sometimes the box is testing whether you'll waste twenty minutes decoding a joke instead of moving on to broader enumeration. Decode it, note the result, and don't let sunk cost convince you it must lead somewhere just because it took effort to get there.</div>
+  <h2 data-reveal>If I Did It Again</h2>
 <p>Run a full <code>-p-</code> Nmap scan immediately after the first RustScan pass, rather than trusting a credential log's stated port number — the actual SSH port was only found by re-scanning, and that detour could have been avoided by scanning thoroughly from the start.</p>
   <div class="cta-row">
     <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/boilerctf_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
@@ -174,5 +174,30 @@ It wasn't that hard, was it?</code></pre>
   </div>
   <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
 </div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
 </body>
 </html>

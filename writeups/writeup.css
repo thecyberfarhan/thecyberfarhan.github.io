@@ -8,10 +8,28 @@
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 body{
   margin:0;background:var(--bg);color:var(--soft);font-family:var(--sans);
   line-height:1.6;-webkit-font-smoothing:antialiased;
+  position:relative;
 }
+/* faint grid + a soft glow behind the title -- plain was the complaint, this
+   is cheap (one pseudo-element, no JS, no canvas) and keeps these pages light */
+body::before{
+  content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background-image:
+    radial-gradient(ellipse 900px 500px at 50% -10%,#b4232c14,transparent 60%),
+    linear-gradient(var(--border) 1px,transparent 1px),
+    linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:auto,64px 64px,64px 64px;
+  opacity:.5;
+  mask-image:radial-gradient(ellipse 70% 60% at 50% 0%,#000 0%,transparent 75%);
+  -webkit-mask-image:radial-gradient(ellipse 70% 60% at 50% 0%,#000 0%,transparent 75%);
+}
+[data-reveal]{opacity:0;transform:translateY(14px);transition:opacity .5s ease,transform .5s ease;transition-delay:var(--d,0ms)}
+[data-reveal].in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){[data-reveal]{opacity:1;transform:none;transition:none}}
 .wrap{max-width:760px;margin:0 auto;padding:0 24px 80px}
 .topbar{
   display:flex;align-items:center;justify-content:space-between;gap:16px;
@@ -47,9 +65,20 @@ blockquote{margin:0 0 16px;padding:10px 16px;border-left:3px solid var(--border)
 }
 .tldr b{color:var(--steel);font-family:var(--mono);font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;display:block;margin-bottom:6px}
 pre{
-  background:#0a0d12;border:1px solid var(--border);border-radius:8px;padding:14px 16px;
+  position:relative;background:#0a0d12;border:1px solid var(--border);border-radius:8px;padding:14px 16px;
   overflow-x:auto;font:12.5px/1.6 var(--mono);color:var(--soft);margin:0 0 20px;
 }
+.copy-btn{
+  position:absolute;top:8px;right:8px;display:inline-flex;align-items:center;gap:5px;
+  font:600 .68rem var(--mono);padding:5px 9px;border-radius:6px;cursor:pointer;
+  border:1px solid var(--border);background:var(--surface);color:var(--muted);
+  opacity:0;transition:opacity .2s,color .2s,border-color .2s;
+}
+pre:hover .copy-btn,.copy-btn:focus-visible{opacity:1}
+.copy-btn:hover{color:var(--text);border-color:var(--steel)}
+.copy-btn svg{width:11px;height:11px}
+.copy-btn.copied{color:var(--ok);border-color:var(--ok)}
+@media(hover:none){.copy-btn{opacity:1}}
 code{font-family:var(--mono);font-size:.88em;color:var(--bronze)}
 pre code{color:inherit;font-size:1em}
 ol,ul{padding-left:22px;margin:0 0 16px}
@@ -80,15 +109,48 @@ footer a{color:var(--steel)}
 
 /* ---------- index hub ---------- */
 .hub-lead{color:var(--muted);max-width:56ch;margin-bottom:36px}
-.wu-list{display:flex;flex-direction:column;gap:14px;list-style:none;padding:0;margin:0}
+.wu-list{display:flex;flex-direction:column;list-style:none;padding:0;margin:0}
 .wu-card{
   display:block;padding:20px 22px;border:1px solid var(--border);border-radius:12px;
-  background:var(--surface);text-decoration:none;transition:border-color .2s,transform .2s;
+  background:var(--surface);list-style:none;
 }
-.wu-card:hover{border-color:var(--steel);transform:translateY(-2px)}
+.wu-card a{display:block;text-decoration:none;color:inherit}
+.wu-card:hover{border-color:var(--steel)}
+.wu-card:hover a{transform:translateY(-2px);display:block;transition:transform .2s}
 .wu-card h3{color:var(--text);font-size:1.1rem;margin:0 0 6px;letter-spacing:-.01em}
 .wu-card p{color:var(--muted);font-size:.9rem;margin:0}
 .wu-card .meta{margin-top:12px;margin-bottom:0}
+.wu-card{
+  max-height:300px;overflow:hidden;margin-bottom:14px;
+  transition:opacity .3s ease,transform .3s ease,max-height .35s ease,margin .35s ease,padding .35s ease,border-color .2s;
+}
+.wu-card.wu-hide{
+  opacity:0!important;transform:scale(.97) translateY(-4px)!important;pointer-events:none;
+  max-height:0;min-height:0;margin:0;padding-top:0;padding-bottom:0;border-width:0;
+}
+
+.filters{
+  display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 28px;
+  padding-bottom:20px;border-bottom:1px solid var(--border);
+}
+.f-search{position:relative;flex:1;min-width:180px}
+.f-search input{
+  width:100%;padding:9px 14px 9px 34px;border-radius:8px;border:1px solid var(--border);
+  background:var(--surface);color:var(--text);font:inherit;font-size:.88rem;
+  transition:border-color .2s;
+}
+.f-search input:focus{outline:none;border-color:var(--steel)}
+.f-search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--muted);pointer-events:none}
+.f-group{display:flex;gap:6px;flex-wrap:wrap}
+.f-chip{
+  font:600 .78rem var(--mono);padding:6px 12px;border-radius:20px;cursor:pointer;
+  border:1px solid var(--border);background:transparent;color:var(--muted);
+  transition:border-color .2s,color .2s,background .2s;white-space:nowrap;
+}
+.f-chip:hover{color:var(--soft);border-color:var(--muted)}
+.f-chip.active{color:var(--text);border-color:var(--steel);background:#7fa8cc14}
+.f-empty{display:none;color:var(--muted);padding:30px 0;text-align:center;font-size:.9rem}
+.f-empty.show{display:block}
 
 @media(max-width:600px){
   .wrap{padding:0 18px 60px}

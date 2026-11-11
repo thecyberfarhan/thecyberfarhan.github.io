@@ -21,21 +21,21 @@
     <a class="back" href="./">&larr; All writeups</a>
     <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
   </div>
-  <p class="eyebrow">TryHackMe writeup</p>
-  <h1>Watcher</h1>
-  <div class="meta">
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>Watcher</h1>
+  <div class="meta" data-reveal>
     <span class="plat">TryHackMe</span>
     <span class="diff">Medium</span>
     <span>June 18, 2026</span>
   </div>
-  <div class="tldr"><b>TL;DR</b>Six escalation hops from <code>www-data</code> to root, each building on the previous: LFI read FTP credentials → FTP shell upload → <code>www-data</code> → <code>sudo php</code> as <code>toby</code> → writable cron script → <code>mat</code> → writable Python import module → <code>will</code> → base64-encoded root RSA key in <code>/opt/backups/</code> → SSH as root. Seven flags distributed across every step of the chain. </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>Six escalation hops from <code>www-data</code> to root, each building on the previous: LFI read FTP credentials → FTP shell upload → <code>www-data</code> → <code>sudo php</code> as <code>toby</code> → writable cron script → <code>mat</code> → writable Python import module → <code>will</code> → base64-encoded root RSA key in <code>/opt/backups/</code> → SSH as root. Seven flags distributed across every step of the chain. </div>
   <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">🕷 Feroxbuster</span><span class="chip">🌐 Browser</span><span class="chip">📂 FTP client</span><span class="chip">🐚 Netcat</span><span class="chip">🔑 SSH</span></div>
-  <h2>Introduction</h2>
+  <h2 data-reveal>Introduction</h2>
 <p>Today's target is <strong>Watcher</strong> — a box that earns its medium difficulty rating not through any single clever exploit, but through sheer chain length. Six privilege escalation hops between <code>www-data</code> and root, each with a distinct technique: <code>sudo</code> to different users, a cron job, Python library hijacking, and a base64-encoded SSH key hiding in a group-readable backup directory. The flags are scattered across every account and directory along the path, turning the box into a scavenger hunt that doubles as a privilege escalation tutorial. Methodical enumeration at each step is the only way through.</p>
 <h3>Prerequisites</h3>
 <p>Readers are assumed to know:</p>
 <ul><li>What LFI is and how <code>?post=</code> parameters can read arbitrary files</li><li>How to upload a reverse shell via FTP and trigger it via LFI</li><li>What cron jobs are and why writable cron scripts are dangerous</li><li>How Python's import system works and why a writable imported module is a hijack vector</li><li>What Base64 encoding is and how to decode it on the command line</li></ul>
-<h2>Recon</h2>
+<h2 data-reveal>Recon</h2>
 <p class="aside">(~0 mins into the box)</p>
 <h3>Port Scan</h3>
 <pre><code>rustscan -a 10.49.154.122 -r 1-65535 --ulimit 5000 -- -Pn -sC -sV</code></pre>
@@ -57,7 +57,7 @@ Allow: /secret_file_do_not_read.txt</code></pre>
 <p><code>robots.txt</code> is explicitly allowing both files — including the one named "do not read." The irony is intentional. <code>flag_1.txt</code> is directly readable:</p>
 <pre><code>FLAG{robots_dot_text_what_is_next}</code></pre>
 <p><code>secret_file_do_not_read.txt</code> returns 403 directly — but the LFI will handle that.</p>
-<h2>Foothold</h2>
+<h2 data-reveal>Foothold</h2>
 <p class="aside">(~8 mins into the box)</p>
 <h3>LFI on <code>post.php?post=</code></h3>
 <p>The blog posts are loaded via <code>http://10.49.154.122/post.php?post=striped.php</code> — a <code>?post=</code> parameter feeding a filename directly to PHP's include function.</p>
@@ -93,18 +93,18 @@ uid=33(www-data) gid=33(www-data) groups=33(www-data)</code></pre>
 <p><code>python</code> was not available; using the <code>script</code> fallback:</p>
 <pre><code>/usr/bin/script -qc /bin/bash /dev/null</code></pre>
 
-<h2>The Full Chain</h2>
+<h2 data-reveal>The Full Chain</h2>
 <p>The complete seven-hop chain:</p>
 <ol><li><strong>Feroxbuster</strong> → <code>flag_1.txt</code> via <code>robots.txt</code>, LFI on <code>post.php?post=</code></li><li><strong>LFI</strong> read <code>secret_file_do_not_read.txt</code> → FTP credentials <code>ftpuser:givemefiles777</code></li><li><strong>FTP</strong> → <code>flag_2.txt</code>; uploaded PHP reverse shell to <code>/files/</code></li><li><strong>LFI triggered shell</strong> → <code>www-data</code> → <code>flag_3.txt</code> in hidden web dir</li><li><strong><code>sudo php</code> as <code>toby</code></strong> → <code>flag_4.txt</code>; cron note found</li><li><strong>Writable <code>cow.sh</code></strong> run as <code>mat</code> by cron → <code>flag_5.txt</code></li><li><strong>Writable <code>cmd.py</code></strong> imported by <code>will_script.py</code> run as <code>will</code> → <code>flag_6.txt</code></li><li><strong><code>adm</code> group</strong> → <code>/opt/backups/key.b64</code> → root RSA key → SSH as root → <code>flag_7.txt</code></li></ol>
-<h2>Rabbit Holes</h2>
+<h2 data-reveal>Rabbit Holes</h2>
 <h3><code>cow.sh</code> Connection Refused on Manual Run</h3>
 <p>Running <code>cow.sh</code> manually triggered "connection refused" because the Netcat listener wasn't set up yet at that moment. The script itself was correct — it just needed the listener to be active before the cron fired (or before manually running it). Starting <code>nc -lnvp 1235</code> first, then waiting for the cron or running the script again, resolved it immediately.</p>
 <h3>Python Not Available for Shell Stabilisation</h3>
 <p><code>python -c 'import pty; pty.spawn("/bin/bash")'</code> failed with "not found" — Python 2 is not installed. Python 3 is present but <code>python3</code> wasn't tried immediately. The <code>script</code> fallback (<code>/usr/bin/script -qc /bin/bash /dev/null</code>) worked cleanly without needing any Python at all.</p>
-<h2>Mitigations</h2>
+<h2 data-reveal>Mitigations</h2>
 <table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>LFI via unsanitised <code>?post=</code> parameter</td><td class="sev-critical">Critical</td><td>Validate <code>post</code> against an explicit allowlist of permitted filenames; never pass user input directly to <code>include()</code></td></tr><tr><td>FTP credentials stored in a web-accessible file</td><td class="sev-critical">Critical</td><td>Never store credentials in files readable by the web server; use environment variables or a secrets manager</td></tr><tr><td>FTP upload directory path-traversable via LFI</td><td class="sev-high">High</td><td>Store FTP uploads outside the webroot entirely; disable PHP execution in upload directories</td></tr><tr><td><code>www-data</code> granted <code>sudo php</code> as <code>toby</code></td><td class="sev-critical">Critical</td><td>PHP can execute arbitrary code — granting it via <code>sudo</code> is equivalent to granting a shell</td></tr><tr><td>Cron script writable by the user it's owned by</td><td class="sev-critical">Critical</td><td>Cron scripts executed as a different user must not be writable by the initiating account; <code>chmod 755</code> and <code>chown mat:mat</code></td></tr><tr><td><code>cmd.py</code> (imported module) writable by <code>mat</code></td><td class="sev-high">High</td><td>Privileged Python scripts should use absolute imports and ensure all imported modules are in root-owned, non-writable locations</td></tr><tr><td>Root SSH private key stored in adm-readable directory</td><td class="sev-critical">Critical</td><td>Private keys must be stored in root-only directories (<code>700</code>); never in group-readable locations</td></tr></tbody></table>
-  <div class="takeaway"><b>Key takeaway</b>Python's import resolution searches the script's local directory before system paths. A writable file in the same directory as a privileged script is a library hijack waiting to happen — even if the script itself is locked down tight. Always ensure every file in a privileged script's directory is owned and writable only by root.</div>
-  <h2>If I Did It Again</h2>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>Python's import resolution searches the script's local directory before system paths. A writable file in the same directory as a privileged script is a library hijack waiting to happen — even if the script itself is locked down tight. Always ensure every file in a privileged script's directory is owned and writable only by root.</div>
+  <h2 data-reveal>If I Did It Again</h2>
 <p>After landing <code>www-data</code>, run <code>sudo -l</code> immediately before exploring the filesystem — the <code>(toby) NOPASSWD: /usr/bin/php</code> rule is the entire next step and knowing it early focuses the effort. Also set up all three Netcat listeners before starting the escalation chain to avoid the "connection refused because listener wasn't ready" stumble on <code>cow.sh</code>.</p>
   <div class="cta-row">
     <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/watcher_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
@@ -112,5 +112,30 @@ uid=33(www-data) gid=33(www-data) groups=33(www-data)</code></pre>
   </div>
   <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
 </div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
 </body>
 </html>

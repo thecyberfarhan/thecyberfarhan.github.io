@@ -261,6 +261,62 @@ function toolChips(toolsSection) {
 
 // ---------- page render ----------
 
+function plainTakeaway(w) {
+  const raw = w.sections['key takeaway'] ? stripHr(w.sections['key takeaway']) : null;
+  if (!raw) return null;
+  return raw.split('\n').map((l) => l.replace(/^>\s?/, '')).join(' ').replace(/^💡\s*\*\*Takeaway:\*\*\s*/, '').replace(/[*`]/g, '').trim();
+}
+
+function difficultyClass(difficulty) {
+  const key = (difficulty || '').toLowerCase();
+  if (key === 'very easy') return 'l-veryeasy';
+  if (key === 'easy') return 'l-easy';
+  if (key === 'medium') return 'l-medium';
+  if (key === 'hard') return 'l-hard';
+  if (key === 'challenge') return 'l-challenge';
+  return 'l-written';
+}
+
+function ledgerHtml(items) {
+  return items.map((w, i) => {
+    const onSite = w.onSite;
+    const href = onSite ? `writeups/${w.slug}.html` : `https://github.com/${OWNER}/${REPO}/blob/main/${w.dir}/${w.filename}`;
+    const takeaway = plainTakeaway(w) || w.summary || `${w.platform} writeup.`;
+    const blurb = esc(truncate(takeaway, 170));
+    const diffLabel = w.difficulty || '';
+    return `<li data-reveal style="--d:${i * 50}ms"><a class="lrow" href="${href}"${onSite ? '' : ' target="_blank" rel="noopener"'}><span class="l-plat">${esc(w.platform)}</span><span class="l-title">${esc(w.title)}</span><span class="l-take">${blurb}</span>${diffLabel ? `<span class="lvl ${difficultyClass(w.difficulty)}">${esc(diffLabel)}</span>` : ''}<span class="l-go"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"> <path d="M5 12h14" /> <path d="m12 5 7 7-7 7" /> </svg></span></a></li>`;
+  }).join('\n');
+}
+
+// shared, inline, dependency-free: no eval, no innerHTML of anything user-controlled
+const REVEAL_SCRIPT = `
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}`;
+
+const COPY_BUTTON_SCRIPT = `
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});`;
+
 function pageHtml(w, slug) {
   const dateHuman = w.date ? new Date(w.date + 'T00:00:00Z').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
   const tldr = stripHr(w.sections['tldr'] || w.sections['tl;dr'] || '') || null;
@@ -276,7 +332,7 @@ function pageHtml(w, slug) {
   ];
   const body = sectionOrder
     .filter(([key]) => w.sections[key])
-    .map(([key, label]) => `<h2>${label}</h2>\n${mdToHtml(w.sections[key])}`)
+    .map(([key, label]) => `<h2 data-reveal>${label}</h2>\n${mdToHtml(w.sections[key])}`)
     .join('\n');
 
   const takeawayRaw = w.sections['key takeaway'] ? stripHr(w.sections['key takeaway']) : null;
@@ -320,38 +376,92 @@ function pageHtml(w, slug) {
     <a class="back" href="./">&larr; All writeups</a>
     <a class="brand" href="${SITE_URL}/">Farhan<span>.</span></a>
   </div>
-  <p class="eyebrow">${esc(w.platform)} writeup</p>
-  <h1>${esc(w.title)}</h1>
-  <div class="meta">
+  <p class="eyebrow" data-reveal>${esc(w.platform)} writeup</p>
+  <h1 data-reveal>${esc(w.title)}</h1>
+  <div class="meta" data-reveal>
     <span class="plat">${esc(w.platform)}</span>
     ${w.difficulty ? `<span class="diff">${esc(w.difficulty)}</span>` : ''}
     ${dateHuman ? `<span>${esc(dateHuman)}</span>` : ''}
   </div>
-  ${tldr ? `<div class="tldr"><b>TL;DR</b>${inline(tldr.replace(/\n+/g, ' '))}</div>` : ''}
+  ${tldr ? `<div class="tldr" data-reveal><b>TL;DR</b>${inline(tldr.replace(/\n+/g, ' '))}</div>` : ''}
   ${toolChips(w.sections['tools used'])}
   ${body}
-  ${takeaway ? `<div class="takeaway"><b>Key takeaway</b>${takeaway}</div>` : ''}
-  ${again ? `<h2>If I Did It Again</h2>\n${mdToHtml(again)}` : ''}
+  ${takeaway ? `<div class="takeaway" data-reveal><b>Key takeaway</b>${takeaway}</div>` : ''}
+  ${again ? `<h2 data-reveal>If I Did It Again</h2>\n${mdToHtml(again)}` : ''}
   <div class="cta-row">
     <a class="btn primary" href="https://github.com/${OWNER}/${REPO}/blob/main/${w.dir}/${w.filename}" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
     <a class="btn" href="./">More writeups</a>
   </div>
   <footer>Part of <a href="${SITE_URL}/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/${OWNER}/${REPO}">CTF-Writeups</a> repo — edits happen there, not here.</footer>
 </div>
+<script>${COPY_BUTTON_SCRIPT}${REVEAL_SCRIPT}</script>
 </body>
 </html>`;
 }
 
 function hubHtml(writeups) {
-  const cards = writeups.map((w) => `
-    <a class="wu-card" href="./${w.slug}.html">
-      <h3>${esc(w.title)}</h3>
-      <p>${esc(w.summary)}</p>
-      <div class="meta">
-        <span class="plat">${esc(w.platform)}</span>
-        ${w.difficulty ? `<span class="diff">${esc(w.difficulty)}</span>` : ''}
-      </div>
-    </a>`).join('\n');
+  const platforms = [...new Set(writeups.map((w) => w.platform))];
+  const difficulties = [...new Set(writeups.map((w) => w.difficulty).filter(Boolean))];
+
+  const cards = writeups.map((w, i) => {
+    // data-search holds a pre-lowercased, HTML-escaped haystack -- the filter
+    // script only ever reads this via .dataset (never writes it back into the
+    // DOM), so there's no way a search term can reach innerHTML unescaped.
+    const haystack = esc(`${w.title} ${w.summary}`.toLowerCase());
+    return `
+    <li class="wu-card" data-reveal style="--d:${Math.min(i, 8) * 40}ms" data-platform="${esc(w.platform)}" data-difficulty="${esc(w.difficulty || '')}" data-search="${haystack}">
+      <a href="./${w.slug}.html">
+        <h3>${esc(w.title)}</h3>
+        <p>${esc(w.summary)}</p>
+        <div class="meta">
+          <span class="plat">${esc(w.platform)}</span>
+          ${w.difficulty ? `<span class="diff">${esc(w.difficulty)}</span>` : ''}
+        </div>
+      </a>
+    </li>`;
+  }).join('\n');
+
+  const platChips = platforms.map((p) => `<button type="button" class="f-chip" data-filter="platform" data-value="${esc(p)}">${esc(p)}</button>`).join('');
+  const diffChips = difficulties.map((d) => `<button type="button" class="f-chip" data-filter="difficulty" data-value="${esc(d)}">${esc(d)}</button>`).join('');
+
+  const filterScript = `
+(function () {
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.wu-card'));
+  var state = { platform: 'all', difficulty: 'all', q: '' };
+  var empty = document.querySelector('.f-empty');
+  function apply() {
+    var visible = 0;
+    cards.forEach(function (card) {
+      var matchP = state.platform === 'all' || card.dataset.platform === state.platform;
+      var matchD = state.difficulty === 'all' || card.dataset.difficulty === state.difficulty;
+      var matchQ = !state.q || card.dataset.search.indexOf(state.q) !== -1;
+      var show = matchP && matchD && matchQ;
+      card.classList.toggle('wu-hide', !show);
+      if (show) visible++;
+    });
+    if (empty) empty.classList.toggle('show', visible === 0);
+  }
+  document.querySelectorAll('.f-chip').forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      var group = chip.dataset.filter;
+      var isAll = chip.classList.contains('f-all');
+      document.querySelectorAll('.f-chip[data-filter="' + group + '"], .f-all[data-filter="' + group + '"]').forEach(function (c) { c.classList.remove('active'); });
+      chip.classList.add('active');
+      state[group] = isAll ? 'all' : chip.dataset.value;
+      apply();
+    });
+  });
+  var search = document.querySelector('.f-search input');
+  if (search) {
+    // plain substring match against a pre-escaped, pre-lowercased dataset
+    // string -- never fed to innerHTML/eval/a selector, so there's nothing
+    // here for an injected value to reach regardless of what's typed
+    search.addEventListener('input', function () {
+      state.q = search.value.toLowerCase().slice(0, 100);
+      apply();
+    });
+  }
+})();`;
 
   return `<!doctype html>
 <html lang="en" data-theme="dark">
@@ -370,12 +480,26 @@ function hubHtml(writeups) {
     <a class="back" href="${SITE_URL}/">&larr; thecyberfarhan.github.io</a>
     <a class="brand" href="${SITE_URL}/">Farhan<span>.</span></a>
   </div>
-  <p class="eyebrow">Writeups</p>
-  <h1>Medium and hard rooms, written up properly</h1>
-  <p class="hub-lead">The easy ones stay on GitHub. These are the ones with an actual chain worth reading: recon, foothold, escalation, the dead ends, and how I'd fix each hole.</p>
+  <p class="eyebrow" data-reveal>Writeups</p>
+  <h1 data-reveal>Medium and hard rooms, written up properly</h1>
+  <p class="hub-lead" data-reveal>The easy ones stay on GitHub. These are the ones with an actual chain worth reading: recon, foothold, escalation, the dead ends, and how I'd fix each hole.</p>
+  <div class="filters" data-reveal>
+    <div class="f-search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="search" placeholder="Search writeups…" maxlength="100" autocomplete="off" spellcheck="false">
+    </div>
+    <div class="f-group">
+      <button type="button" class="f-chip f-all active" data-filter="platform">All platforms</button>${platChips}
+    </div>
+    <div class="f-group">
+      <button type="button" class="f-chip f-all active" data-filter="difficulty">All levels</button>${diffChips}
+    </div>
+  </div>
   <ul class="wu-list">${cards}</ul>
+  <p class="f-empty">No writeups match those filters.</p>
   <footer>${writeups.length} featured here, out of the full set on <a href="https://github.com/${OWNER}/${REPO}">github.com/${OWNER}/${REPO}</a>.</footer>
 </div>
+<script>${filterScript}${REVEAL_SCRIPT}</script>
 </body>
 </html>`;
 }
@@ -396,6 +520,24 @@ async function main() {
   const totalCount = all.length;
   const featured = all.filter((w) => !w.difficulty || !EXCLUDE_DIFFICULTY.includes(w.difficulty.toLowerCase()));
   featured.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  featured.forEach((w) => { w.onSite = true; });
+
+  // the main site's "Selected writeups" ledger: mostly medium/hard, with one or
+  // two easy ones mixed in just to fill out the row count -- not a separate
+  // hand-maintained list, so it can never drift the way the old hardcoded one did
+  const LEDGER_SIZE = 8, LEDGER_EASY_SLOTS = 2;
+  const difficultyRank = (w) => ({ hard: 3, medium: 2, challenge: 1 })[(w.difficulty || '').toLowerCase()] ?? 0;
+  const byDifficultyThenDate = [...featured].sort((a, b) => {
+    const d = difficultyRank(b) - difficultyRank(a);
+    return d !== 0 ? d : (b.date || '').localeCompare(a.date || '');
+  });
+  const easyPool = all
+    .filter((w) => !featured.includes(w))
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const ledgerItems = [
+    ...byDifficultyThenDate.slice(0, LEDGER_SIZE - LEDGER_EASY_SLOTS),
+    ...easyPool.slice(0, LEDGER_EASY_SLOTS)
+  ];
 
   const outDir = path.join(SITE_ROOT, 'writeups');
   mkdirSync(outDir, { recursive: true });
@@ -430,6 +572,7 @@ async function main() {
     [/CPENT-certified web and API penetration tester\. TryHackMe top 3%, \d+ published writeups\./, `CPENT-certified web and API penetration tester. TryHackMe top 3%, ${totalCount} published writeups.`],
     [/<li>\d+ writeups<\/li>/, `<li>${totalCount} writeups</li>`],
     [/<b data-count="\d+">\d+<\/b><span>published writeups<\/span>/, `<b data-count="${totalCount}">${totalCount}</b><span>published writeups</span>`],
+    [/<ol class="ledger">[\s\S]*?<\/ol>/, `<ol class="ledger">\n${ledgerHtml(ledgerItems)}\n  </ol>`],
     [/CTF-Writeups, \d+ and counting/, `CTF-Writeups, ${totalCount} and counting`]
   ];
   for (const [pattern, replacement] of indexReplacements) {

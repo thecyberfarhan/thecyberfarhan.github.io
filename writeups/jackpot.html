@@ -21,19 +21,19 @@
     <a class="back" href="./">&larr; All writeups</a>
     <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
   </div>
-  <p class="eyebrow">TryHackMe writeup</p>
-  <h1>Jackpot</h1>
-  <div class="meta">
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>Jackpot</h1>
+  <div class="meta" data-reveal>
     <span class="plat">TryHackMe</span>
     <span class="diff">Challenge</span>
     
   </div>
-  <div class="tldr"><b>TL;DR</b>The target runs a fake ATM web UI on port 8080 that serves a stripped x86-64 binary called <code>jackpot</code>. The binary takes a 6-digit nonce from the ATM screen and outputs an 8-digit activation code derived from two FNV-1a passes with an xorshift mixed in. Port 9100 exposes an XFS-bridge binary protocol — the ATM's engineering interface — but all commands silently return the banner unless you read the banner first on the same persistent socket. Once the protocol framing is figured out, the attack chain is: get the current nonce from the <code>/status</code> API, run it through the reversed algorithm to compute the activation code, send it to <code>WFS_CMD_CDM_ARM</code> as a raw string payload (not JSON), disable the fraud monitor, loop <code>WFS_CMD_CDM_DISPENSE</code> until the vault is empty, then call <code>WFS_CMD_CDM_GET_FLAG</code>. </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>The target runs a fake ATM web UI on port 8080 that serves a stripped x86-64 binary called <code>jackpot</code>. The binary takes a 6-digit nonce from the ATM screen and outputs an 8-digit activation code derived from two FNV-1a passes with an xorshift mixed in. Port 9100 exposes an XFS-bridge binary protocol — the ATM's engineering interface — but all commands silently return the banner unless you read the banner first on the same persistent socket. Once the protocol framing is figured out, the attack chain is: get the current nonce from the <code>/status</code> API, run it through the reversed algorithm to compute the activation code, send it to <code>WFS_CMD_CDM_ARM</code> as a raw string payload (not JSON), disable the fraud monitor, loop <code>WFS_CMD_CDM_DISPENSE</code> until the vault is empty, then call <code>WFS_CMD_CDM_GET_FLAG</code>. </div>
   <div class="tools"></div>
-  <h2>Introduction</h2>
+  <h2 data-reveal>Introduction</h2>
 <p>Jackpot simulates an ATM cashout — specifically the kind where an attacker gains access to the engineering interface of a cash dispense machine (CDM) and empties the vault. The room uses the XFS/CEN standard, which is the actual protocol stack that real ATM software sits on; most ATM vendors abstract over XFS, so this isn't entirely fictional.</p>
 <p>The interesting layers here are: a custom binary protocol over raw TCP, a stripped binary that implements an HMAC-like activation code scheme you have to reverse, and a pile of red herrings in the web UI and content enumeration that go exactly nowhere. The whole challenge is about reading the protocol spec correctly and figuring out that "keepalive" framing is the difference between the server responding and silently returning the same banner every single time.</p>
-<h2>Recon</h2>
+<h2 data-reveal>Recon</h2>
 <h3>Port Scan</h3>
 <pre><code>rustscan -a 10.49.184.196 --ulimit 5000 -b 500 -t 1500 -- -Pn -sV -sC</code></pre>
 <p>Three open ports:</p>
@@ -60,7 +60,7 @@
   "flag_released": false
 }</code></pre>
 <p>The <code>nonce</code> field rotates. <code>flag_released</code> is the win condition.</p>
-<h2>Foothold</h2>
+<h2 data-reveal>Foothold</h2>
 <h3>Binary Analysis — <code>jackpot</code></h3>
 <p>The download button on the web UI delivered a file called <code>jackpot</code>. Initial checks:</p>
 <pre><code>file Downloads/jackpot</code></pre>
@@ -116,7 +116,7 @@ print(f"code = {code:08d}")</code></pre>
 
 <pre><code>code = 16845467</code></pre>
 <p>Matches the binary output for nonce <code>993269</code>. The algorithm: <strong>FNV-1a over nonce (no xorshift) → FNV-1a over <code>"ENBANK"</code> seeded from pass 1 (xorshift applied after the loop) → modulo 10^8</strong>.</p>
-<h2>The Full Chain</h2>
+<h2 data-reveal>The Full Chain</h2>
 <h3>Step 1 — Get current nonce</h3>
 <pre><code>curl -s http://10.49.178.119:8080/status | jq -r .nonce</code></pre>
 
@@ -160,19 +160,19 @@ done</code></pre>
   "flag": "THM{n0_card_n0_pin_just_the_wr0ng_v0ice_speaking_XFS}"
 }</code></pre>
 
-<h2>Rabbit Holes</h2>
+<h2 data-reveal>Rabbit Holes</h2>
 <p><strong>Feroxbuster on port 8080:</strong> Spent time running directory scans against the web UI. Found only <code>/status</code> and duplicate extensions of it. The web surface is exactly one download endpoint and one status API — there is nothing else there.</p>
 <p><strong>Initial <code>xfs.py</code> one-shot client:</strong> Every command returned the identical banner regardless of content. Spent significant time assuming the issue was the protocol framing (wrong byte order, wrong length field, missing null terminator, wrong command IDs). None of those were the problem. The server sends a banner on connect unconditionally; a client that opens a new socket per request reads the banner as the reply and misses the actual response every single time. The fix was a persistent socket — read banner first, then command.</p>
 <p><strong>JSON payload for <code>WFS_CMD_CDM_ARM</code>:</strong> After getting the protocol working, all attempts to send the activation code in JSON format (<code>{"code":"16845467"}</code>, <code>{"activationCode":16845467}</code>, <code>{"code":16845467}</code>, tried 7+ field names) returned <code>WFS_ERR_CDM_INVALIDCODE</code>. The server expected the raw numeric string as the entire data payload with no wrapping. This took about 15 minutes of iteration.</p>
 <p><strong>GDB dynamic analysis on the binary:</strong> Attempted to set a breakpoint at <code>0x116c</code> (just before the final division) to read the hash from <code>$rax</code> at runtime. Failed twice — first because the binary lacked execute permission (forgot <code>chmod +x</code> before the <code>gdb</code> call), then because PIE relocates the binary at runtime and the static address <code>0x116c</code> doesn't exist in memory until it's rebased. The correct approach is to break on <code>starti</code>, read the base address, and add the offset — but by this point the Python reimplementation already matched the binary output exactly, so gdb wasn't needed.</p>
 <p><strong>Trying to type Python code directly into zsh:</strong> Pasted the <code>def fnv1a(...)</code> function block into the terminal interactively. zsh tried to execute each line as a separate command and threw parse errors. Not Python's fault.</p>
-<h2>Mitigations</h2>
+<h2 data-reveal>Mitigations</h2>
 <p><strong>Activation code algorithm security:</strong> The activation code is derived from FNV-1a — a checksum algorithm, not a cryptographic hash. FNV-1a has no key, no secret, and no resistance to reverse engineering. An attacker who obtains the binary can recover the full algorithm in minutes. A proper implementation would use HMAC-SHA256 with a secret key stored in hardware-protected storage (TPM or HSM), making the activation code impossible to replicate without the hardware secret even if the algorithm is known.</p>
 <p><strong>Unauthenticated XFS engineering interface on the network:</strong> The XFS gateway on port 9100 accepts connections from any host, requires no authentication layer before accepting EXECUTE commands, and trusts the activation code as the sole authorization gate. A real ATM engineering interface should be accessible only over a dedicated management network or through a VPN, and should require mutual TLS client certificates before any command is processed.</p>
 <p><strong>Fraud monitor as an optional disable:</strong> The fraud monitor (<code>WFS_CMD_CDM_SET_MONITOR</code>) can be disabled by any authenticated supervisor session. If the monitoring system is a security control, it should not be defeatable through the same interface it is meant to protect. Disabling it should require a second authorization factor or should only be possible from a physically separate management console.</p>
 <p><strong>Binary distribution via unauthenticated HTTP:</strong> The <code>jackpot</code> binary was served over plain HTTP from a port accessible to anyone on the network. An attacker who can download the binary can reverse it. Tools like this should not be distributed from the network-facing service they authenticate to — they belong on physically controlled maintenance laptops or dedicated provisioning systems.</p>
-  <div class="takeaway"><b>Key takeaway</b>The critical insight here is protocol framing: the XFS server sends an unsolicited banner on every new connection, and the reply to your command comes after that. A client that opens a fresh socket per request reads the banner as the reply and silently misses every actual response. This kind of "greeting + command" pattern is common in legacy industrial and banking protocols — Telnet, FTP, SMTP, and others all do it. When every command returns the same result regardless of input, the first thing to check is whether you're reading the right frame.  The binary reversal lesson is also worth keeping: stripped + PIE + no canary doesn't mean the algorithm is hidden. <code>objdump</code> and <code>strings</code> together exposed the constant <code>0xcbf29ce484222325</code> (FNV-1a offset basis) and the string <code>"ENBANK"</code> in <code>.rodata</code>. Those two facts determined the algorithm family and the second-pass input immediately. You don't always need dynamic analysis to understand what a binary does.</div>
-  <h2>If I Did It Again</h2>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>The critical insight here is protocol framing: the XFS server sends an unsolicited banner on every new connection, and the reply to your command comes after that. A client that opens a fresh socket per request reads the banner as the reply and silently misses every actual response. This kind of "greeting + command" pattern is common in legacy industrial and banking protocols — Telnet, FTP, SMTP, and others all do it. When every command returns the same result regardless of input, the first thing to check is whether you're reading the right frame.  The binary reversal lesson is also worth keeping: stripped + PIE + no canary doesn't mean the algorithm is hidden. <code>objdump</code> and <code>strings</code> together exposed the constant <code>0xcbf29ce484222325</code> (FNV-1a offset basis) and the string <code>"ENBANK"</code> in <code>.rodata</code>. Those two facts determined the algorithm family and the second-pass input immediately. You don't always need dynamic analysis to understand what a binary does.</div>
+  <h2 data-reveal>If I Did It Again</h2>
 <p>Skip feroxbuster entirely. There's nothing on the web surface beyond <code>/status</code> — the page title says "Terminal Engineering Tool" and there's a single download button. The web UI exists to deliver the binary and expose the nonce. Five minutes of reading the page source is worth more than a 90-second directory scan.</p>
 <p>For the protocol, the first question when every command returns the same thing should be "is my client reading a stale frame?" before assuming wrong command IDs or wrong byte order. A <code>timeout 5 nc jackpot.thm 9100 | xxd | head</code> to see whether the banner arrives unprompted would have pointed to the persistent-socket fix immediately.</p>
 <p>For the binary, <code>chmod +x</code> before attempting any dynamic analysis. Also: PIE means no static breakpoints in gdb — always <code>starti</code> first, read the load base from <code>/proc/&lt;pid&gt;/maps</code>, then add your offset.</p>
@@ -182,5 +182,30 @@ done</code></pre>
   </div>
   <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
 </div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
 </body>
 </html>

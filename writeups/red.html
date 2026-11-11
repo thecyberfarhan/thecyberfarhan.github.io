@@ -21,18 +21,18 @@
     <a class="back" href="./">&larr; All writeups</a>
     <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
   </div>
-  <p class="eyebrow">TryHackMe writeup</p>
-  <h1>Red</h1>
-  <div class="meta">
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>Red</h1>
+  <div class="meta" data-reveal>
     <span class="plat">TryHackMe</span>
     <span class="diff">Medium</span>
     <span>June 25, 2026</span>
   </div>
-  <div class="tldr"><b>TL;DR</b>An LFI in a "free business template" PHP app leaks its own source code via <code>php://filter</code>, exposing a single-pass sanitization flaw that's trivially bypassed. That LFI leads to a leaked password reminder, which gets mutated with hashcat rules into a real password for the user <code>blue</code>. From there, an actively hostile <code>red</code> user is found editing <code>/etc/hosts</code> and killing shells in real time, eventually getting lateral'd into via a reverse shell back-connect. A SUID <code>pkexec</code> binary is found but the PwnKit exploit fails due to a GLIBC version mismatch between attacker and target. </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>An LFI in a "free business template" PHP app leaks its own source code via <code>php://filter</code>, exposing a single-pass sanitization flaw that's trivially bypassed. That LFI leads to a leaked password reminder, which gets mutated with hashcat rules into a real password for the user <code>blue</code>. From there, an actively hostile <code>red</code> user is found editing <code>/etc/hosts</code> and killing shells in real time, eventually getting lateral'd into via a reverse shell back-connect. A SUID <code>pkexec</code> binary is found but the PwnKit exploit fails due to a GLIBC version mismatch between attacker and target. </div>
   <div class="tools"><span class="chip">🔎 Nmap</span><span class="chip">🕷 Feroxbuster</span><span class="chip">🌀 cURL</span><span class="chip">🔓 Hashcat</span><span class="chip">🐎 Hydra</span><span class="chip">🐍 pkexec PwnKit PoC (EDB-50689)</span><span class="chip">🛰 Netcat</span></div>
-  <h2>Introduction</h2>
+  <h2 data-reveal>Introduction</h2>
 <p>*Today's victim is a humble little Apache box hiding behind a free "Atlanta" business template* — the kind of site you'd scroll past without a second glance. But scratch the surface of <code>index.php?page=</code> and something interesting happens: the page parameter doesn't just load content, it <strong>reads files</strong>. And buried somewhere on this box are two users locked in what can only be described as a turf war — one of them is about to find out the hard way that "Red Rules" wasn't just a username flex.</p>
-<h2>Recon</h2>
+<h2 data-reveal>Recon</h2>
 <p class="aside">Standard nmap service scan against the target:</p>
 <pre><code>nmap -sV -sC 10.49.179.19</code></pre>
 
@@ -50,7 +50,7 @@
 <p>Feroxbuster was thrown at the site for good measure:</p>
 <pre><code>feroxbuster -u http://10.49.179.19 -w /usr/share/wordlists/dirb/common.txt</code></pre>
 <p>*Didn't turn up anything worth reporting* — no juicy hidden directories. The real way in was always going to be that <code>page</code> parameter.</p>
-<h2>Foothold</h2>
+<h2 data-reveal>Foothold</h2>
 <h3>Understanding the vulnerability</h3>
 <p>Local File Inclusion happens when an application takes user input and feeds it directly into a file-read function (<code>include</code>, <code>readfile</code>, etc.) without properly validating it. If the app strips dangerous sequences like <code>../</code> but only does it <strong>once</strong>, you can often smuggle a traversal sequence past the filter by nesting it — the classic <code>....//</code> trick. The filter removes the inner <code>../</code>, and what's left collapses back into a working traversal sequence.</p>
 <p class="aside">A single line before the payload: this is the core LFI request structure used against the target.</p>
@@ -94,7 +94,7 @@ if (isset($page) &amp;&amp; preg_match("/^[a-z]/", $page)) {
 
 <pre><code>sup3r_p@s$w0rd!</code></pre>
 <p>A bare password string sitting in a dotfile. Almost too easy — except this wasn't the actual SSH password, just the seed for one.</p>
-<h2>Shell / Access</h2>
+<h2 data-reveal>Shell / Access</h2>
 <h3>From base string to real password</h3>
 <p>The <code>.reminder</code> string clearly wasn't going to work as-is over SSH — <code>bash_history</code> on the box hinted that the real password had been run through a <strong>best64 rule</strong> mutation, with a strong nudge that the <code>red</code> user ("Red rules") was the one applying it.</p>
 <p class="aside">Generating a candidate wordlist from the reminder string using hashcat's rule engine:</p>
@@ -144,7 +144,7 @@ flag2
 red@red:~$ cat flag2
 THM{Y0u_won't_mak3_IT_furTH3r_th@n_th1S}</code></pre>
 <p>That reverse shell landed as <code>red</code>, not <code>blue</code> — *most likely the cron job or script running <code>red</code>'s side of the taunting also owned the process that picked up the back-connect, or <code>red</code>'s account was what actually executed the queued reverse shell command from blue's typed input.* Either way, second flag captured. *(~40 mins into the box)*</p>
-<h2>The Full Chain</h2>
+<h2 data-reveal>The Full Chain</h2>
 <h3>Hunting for privilege escalation</h3>
 <p>With a shell as <code>red</code>, the standard SUID sweep was run:</p>
 <p class="aside">Searching for SUID binaries that might allow privilege escalation:</p>
@@ -172,14 +172,14 @@ chmod +x exploit
 <pre><code>./exploit: /lib/x86_64-linux-gnu/libc.so.6: version `GLIBC_2.34' not found (required by ./exploit)</code></pre>
 <p>*This is the important failure line* — the binary was linked against a GLIBC version the target simply doesn't have.</p>
 <p>See the Rabbit Holes section below for the full breakdown of why, and what the correct fix would have been.</p>
-<h2>Rabbit Holes</h2>
+<h2 data-reveal>Rabbit Holes</h2>
 <p><strong>John rule syntax fed into Hashcat:</strong> The first attempt at generating the credential wordlist ran John the Ripper's <code>best64.rule</code> file directly through Hashcat's <code>--stdout</code> engine. Hashcat couldn't fully parse John's native rule syntax and silently dropped most of the rules, producing only 20 mutated words instead of a full expansion. *Recreating a Hashcat-native version of the best64 rule set from scratch fixed this* — the two tools' rule grammars aren't drop-in compatible even though they look similar on the surface.</p>
 <p><strong>PwnKit GLIBC mismatch:</strong> The patched PwnKit exploit was compiled on a Kali Rolling attacker machine running <strong>GLIBC 2.42</strong>, while the target was Ubuntu 20.04 on <strong>GLIBC 2.31</strong>. The compiled binary ended up requiring the symbol <code>__libc_start_main@GLIBC_2.34</code>, which doesn't exist on the target's older libc — even though the exploit's actual source code only calls older, widely-available functions like <code>execve</code> and <code>system</code>. The incompatibility came entirely from the build environment, not the exploit logic itself. *The correct fix would have been compiling in a container or VM matching Ubuntu 20.04 / GLIBC 2.31, or compiling directly on the target* — but no compiler (<code>gcc</code>) was available on the box, and write access to install one via <code>apt</code> was blocked by missing dpkg lock permissions. This was documented rather than chased further given time constraints.</p>
 <p><strong>Two minor compile fixes</strong> were also needed along the way for the supporting <code>evil-so.c</code> and <code>exploit.c</code> files — missing <code>#include &lt;grp.h&gt;</code> and <code>#include &lt;unistd.h&gt;</code> respectively — *likely due to stricter default header inclusion behavior on newer glibc/gcc toolchains than whatever the original PoC was written against.*</p>
-<h2>Mitigations</h2>
+<h2 data-reveal>Mitigations</h2>
 <table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>LFI via <code>page</code> parameter</td><td class="sev-high">High</td><td>Use a strict allowlist of permitted filenames instead of blocklist-based sanitization; never pass user input directly into <code>readfile()</code></td></tr><tr><td>Single-pass <code>str_replace</code> sanitization</td><td class="sev-high">High</td><td>Apply sanitization in a loop until no more matches are found, or better, reject any input containing path separators entirely</td></tr><tr><td>Credentials stored in plaintext dotfiles</td><td class="sev-medium">Medium</td><td>Never store passwords or password seeds in user-readable home directory files, even "hidden" ones</td></tr><tr><td>SUID <code>pkexec</code> binary in non-standard location</td><td class="sev-critical">Critical</td><td>Audit the filesystem regularly for unexpected SUID binaries; patch Polkit to a version beyond CVE-2021-4034</td></tr><tr><td>Weak/predictable SSH password policy</td><td class="sev-medium">Medium</td><td>Enforce strong, randomly generated credentials and consider disabling password auth in favor of key-based SSH</td></tr></tbody></table>
-  <div class="takeaway"><b>Key takeaway</b>A sanitization function that only runs once is functionally the same as no sanitization at all — always test traversal filters by nesting the very sequence they claim to strip.</div>
-  <h2>If I Did It Again</h2>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>A sanitization function that only runs once is functionally the same as no sanitization at all — always test traversal filters by nesting the very sequence they claim to strip.</div>
+  <h2 data-reveal>If I Did It Again</h2>
 <p>I'd spin up a matching Ubuntu 20.04 / GLIBC 2.31 container locally before touching the PwnKit exploit, instead of compiling on Kali Rolling and discovering the version mismatch after the fact.</p>
   <div class="cta-row">
     <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/red_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
@@ -187,5 +187,30 @@ chmod +x exploit
   </div>
   <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
 </div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
 </body>
 </html>

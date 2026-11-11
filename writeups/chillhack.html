@@ -21,21 +21,21 @@
     <a class="back" href="./">&larr; All writeups</a>
     <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
   </div>
-  <p class="eyebrow">TryHackMe writeup</p>
-  <h1>Chill Hack</h1>
-  <div class="meta">
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>Chill Hack</h1>
+  <div class="meta" data-reveal>
     <span class="plat">TryHackMe</span>
     <span class="diff">Medium</span>
     <span>June 23, 2026</span>
   </div>
-  <div class="tldr"><b>TL;DR</b>A command execution panel filtered most shell commands but missed <code>find</code>, which was abused via <code>-exec</code> to spawn a Python reverse shell. A hint file led to an image hiding a password-protected zip (steghide → John cracked the zip password). Inside the zip, PHP source code contained a base64-encoded password that decoded to SSH credentials. From there, LinPEAS flagged a writable Docker socket — mounting the host filesystem into a new container and <code>chroot</code>-ing into it delivered an instant root shell. </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>A command execution panel filtered most shell commands but missed <code>find</code>, which was abused via <code>-exec</code> to spawn a Python reverse shell. A hint file led to an image hiding a password-protected zip (steghide → John cracked the zip password). Inside the zip, PHP source code contained a base64-encoded password that decoded to SSH credentials. From there, LinPEAS flagged a writable Docker socket — mounting the host filesystem into a new container and <code>chroot</code>-ing into it delivered an instant root shell. </div>
   <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">🕷 Feroxbuster</span><span class="chip">📂 FTP client</span><span class="chip">🐍 Python <code>find -exec</code></span><span class="chip">🌐 Python HTTP server</span><span class="chip">🔍 Steghide</span><span class="chip">🔓 zip2john + John the Ripper</span><span class="chip">🐳 Docker</span><span class="chip">🔑 SSH</span></div>
-  <h2>Introduction</h2>
+  <h2 data-reveal>Introduction</h2>
 <p>Today's target is <strong>Chill Hack</strong> — a box built by someone who clearly enjoys layering puzzles: a command filter that misses one critical binary, a hint hidden behind an in-joke image, steganography wrapping a password-protected archive, and PHP source code with a base64-encoded credential sitting in plain sight. The escalation path drops all the cleverness for something blunt and devastating: a writable Docker socket, which is essentially a root shell with extra steps. The box rewards patience through the puzzle chain and then hands you the keys outright once you're in the right group.</p>
 <h3>Prerequisites</h3>
 <p>Readers are assumed to know:</p>
 <ul><li>How command injection filters work and why allowlist-vs-denylist matters (recurring theme across this series)</li><li>What <code>find -exec</code> does and why it's a powerful command execution primitive</li><li>What steghide is and how steganography conceals data inside image files</li><li>What a writable Docker socket grants and why mounting the host filesystem into a container is a root escalation</li></ul>
-<h2>Recon</h2>
+<h2 data-reveal>Recon</h2>
 <p class="aside">(~0 mins into the box)</p>
 <h3>Port Scan</h3>
 <pre><code>rustscan -a 10.48.166.24 -r 1-65535 --ulimit 5000 -- -Pn -sC -sV</code></pre>
@@ -54,7 +54,7 @@ command -- Apaar</code></pre>
 200  /secret/index.php
 301  /css /images /js  # noise — full sports template site</code></pre>
 <p><code>/secret/</code> is a single input field plus an execute button. Testing <code>ls</code> directly returns: *"are you a hacker?"* — confirming command filtering is active, consistent with the FTP note.</p>
-<h2>Foothold</h2>
+<h2 data-reveal>Foothold</h2>
 <p class="aside">(~10 mins into the box)</p>
 <h3>Command Filter Bypass — find -exec</h3>
 <p>Testing individual commands one at a time against the filter, every common command (<code>ls</code>, <code>cat</code>, <code>whoami</code>, etc.) was blocked. <code>find</code> was not.</p>
@@ -71,7 +71,7 @@ command -- Apaar</code></pre>
 
 <pre><code>www-data@ip-10-48-166-24:/var/www/html/secret$</code></pre>
 
-<h2>Escalation</h2>
+<h2 data-reveal>Escalation</h2>
 <p class="aside">(~35 mins into the box)</p>
 <h3>LinPEAS — Writable Docker Socket</h3>
 <pre><code>curl -O https://raw.githubusercontent.com/carlospolop/privilege-escalation-awesome-scripts-suite/master/linPEAS/linpeas.sh
@@ -93,20 +93,20 @@ root@7ac6b0d2360a:~# cat proof.txt
 <pre><code>cat /home/apaar/local.txt
 # {USER-FLAG: e8vpd3323cfvlp0qpxxx9qtr5iq37oww}</code></pre>
 
-<h2>The Full Chain</h2>
+<h2 data-reveal>The Full Chain</h2>
 <p>The complete attack chain:</p>
 <ol><li><strong>Anonymous FTP</strong> → <code>note.txt</code> hints at command filtering on a panel</li><li><strong><code>/secret/</code> command panel</strong> → <code>find -exec</code> bypasses the filter → Python reverse shell → <code>www-data</code></li><li><strong><code>hacker.php</code></strong> hint → image hiding a steghide-embedded zip</li><li><strong>Steghide extraction</strong> → password-protected zip → <code>zip2john</code> + John → <code>pass1word</code></li><li><strong><code>source_code.php</code></strong> → base64-encoded password comparison → decoded → <code>anurodh</code>'s SSH password</li><li><strong>SSH as <code>anurodh</code></strong> → LinPEAS → writable Docker socket flagged</li><li><strong>Docker host-mount + chroot</strong> → root → both flags retrieved</li></ol>
-<h2>Rabbit Holes</h2>
+<h2 data-reveal>Rabbit Holes</h2>
 <h3><code>/home/anurodh</code> and <code>/home/aurick</code> — Permission Denied</h3>
 <p>Both directories were completely inaccessible from <code>www-data</code>, including directory listing itself (not just file contents). No path forward existed there until escalating further — confirmed as dead ends early rather than spending more time probing.</p>
 <h3>Broken Pipe on the Python HTTP Server</h3>
 <p>The Python HTTP server serving <code>/var/www/files/images/</code> threw a <code>BrokenPipeError</code> mid-transfer on one request. This didn't affect the actual file transfer — the subsequent <code>wget</code> from the attacking machine completed successfully on a fresh request. Broken pipe errors on Python's built-in HTTP server are typically harmless client-disconnect artefacts, not corruption of the served file.</p>
 <h3>steghide Extraction Required No Passphrase</h3>
 <p>The steghide extraction step succeeded with no passphrase entered at all — <code>steghide</code> happily extracts data embedded with an empty passphrase. This wasn't a stumble exactly, but worth noting: not every steghide-protected file in CTF challenges actually requires a meaningful passphrase to be supplied.</p>
-<h2>Mitigations</h2>
+<h2 data-reveal>Mitigations</h2>
 <table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Command filter using a denylist that missed <code>find</code></td><td class="sev-critical">Critical</td><td>Use an allowlist of explicitly permitted commands rather than trying to block dangerous ones; <code>find -exec</code>, <code>awk</code>, <code>vim</code>, and dozens of other binaries can run arbitrary commands</td></tr><tr><td>Sensitive data hidden in an image accessible from the webroot</td><td class="sev-medium">Medium</td><td>Never rely on steganography or obscurity for actual access control; if a file must remain confidential, it shouldn't be served by the web server at all</td></tr><tr><td>Password stored as a base64 comparison in PHP source</td><td class="sev-critical">Critical</td><td>Base64 is encoding, not encryption — it's instantly reversible; use a proper salted password hash (bcrypt/Argon2) for any credential comparison</td></tr><tr><td>Writable Docker socket accessible to a non-root user</td><td class="sev-critical">Critical</td><td>Never grant socket access to the Docker daemon to non-root users without equivalent trust to root; if Docker access is required, use rootless Docker or strictly scoped API permissions</td></tr></tbody></table>
-  <div class="takeaway"><b>Key takeaway</b>Access to the Docker socket is equivalent to root access on the host — there is no meaningful distinction. Any user who can run <code>docker</code> commands against <code>/var/run/docker.sock</code> can mount the entire host filesystem into a container and walk straight through every permission boundary that would otherwise apply. Treat Docker group membership and socket access with exactly the same caution as a <code>sudo</code> grant to <code>/bin/bash</code>.</div>
-  <h2>If I Did It Again</h2>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>Access to the Docker socket is equivalent to root access on the host — there is no meaningful distinction. Any user who can run <code>docker</code> commands against <code>/var/run/docker.sock</code> can mount the entire host filesystem into a container and walk straight through every permission boundary that would otherwise apply. Treat Docker group membership and socket access with exactly the same caution as a <code>sudo</code> grant to <code>/bin/bash</code>.</div>
+  <h2 data-reveal>If I Did It Again</h2>
 <p>Check <code>groups</code> and <code>ls -la /var/run/docker.sock</code> immediately after landing a shell as a named user — Docker socket access is one of the highest-value, fastest-to-check privilege escalation primitives, and it should be near the top of any post-landing checklist alongside <code>sudo -l</code> and SUID enumeration.</p>
   <div class="cta-row">
     <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/chillhack_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
@@ -114,5 +114,30 @@ root@7ac6b0d2360a:~# cat proof.txt
   </div>
   <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
 </div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
 </body>
 </html>

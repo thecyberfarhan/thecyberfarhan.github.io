@@ -21,21 +21,21 @@
     <a class="back" href="./">&larr; All writeups</a>
     <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
   </div>
-  <p class="eyebrow">TryHackMe writeup</p>
-  <h1>Lian Yu</h1>
-  <div class="meta">
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>Lian Yu</h1>
+  <div class="meta" data-reveal>
     <span class="plat">TryHackMe</span>
     <span class="diff">Medium</span>
     <span>June 7, 2026</span>
   </div>
-  <div class="tldr"><b>TL;DR</b>A layered reconnaissance trail: a white-text hidden word on a web page pointed to a directory, an HTML comment hinted at a <code>.ticket</code> file extension, and a Feroxbuster scan with that custom extension surfaced a Base58-encoded FTP password. FTP served three images — one with a zip hidden via steghide (cracked passphrase: <code>password</code>), one with corrupted PNG magic bytes concealing a password hint. Fixing the header revealed the SSH password; <code>slade:M3tahuman</code> got in. <code>sudo pkexec /bin/bash</code> finished the job. </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>A layered reconnaissance trail: a white-text hidden word on a web page pointed to a directory, an HTML comment hinted at a <code>.ticket</code> file extension, and a Feroxbuster scan with that custom extension surfaced a Base58-encoded FTP password. FTP served three images — one with a zip hidden via steghide (cracked passphrase: <code>password</code>), one with corrupted PNG magic bytes concealing a password hint. Fixing the header revealed the SSH password; <code>slade:M3tahuman</code> got in. <code>sudo pkexec /bin/bash</code> finished the job. </div>
   <div class="tools"><span class="chip">🔎 RustScan + Nmap</span><span class="chip">🕷 Feroxbuster</span><span class="chip">📂 FTP client</span><span class="chip">🔍 Stegseek</span><span class="chip">🔬 Steghide</span><span class="chip">🛠 Hex editor</span><span class="chip">🔑 Base58 decoder</span><span class="chip">🔐 SSH</span></div>
-  <h2>Introduction</h2>
+  <h2 data-reveal>Introduction</h2>
 <p>Today's target is <strong>Lian Yu</strong> — the Arrow-themed island where Oliver Queen honed his skills, and where the box author hid credentials in increasingly elaborate places. This is the most puzzle-box-style machine in the series so far: no brute force of a login form, no SQLi, no upload bypass. Instead, the path winds through hidden white text, a custom file extension nobody would guess without a clue, steganography brute force, a corrupted image file with deliberately wrong magic bytes, and a Base58 encoding detour. It rewards patient, methodical enumeration over speed.</p>
 <h3>Prerequisites</h3>
 <p>Readers are assumed to know:</p>
 <ul><li>Basic web enumeration and what file extensions mean for discovery tools</li><li>What steganography is and how <code>steghide</code>/<code>stegseek</code> work</li><li>What PNG magic bytes are and how to fix a corrupted file header in a hex editor</li><li>What Base58 encoding is (commonly used in Bitcoin addresses — not in passwords, until today)</li></ul>
-<h2>Recon</h2>
+<h2 data-reveal>Recon</h2>
 <p class="aside">(~0 mins into the box)</p>
 <h3>Port Scan</h3>
 <p class="aside">Full-range sweep with RustScan, Nmap for service and version fingerprinting:</p>
@@ -78,7 +78,7 @@ vigilante</code></pre>
 <p>A short string. Not plaintext, not hex, not Base64 (wrong character set). Base58 — the encoding used by Bitcoin addresses, distinguishable because it omits characters <code>0</code>, <code>O</code>, <code>I</code>, and <code>l</code> to prevent visual confusion. Decoded:</p>
 <pre><code>!#th3h00d</code></pre>
 <p>FTP password confirmed.</p>
-<h2>Foothold</h2>
+<h2 data-reveal>Foothold</h2>
 <p class="aside">(~20 mins into the box)</p>
 <h3>FTP Login — Image File Retrieval</h3>
 <p>Combining the username found in white text (<code>vigilante</code>) with the decoded ticket password (<code>!#th3h00d</code>):</p>
@@ -123,7 +123,7 @@ After:  89 50 4E 47 0D 0A 1A 0A</code></pre>
 <pre><code>Just leave me alone here is what you want
 Password</code></pre>
 <p>The image confirms <code>M3tahuman</code> (extracted from <code>shado</code>) is the SSH password.</p>
-<h2>Shell / Access</h2>
+<h2 data-reveal>Shell / Access</h2>
 <p class="aside">(~35 mins into the box)</p>
 <p>Two SSH usernames were known from context — <code>vigilante</code> (from the web page) and <code>slade</code> (from the Arrow lore and FTP filenames). <code>vigilante</code> failed; <code>slade</code> with password <code>M3tahuman</code> connected cleanly:</p>
 <pre><code>ssh slade@10.48.156.154</code></pre>
@@ -142,7 +142,7 @@ slade@LianYu:~$</code></pre>
 <pre><code>THM{P30P7E_K33P_53CRET5__C0MPUT3R5_D0N'T}
                         --Felicity Smoak</code></pre>
 
-<h2>Escalation</h2>
+<h2 data-reveal>Escalation</h2>
 <p class="aside">(~36 mins into the box)</p>
 <h3>sudo pkexec — Root Shell</h3>
 <p class="aside">Checking sudo permissions:</p>
@@ -166,20 +166,20 @@ You are injected me with Mirakuru:) ---&gt; Now slade Will become DEATHSTROKE.
 THM{MY_W0RD_I5_MY_B0ND_IF_I_ACC3PT_YOUR_CONTRACT_THEN_IT_WILL_BE_COMPL3TED_OR_I'LL_BE_D34D}
                                                                       --DEATHSTROKE</code></pre>
 
-<h2>The Full Chain</h2>
+<h2 data-reveal>The Full Chain</h2>
 <p>The complete attack chain:</p>
 <ol><li><strong>White-text hidden word</strong> at <code>/island/</code> → FTP username <code>vigilante</code></li><li><strong>HTML comment</strong> at <code>/island/2100/</code> → <code>.ticket</code> extension clue</li><li><strong>Feroxbuster</strong> with <code>.ticket</code> → <code>green_arrow.ticket</code> → Base58 decoded to FTP password <code>!#th3h00d</code></li><li><strong>FTP login as <code>vigilante</code></strong> → three image files downloaded</li><li><strong>Stegseek on <code>aa.jpg</code></strong> (passphrase: <code>password</code>) → <code>ss.zip</code> → <code>shado</code> file → password <code>M3tahuman</code></li><li><strong>PNG magic byte repair</strong> on <code>Leave_me_alone.png</code> → image confirmed <code>M3tahuman</code> as SSH password</li><li><strong>SSH as <code>slade</code></strong> → user flag</li><li><strong><code>sudo pkexec /bin/bash</code></strong> → root shell → root flag</li></ol>
-<h2>Rabbit Holes</h2>
+<h2 data-reveal>Rabbit Holes</h2>
 <h3><code>vigilante</code> as a Password</h3>
 <p>The word <code>vigilante</code> appeared in white text on <code>/island/</code> and immediately *felt* like a password. Anonymous FTP was already blocked, so the obvious next guess was trying <code>vigilante</code> as both username and password for FTP — no luck. It turned out to be the username, with the password buried several more steps down the chain. This is the box's main misdirection: give you half a credential early and make you work for the other half.</p>
 <h3><code>vigilante</code> SSH Login</h3>
 <p>After decoding <code>M3tahuman</code> from the zip, the first SSH attempt used <code>vigilante</code> as the username (since it was the known account name from the web page). That failed — <code>vigilante</code> doesn't appear to have a system account with password auth enabled. Switching to <code>slade</code> (the other Arrow character whose name appears contextually in the FTP files and theme) worked immediately.</p>
 <h3><code>Queen's_Gambit.png</code> — Steghide Dead End</h3>
 <p><code>Queen's_Gambit.png</code> was run through stegseek and steghide as well. *It appeared to contain no hidden data, or at least nothing extractable with rockyou.txt as the passphrase list.* The box's intended path runs only through <code>aa.jpg</code> and <code>Leave_me_alone.png</code>.</p>
-<h2>Mitigations</h2>
+<h2 data-reveal>Mitigations</h2>
 <table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>Credentials hidden in white-on-white text</td><td class="sev-medium">Medium</td><td>Never embed credentials or hints in HTML — even "invisible" ones; source code is always readable</td></tr><tr><td>FTP accessible with guessable credentials</td><td class="sev-high">High</td><td>Disable FTP entirely if not needed; if required, enforce strong passwords and restrict by IP</td></tr><tr><td>Sensitive files (images with hidden data) served over FTP</td><td class="sev-high">High</td><td>Never store credential-bearing files on network-accessible servers; restrict FTP directories strictly</td></tr><tr><td>Password hidden in steganographic zip (<code>password</code> passphrase)</td><td class="sev-high">High</td><td>If steganography must be used for legitimate purposes, use a strong, unique passphrase</td></tr><tr><td>Corrupted PNG concealing password hint</td><td class="sev-medium">Medium</td><td>Security through obscurity is not security — file header manipulation delays but does not prevent discovery</td></tr><tr><td><code>sudo pkexec /bin/bash</code> allowed</td><td class="sev-critical">Critical</td><td>Never grant unrestricted <code>pkexec</code> via <code>sudoers</code>; restrict it to specific, non-shell-spawning operations if required at all</td></tr></tbody></table>
-  <div class="takeaway"><b>Key takeaway</b>Enumeration isn't just running the same tools with the same flags every time — Lian Yu's key step was adding <code>.ticket</code> to Feroxbuster's extension list based on a clue buried in an HTML comment. Paying attention to what the target is telling you, not just what your tools return by default, is what separates a methodical tester from one who gives up at the first dead end.</div>
-  <h2>If I Did It Again</h2>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>Enumeration isn't just running the same tools with the same flags every time — Lian Yu's key step was adding <code>.ticket</code> to Feroxbuster's extension list based on a clue buried in an HTML comment. Paying attention to what the target is telling you, not just what your tools return by default, is what separates a methodical tester from one who gives up at the first dead end.</div>
+  <h2 data-reveal>If I Did It Again</h2>
 <p>Check the page source of every web page manually before running directory scanners — the <code>.ticket</code> clue and the <code>vigilante</code> white-text were both in the HTML. Reading those first would have shaved significant scan time and gotten to the FTP credentials faster.</p>
   <div class="cta-row">
     <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/lianyu_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
@@ -187,5 +187,30 @@ THM{MY_W0RD_I5_MY_B0ND_IF_I_ACC3PT_YOUR_CONTRACT_THEN_IT_WILL_BE_COMPL3TED_OR_I'
   </div>
   <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
 </div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
 </body>
 </html>

