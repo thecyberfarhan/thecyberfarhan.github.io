@@ -1,8 +1,9 @@
 <!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="dark" style="--tint:#C2686C">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="view-transition" content="same-origin">
 <title>Red — TryHackMe writeup | Farhan Hussain</title>
 <meta name="description" content="An LFI in a "free business template" PHP app leaks its own source code via php://filter, exposing a single-pass sanitization flaw that's trivially…">
 <link rel="canonical" href="https://thecyberfarhan.github.io/writeups/red.html">
@@ -16,13 +17,14 @@
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Red — TryHackMe writeup","description":"An LFI in a \"free business template\" PHP app leaks its own source code via php://filter, exposing a single-pass sanitization flaw that's trivially…","author":{"@id":"https://thecyberfarhan.github.io/#me"},"datePublished":"2026-06-25","url":"https://thecyberfarhan.github.io/writeups/red.html","mainEntityOfPage":"https://thecyberfarhan.github.io/writeups/red.html"}</script>
 </head>
 <body>
+<canvas id="rain" aria-hidden="true"></canvas>
 <div class="wrap">
   <div class="topbar">
     <a class="back" href="./">&larr; All writeups</a>
     <a class="brand" href="https://thecyberfarhan.github.io/">Farhan<span>.</span></a>
   </div>
   <p class="eyebrow" data-reveal>TryHackMe writeup</p>
-  <h1 data-reveal>Red</h1>
+  <h1 data-reveal style="view-transition-name:wu-title-red">Red</h1>
   <div class="meta" data-reveal>
     <span class="plat">TryHackMe</span>
     <span class="diff">Medium</span>
@@ -211,6 +213,51 @@ if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
   document.querySelectorAll('[data-reveal]').forEach(function (el) { io.observe(el); });
 } else {
   document.querySelectorAll('[data-reveal]').forEach(function (el) { el.classList.add('in'); });
-}</script>
+}
+(function () {
+  var rc = document.getElementById('rain'), rctx = rc && rc.getContext && rc.getContext('2d');
+  if (!rctx) return;
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var CHARS = '0123456789ABCDEF/\\#:_.>-'.split('');
+  var GW = 0, GH = 0, cols = [], tint = [194, 104, 108], glyphSize = 14;
+  function speed() { return (0.55 + Math.random() * 0.5); }
+  function build() {
+    var colW = innerWidth < 760 ? 20 : 24, n = Math.ceil(innerWidth / colW), density = innerWidth < 760 ? 0.38 : 0.5;
+    cols = [];
+    for (var i = 0; i < n; i++) {
+      if (Math.random() > density) continue;
+      var len = 5 + Math.floor(Math.random() * 7), glyphs = [];
+      for (var k = 0; k < len; k++) glyphs.push(CHARS[Math.floor(Math.random() * CHARS.length)]);
+      cols.push({ x: i * colW + colW / 2, y: -Math.random() * innerHeight, speed: speed(), len: len, glyphs: glyphs });
+    }
+  }
+  function size() {
+    var d = Math.min(window.devicePixelRatio || 1, innerWidth < 760 ? 1.1 : 1.5);
+    GW = innerWidth; GH = innerHeight;
+    rc.width = GW * d; rc.height = GH * d; rctx.setTransform(d, 0, 0, d, 0, 0);
+    build();
+  }
+  function draw() {
+    rctx.clearRect(0, 0, GW, GH);
+    rctx.font = glyphSize + 'px var(--mono)';
+    rctx.textBaseline = 'middle';
+    cols.forEach(function (c) {
+      for (var k = 0; k < c.len; k++) {
+        var gy = c.y - k * glyphSize;
+        if (gy < -glyphSize || gy > GH + glyphSize) continue;
+        var fade = 1 - k / c.len, op = Math.pow(fade, 1.4) * 0.34;
+        rctx.fillStyle = 'rgba(' + tint[0] + ',' + tint[1] + ',' + tint[2] + ',' + op.toFixed(3) + ')';
+        rctx.fillText(c.glyphs[k], c.x, gy);
+      }
+      if (!reduced) { c.y += c.speed; if (c.y - c.len * glyphSize > GH) { c.y = -Math.random() * innerHeight * 0.3; c.speed = speed(); } }
+    });
+  }
+  var running = false;
+  function frame() { if (!running) return; try { draw(); } catch (e) {} if (!reduced) requestAnimationFrame(frame); }
+  function start() { if (running || document.hidden) return; running = true; requestAnimationFrame(frame); }
+  size(); draw(); if (!reduced) start();
+  window.addEventListener('resize', function () { size(); draw(); });
+  document.addEventListener('visibilitychange', function () { if (document.hidden) running = false; else start(); });
+})();</script>
 </body>
 </html>

@@ -14,12 +14,12 @@ body{
   line-height:1.6;-webkit-font-smoothing:antialiased;
   position:relative;
 }
-/* faint grid + a soft glow behind the title -- plain was the complaint, this
-   is cheap (one pseudo-element, no JS, no canvas) and keeps these pages light */
+/* faint grid + a soft glow tinted to the page's difficulty colour, behind a
+   trimmed port of the main site's rain canvas (#rain, z-index below this) */
 body::before{
   content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
   background-image:
-    radial-gradient(ellipse 900px 500px at 50% -10%,#b4232c14,transparent 60%),
+    radial-gradient(ellipse 900px 500px at 50% -10%,color-mix(in srgb,var(--tint,var(--accent)) 10%,transparent),transparent 60%),
     linear-gradient(var(--border) 1px,transparent 1px),
     linear-gradient(90deg,var(--border) 1px,transparent 1px);
   background-size:auto,64px 64px,64px 64px;
@@ -27,6 +27,7 @@ body::before{
   mask-image:radial-gradient(ellipse 70% 60% at 50% 0%,#000 0%,transparent 75%);
   -webkit-mask-image:radial-gradient(ellipse 70% 60% at 50% 0%,#000 0%,transparent 75%);
 }
+#rain{position:fixed;inset:0;width:100%;height:100%;z-index:-2;pointer-events:none;opacity:.55}
 [data-reveal]{opacity:0;transform:translateY(14px);transition:opacity .5s ease,transform .5s ease;transition-delay:var(--d,0ms)}
 [data-reveal].in{opacity:1;transform:none}
 @media(prefers-reduced-motion:reduce){[data-reveal]{opacity:1;transform:none;transition:none}}
@@ -39,7 +40,7 @@ body::before{
 .back:hover{color:var(--text)}
 .brand{color:var(--text);text-decoration:none;font-weight:700;font-size:.95rem;letter-spacing:-.01em}
 .brand span{color:var(--accent)}
-.eyebrow{font:700 .78rem var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--steel);margin:0 0 10px}
+.eyebrow{font:700 .78rem var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--tint,var(--steel));margin:0 0 10px}
 h1{color:var(--text);font-size:clamp(1.8rem,4.5vw,2.6rem);line-height:1.15;letter-spacing:-.02em;margin:0 0 14px}
 .meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:28px}
 .meta span{
@@ -47,7 +48,7 @@ h1{color:var(--text);font-size:clamp(1.8rem,4.5vw,2.6rem);line-height:1.15;lette
   border:1px solid var(--border);background:var(--surface);color:var(--muted);
 }
 .meta .plat{color:var(--steel);border-color:#7fa8cc40}
-.meta .diff{color:var(--bronze);border-color:#c79a6640}
+.meta .diff{color:var(--tint,var(--bronze));border-color:color-mix(in srgb,var(--tint,var(--bronze)) 55%,transparent)}
 .tools{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 32px}
 .tools .chip{
   display:inline-flex;align-items:center;gap:6px;font:600 .78rem var(--mono);
@@ -55,15 +56,15 @@ h1{color:var(--text);font-size:clamp(1.8rem,4.5vw,2.6rem);line-height:1.15;lette
   background:var(--surface);color:var(--soft);white-space:nowrap;
 }
 h2{color:var(--text);font-size:1.3rem;margin:44px 0 14px;letter-spacing:-.01em}
-h2::before{content:"";display:inline-block;width:3px;height:1em;background:var(--accent);margin-right:10px;vertical-align:-2px;border-radius:2px}
+h2::before{content:"";display:inline-block;width:3px;height:1em;background:var(--tint,var(--accent));margin-right:10px;vertical-align:-2px;border-radius:2px}
 p{margin:0 0 16px;color:var(--soft)}
 p.aside{color:var(--muted);font-size:.85rem;font-style:italic;margin:-8px 0 16px}
 blockquote{margin:0 0 16px;padding:10px 16px;border-left:3px solid var(--border);color:var(--muted);font-size:.92rem}
 .tldr{
-  background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--steel);
+  background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--tint,var(--steel));
   border-radius:8px;padding:16px 18px;margin:0 0 32px;color:var(--text);font-size:.96rem;
 }
-.tldr b{color:var(--steel);font-family:var(--mono);font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;display:block;margin-bottom:6px}
+.tldr b{color:var(--tint,var(--steel));font-family:var(--mono);font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;display:block;margin-bottom:6px}
 pre{
   position:relative;background:#0a0d12;border:1px solid var(--border);border-radius:8px;padding:14px 16px;
   overflow-x:auto;font:12.5px/1.6 var(--mono);color:var(--soft);margin:0 0 20px;
@@ -112,10 +113,10 @@ footer a{color:var(--steel)}
 .wu-list{display:flex;flex-direction:column;list-style:none;padding:0;margin:0}
 .wu-card{
   display:block;padding:20px 22px;border:1px solid var(--border);border-radius:12px;
-  background:var(--surface);list-style:none;
+  background:var(--surface);list-style:none;position:relative;isolation:isolate;
 }
-.wu-card a{display:block;text-decoration:none;color:inherit}
-.wu-card:hover{border-color:var(--steel)}
+.wu-card a{display:block;text-decoration:none;color:inherit;position:relative;z-index:1}
+.wu-card:hover{border-color:var(--tint,var(--steel))}
 .wu-card:hover a{transform:translateY(-2px);display:block;transition:transform .2s}
 .wu-card h3{color:var(--text);font-size:1.1rem;margin:0 0 6px;letter-spacing:-.01em}
 .wu-card p{color:var(--muted);font-size:.9rem;margin:0}
@@ -128,6 +129,22 @@ footer a{color:var(--steel)}
   opacity:0!important;transform:scale(.97) translateY(-4px)!important;pointer-events:none;
   max-height:0;min-height:0;margin:0;padding-top:0;padding-bottom:0;border-width:0;
 }
+/* mouse-following spotlight along the card, tinted to its difficulty colour --
+   --mx/--my are set by JS on pointermove; off-screen by default so a card that
+   was never hovered shows nothing */
+.wu-card::before{
+  content:"";position:absolute;inset:0;z-index:0;pointer-events:none;border-radius:inherit;
+  background:radial-gradient(240px circle at var(--mx,-999px) var(--my,-999px),color-mix(in srgb,var(--tint,var(--steel)) 16%,transparent),transparent 70%);
+  opacity:0;transition:opacity .3s ease;
+}
+.wu-card:hover::before{opacity:1}
+@keyframes wuFlash{
+  0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--tint,var(--steel)) 55%,transparent)}
+  60%{box-shadow:0 0 0 7px color-mix(in srgb,var(--tint,var(--steel)) 0%,transparent)}
+  100%{box-shadow:0 0 0 0 transparent}
+}
+.wu-card.wu-flash{animation:wuFlash .7s ease-out}
+@media(prefers-reduced-motion:reduce){.wu-card.wu-flash{animation:none}.wu-card::before{display:none}}
 
 .filters{
   display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 28px;

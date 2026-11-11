@@ -318,6 +318,79 @@ document.querySelectorAll('pre').forEach(function (pre) {
   pre.appendChild(btn);
 });`;
 
+// difficulty actually means something now: each page tints its accent bar,
+// TL;DR border and background rain to match -- same palette tokens as the
+// main site (--lav/--steel/--red/--accent/--bronze), just mapped by tier
+const DIFFICULTY_ORDER = ['very easy', 'easy', 'medium', 'hard', 'insane', 'challenge'];
+const DIFFICULTY_COLOR = {
+  'very easy': '#9C97B8',
+  easy: '#7FA8CC',
+  medium: '#C2686C',
+  hard: '#B4232C',
+  insane: '#FF5C5C',
+  challenge: '#C79A66'
+};
+const DEFAULT_TINT = '#7FA8CC';
+function tintFor(difficulty) { return DIFFICULTY_COLOR[(difficulty || '').toLowerCase()] || DEFAULT_TINT; }
+function hexToRgb(hex) {
+  const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [127, 168, 204];
+}
+
+// trimmed port of the main site's digital-rain canvas: same falling-glyph
+// look, tinted to a single fixed color per page (no scroll-based section
+// blending needed here -- these are single-purpose pages), no dot-field
+// cursor glow or loader tie-in, since neither applies on a plain article page
+function rainScript(tintHex) {
+  const [r, g, b] = hexToRgb(tintHex);
+  return `
+(function () {
+  var rc = document.getElementById('rain'), rctx = rc && rc.getContext && rc.getContext('2d');
+  if (!rctx) return;
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var CHARS = '0123456789ABCDEF/\\\\#:_.>-'.split('');
+  var GW = 0, GH = 0, cols = [], tint = [${r}, ${g}, ${b}], glyphSize = 14;
+  function speed() { return (0.55 + Math.random() * 0.5); }
+  function build() {
+    var colW = innerWidth < 760 ? 20 : 24, n = Math.ceil(innerWidth / colW), density = innerWidth < 760 ? 0.38 : 0.5;
+    cols = [];
+    for (var i = 0; i < n; i++) {
+      if (Math.random() > density) continue;
+      var len = 5 + Math.floor(Math.random() * 7), glyphs = [];
+      for (var k = 0; k < len; k++) glyphs.push(CHARS[Math.floor(Math.random() * CHARS.length)]);
+      cols.push({ x: i * colW + colW / 2, y: -Math.random() * innerHeight, speed: speed(), len: len, glyphs: glyphs });
+    }
+  }
+  function size() {
+    var d = Math.min(window.devicePixelRatio || 1, innerWidth < 760 ? 1.1 : 1.5);
+    GW = innerWidth; GH = innerHeight;
+    rc.width = GW * d; rc.height = GH * d; rctx.setTransform(d, 0, 0, d, 0, 0);
+    build();
+  }
+  function draw() {
+    rctx.clearRect(0, 0, GW, GH);
+    rctx.font = glyphSize + 'px var(--mono)';
+    rctx.textBaseline = 'middle';
+    cols.forEach(function (c) {
+      for (var k = 0; k < c.len; k++) {
+        var gy = c.y - k * glyphSize;
+        if (gy < -glyphSize || gy > GH + glyphSize) continue;
+        var fade = 1 - k / c.len, op = Math.pow(fade, 1.4) * 0.34;
+        rctx.fillStyle = 'rgba(' + tint[0] + ',' + tint[1] + ',' + tint[2] + ',' + op.toFixed(3) + ')';
+        rctx.fillText(c.glyphs[k], c.x, gy);
+      }
+      if (!reduced) { c.y += c.speed; if (c.y - c.len * glyphSize > GH) { c.y = -Math.random() * innerHeight * 0.3; c.speed = speed(); } }
+    });
+  }
+  var running = false;
+  function frame() { if (!running) return; try { draw(); } catch (e) {} if (!reduced) requestAnimationFrame(frame); }
+  function start() { if (running || document.hidden) return; running = true; requestAnimationFrame(frame); }
+  size(); draw(); if (!reduced) start();
+  window.addEventListener('resize', function () { size(); draw(); });
+  document.addEventListener('visibilitychange', function () { if (document.hidden) running = false; else start(); });
+})();`;
+}
+
 function pageHtml(w, slug) {
   const dateHuman = w.date ? new Date(w.date + 'T00:00:00Z').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
   const tldr = stripHr(w.sections['tldr'] || w.sections['tl;dr'] || '') || null;
@@ -344,12 +417,14 @@ function pageHtml(w, slug) {
 
   const desc = tldr ? truncate(tldr, 155) : `${w.platform} writeup: ${w.title}.`;
   const canonical = `${SITE_URL}/writeups/${slug}.html`;
+  const tint = tintFor(w.difficulty);
 
   return `<!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="dark" style="--tint:${tint}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="view-transition" content="same-origin">
 <title>${esc(w.title)} — ${esc(w.platform)} writeup | Farhan Hussain</title>
 <meta name="description" content="${esc(desc)}">
 <link rel="canonical" href="${canonical}">
@@ -372,13 +447,14 @@ function pageHtml(w, slug) {
   })}</script>
 </head>
 <body>
+<canvas id="rain" aria-hidden="true"></canvas>
 <div class="wrap">
   <div class="topbar">
     <a class="back" href="./">&larr; All writeups</a>
     <a class="brand" href="${SITE_URL}/">Farhan<span>.</span></a>
   </div>
   <p class="eyebrow" data-reveal>${esc(w.platform)} writeup</p>
-  <h1 data-reveal>${esc(w.title)}</h1>
+  <h1 data-reveal style="view-transition-name:wu-title-${slug}">${esc(w.title)}</h1>
   <div class="meta" data-reveal>
     <span class="plat">${esc(w.platform)}</span>
     ${w.difficulty ? `<span class="diff">${esc(w.difficulty)}</span>` : ''}
@@ -395,12 +471,10 @@ function pageHtml(w, slug) {
   </div>
   <footer>Part of <a href="${SITE_URL}/">thecyberfarhan.github.io</a>. Auto-generated from the <a href="https://github.com/${OWNER}/${REPO}">CTF-Writeups</a> repo — edits happen there, not here.</footer>
 </div>
-<script>${COPY_BUTTON_SCRIPT}${REVEAL_SCRIPT}</script>
+<script>${COPY_BUTTON_SCRIPT}${REVEAL_SCRIPT}${rainScript(tint)}</script>
 </body>
 </html>`;
 }
-
-const DIFFICULTY_ORDER = ['very easy', 'easy', 'medium', 'hard', 'insane', 'challenge'];
 
 function hubHtml(writeups) {
   const platforms = [...new Set(writeups.map((w) => w.platform))];
@@ -415,10 +489,11 @@ function hubHtml(writeups) {
     // script only ever reads this via .dataset (never writes it back into the
     // DOM), so there's no way a search term can reach innerHTML unescaped.
     const haystack = esc(`${w.title} ${w.summary}`.toLowerCase());
+    const tint = tintFor(w.difficulty);
     return `
-    <li class="wu-card" data-reveal style="--d:${Math.min(i, 8) * 40}ms" data-platform="${esc(w.platform)}" data-difficulty="${esc(w.difficulty || '')}" data-search="${haystack}">
+    <li class="wu-card" data-reveal style="--d:${Math.min(i, 8) * 40}ms;--tint:${tint}" data-platform="${esc(w.platform)}" data-difficulty="${esc(w.difficulty || '')}" data-search="${haystack}">
       <a href="./${w.slug}.html">
-        <h3>${esc(w.title)}</h3>
+        <h3 style="view-transition-name:wu-title-${w.slug}">${esc(w.title)}</h3>
         <p>${esc(w.summary)}</p>
         <div class="meta">
           <span class="plat">${esc(w.platform)}</span>
@@ -443,7 +518,16 @@ function hubHtml(writeups) {
       var matchD = state.difficulty === 'all' || card.dataset.difficulty === state.difficulty;
       var matchQ = !state.q || card.dataset.search.indexOf(state.q) !== -1;
       var show = matchP && matchD && matchQ;
+      var wasHidden = card.classList.contains('wu-hide');
       card.classList.toggle('wu-hide', !show);
+      // every apply() is a real filter/search change (nothing calls this on
+      // first paint) -- a card that just became visible gets a brief
+      // glow-pulse settling in, the "found it" flash
+      if (show && wasHidden) {
+        card.classList.remove('wu-flash');
+        void card.offsetWidth;
+        card.classList.add('wu-flash');
+      }
       if (show) visible++;
     });
     if (empty) empty.classList.toggle('show', visible === 0);
@@ -464,13 +548,30 @@ function hubHtml(writeups) {
       apply();
     });
   }
+  cards.forEach(function (card) {
+    card.addEventListener('animationend', function () { card.classList.remove('wu-flash'); });
+  });
 })();`;
 
+  // mouse-following spotlight on card borders -- pure CSS-variable update,
+  // no layout thrash, skipped entirely for touch (no hover to follow)
+  const spotlightScript = `
+if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+  document.querySelectorAll('.wu-card').forEach(function (card) {
+    card.addEventListener('pointermove', function (e) {
+      var r = card.getBoundingClientRect();
+      card.style.setProperty('--mx', (e.clientX - r.left) + 'px');
+      card.style.setProperty('--my', (e.clientY - r.top) + 'px');
+    });
+  });
+}`;
+
   return `<!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="dark" style="--tint:${DEFAULT_TINT}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="view-transition" content="same-origin">
 <title>Writeups — Farhan Hussain</title>
 <meta name="description" content="Every TryHackMe and Hack The Box writeup -- recon, foothold, escalation and fixes, written the way I'd hand a report over on an engagement. Filterable by platform and difficulty.">
 <link rel="canonical" href="${SITE_URL}/writeups/">
@@ -478,6 +579,7 @@ function hubHtml(writeups) {
 <link rel="stylesheet" href="writeup.css">
 </head>
 <body>
+<canvas id="rain" aria-hidden="true"></canvas>
 <div class="wrap">
   <div class="topbar">
     <a class="back" href="${SITE_URL}/">&larr; thecyberfarhan.github.io</a>
@@ -508,7 +610,7 @@ function hubHtml(writeups) {
   <p class="f-empty">No writeups match those filters.</p>
   <footer>${writeups.length} writeups here, mirrored from <a href="https://github.com/${OWNER}/${REPO}">github.com/${OWNER}/${REPO}</a>.</footer>
 </div>
-<script>${filterScript}${REVEAL_SCRIPT}</script>
+<script>${filterScript}${spotlightScript}${REVEAL_SCRIPT}${rainScript(DEFAULT_TINT)}</script>
 </body>
 </html>`;
 }
