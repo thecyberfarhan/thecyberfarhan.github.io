@@ -620,6 +620,121 @@
    ]
   },
   {
+   "slug": "paramspider",
+   "name": "ParamSpider",
+   "tagline": "Mines a domain's Wayback Machine history for every URL that ever carried a query parameter, so you have a fuzzing list without sending a single request to the live target.",
+   "kind": "Fork",
+   "status": "Active",
+   "language": "Python",
+   "requires": "Python 3.10+",
+   "license": "MIT",
+   "upstream": "devanshbatham/ParamSpider",
+   "upstreamStars": null,
+   "scope": "Authorized testing only",
+   "skillArea": "Tooling and automation",
+   "stars": 0,
+   "pushedAt": "2026-11-15",
+   "href": "https://github.com/thecyberfarhan/ParamSpider",
+   "sections": [
+    {
+     "id": "why",
+     "label": "Why",
+     "known": true,
+     "html": "<p>Before fuzzing or exploiting an endpoint, it helps to know which parameters it has ever accepted, without announcing yourself by probing it directly. ParamSpider pulls every archived URL for a domain from the Wayback Machine, strips out the noise (images, fonts, duplicate paths) and normalises every parameter value to a placeholder, leaving a clean, fuzzable URL list built entirely from passive data. This fork keeps that approach and fixes the parts that quietly lost data or killed a whole run over one bad domain.</p>"
+    },
+    {
+     "id": "what-this-shows",
+     "label": "What this shows",
+     "known": true,
+     "html": "<ul><li>Recon and enumeration: passive parameter discovery from archived data is a real step I use before active testing, not just a script I read.</li><li>Finding a logic bug that silently loses data, not just a crash: <code>parse_qs()</code> dropping every empty-value parameter doesn't error or print a warning, it just returns a shorter dict. Caught by comparing its output against the raw query string. See <a href=\"#what-changed\">What changed</a>.</li><li>Fixing a failure mode that only shows up at the scale the tool is meant for: one unresponsive domain in a 500-domain list used to take the other 499 down with it.</li></ul>"
+    },
+    {
+     "id": "requirements",
+     "label": "Requirements",
+     "known": true,
+     "html": "<ul><li>Python 3.10 or newer (CI runs 3.10, 3.12 and 3.13; also run by hand on 3.13 and 3.14)</li><li><code>requests</code>, <code>colorama</code> (see <code>requirements.txt</code>)</li><li>Tried on: Arch Linux</li></ul>"
+    },
+    {
+     "id": "install",
+     "label": "Install",
+     "known": true,
+     "html": "<h3>Arch Linux</h3>\n<pre><code>sudo pacman -S --needed python python-pip git\ngit clone https://github.com/thecyberfarhan/ParamSpider.git\ncd ParamSpider\npython -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -r requirements.txt\npip install -e .</code></pre>\n<h3>Kali Linux, Parrot OS</h3>\n<pre><code>sudo apt update &amp;&amp; sudo apt install -y python3 python3-pip python3-venv git\ngit clone https://github.com/thecyberfarhan/ParamSpider.git\ncd ParamSpider\npython3 -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -r requirements.txt\npip install -e .</code></pre>\n<p>Check it worked:</p>\n<pre><code>paramspider -h</code></pre>\n<p>The virtual environment only needs activating in the shell you use it from. Run <code>deactivate</code>, or open a new terminal, to leave it.</p>"
+    },
+    {
+     "id": "usage",
+     "label": "Usage",
+     "known": true,
+     "html": "<h3>Mine one domain</h3>\n<pre><code>paramspider -d example.com</code></pre>\n<p>Writes every parameterised URL found for the domain to <code>results/example.com.txt</code>.</p>\n<h3>Mine a list of domains</h3>\n<pre><code>paramspider -l domains.txt</code></pre>\n<p>One domain per line. A domain the archive never answers is now skipped, not fatal to the rest of the list.</p>\n<h3>Watch the URLs as they're found</h3>\n<pre><code>paramspider -d example.com -s</code></pre>\n<h3>Route through a proxy</h3>\n<pre><code>paramspider -d example.com --proxy '127.0.0.1:8080'</code></pre>\n<h3>Use a reflection marker instead of FUZZ</h3>\n<pre><code>paramspider -d example.com -p '&quot;&gt;&lt;h1&gt;reflection&lt;/h1&gt;'</code></pre>\n<p>Useful for a quick manual XSS sweep over the output file.</p>\n<h3>Give the archive more time to answer</h3>\n<pre><code>paramspider -d example.com -T 60</code></pre>"
+    },
+    {
+     "id": "options",
+     "label": "Options",
+     "known": true,
+     "html": "<div class=\"table-wrap\"><table><thead><tr><th>Flag</th><th>What it does</th><th>Default</th></tr></thead><tbody><tr><td><code>-d DOMAIN</code></td><td>Domain to mine</td><td>none</td></tr><tr><td><code>-l FILE</code></td><td>File of domains, one per line</td><td>none</td></tr><tr><td><code>-s</code></td><td>Stream found URLs to the terminal as well as the file</td><td>off</td></tr><tr><td><code>--proxy URL</code></td><td>Route requests through a proxy</td><td>none</td></tr><tr><td><code>-p</code>, <code>--placeholder VALUE</code></td><td>Replaces every parameter's value in the output</td><td><code>FUZZ</code></td></tr><tr><td><code>-T</code>, <code>--timeout SECONDS</code></td><td>Per-request timeout</td><td><code>30</code></td></tr></tbody></table></div>"
+    },
+    {
+     "id": "example-output",
+     "label": "Example output",
+     "known": true,
+     "html": "<p>Against a domain with three archived URLs (one an image, one with two empty-value parameters):</p>\n<pre><code>[INFO] Fetching URLs for example.com\n[INFO] Found 3 URLs for example.com\n[INFO] Cleaning URLs for example.com\n[INFO] Found 2 URLs after cleaning\n[INFO] Extracting URLs with parameters\nhttps://example.com/profile?id=FUZZ&amp;debug=FUZZ\nhttps://example.com/search?q=FUZZ&amp;token=FUZZ\n[INFO] Saved cleaned URLs to results/example.com.txt</code></pre>\n<p><code>logo.png?v=2</code> was dropped as a static asset; <code>debug</code> and <code>token</code>, both archived with empty values, are kept.</p>"
+    },
+    {
+     "id": "what-it-checks",
+     "label": "What it checks",
+     "known": true,
+     "html": "<p>ParamSpider doesn't check anything itself; it's a collector. What it does to each archived URL:</p>\n<div class=\"table-wrap\"><table><thead><tr><th>Step</th><th>What happens</th></tr></thead><tbody><tr><td>Fetch</td><td>Every URL the Wayback Machine has ever archived for the domain, via the CDX API</td></tr><tr><td>Drop static assets</td><td>Any URL whose path ends in an image, font, stylesheet, script or document extension</td></tr><tr><td>Normalise</td><td>The port stripped if it's the scheme's default, every parameter value replaced with the placeholder</td></tr><tr><td>Dedupe</td><td>Identical normalised URLs collapsed to one, duplicate parameter names on one URL collapsed to one</td></tr><tr><td>Keep only parameterised URLs</td><td>A URL with no <code>?</code> is dropped from the output file</td></tr></tbody></table></div>"
+    },
+    {
+     "id": "how-it-works",
+     "label": "How it works",
+     "known": true,
+     "html": "<p>For a domain, it queries <code>web.archive.org</code>'s CDX API for every URL ever captured under <code>domain/*</code>, which can be hundreds of thousands of entries for a large or old site. Each URL is parsed, static-asset extensions are filtered out, and every query parameter's value is replaced with the placeholder so that two archived requests to the same endpoint with different real values collapse into one fuzzable template.</p>"
+    },
+    {
+     "id": "comparison",
+     "label": "Comparison",
+     "known": true,
+     "html": "<div class=\"table-wrap\"><table><thead><tr><th></th><th>Upstream <code>devanshbatham/ParamSpider</code></th><th>This fork</th></tr></thead><tbody><tr><td>A parameter with no value (<code>?token=&amp;id=1</code>)</td><td>Silently dropped; only <code>id</code> survives</td><td>Kept, same as every other parameter</td></tr><tr><td>Request timeout</td><td>None; a slow or unresponsive archive.org request hangs forever</td><td><code>-T/--timeout</code>, default 30s</td></tr><tr><td><code>-l domains.txt</code> when one domain's request fails after all retries</td><td><code>sys.exit()</code> kills the whole run, including every domain still queued</td><td>That domain is skipped and logged; the rest of the list still runs</td></tr><tr><td>Output file order</td><td>Arbitrary (<code>set()</code> iteration order); differs between identical runs</td><td>Sorted, same input always produces the same file</td></tr><tr><td>Automated tests</td><td>None</td><td>9 tests, run in CI</td></tr></tbody></table></div>"
+    },
+    {
+     "id": "what-changed",
+     "label": "What changed",
+     "known": true,
+     "html": "<h3>Fixed: empty-value parameters silently dropped</h3>\n<p><code>clean_urls()</code> ran every URL's query string through <code>urllib.parse.parse_qs()</code>, which excludes any key whose value is empty by default. <code>?token=&amp;id=1</code> became <code>{'id': ['1']}</code>, and <code>token</code> never appeared anywhere in the output — no error, no warning, just a parameter discovery tool that fails at discovering a parameter. Reproduced by feeding <code>clean_urls()</code> a URL with an empty-value parameter and checking it was missing from the result. Replaced <code>parse_qs()</code> with <code>parse_qsl(..., keep_blank_values=True)</code>.</p>\n<h3>Fixed: no request timeout</h3>\n<p><code>client.fetch_url_content()</code> called <code>requests.get()</code> with no <code>timeout</code>, so a request to archive.org's CDX endpoint that hung (which it does in practice; the endpoint is slow and sometimes unresponsive) blocked indefinitely with no way to recover. Reproduced against a local server that never responds: without a timeout the call hangs; with one it raises and the function retries instead of hanging forever. <code>-T/--timeout</code> (default 30s) is threaded through from the CLI.</p>\n<h3>Fixed: one failed domain killing the entire <code>-l</code> run</h3>\n<p>After exhausting its retries, <code>fetch_url_content()</code> called <code>sys.exit()</code>, which a caller has no way to catch or recover from: <code>-l domains.txt</code> with 500 domains where even one was unreachable killed the process and silently abandoned every domain still queued behind it. Reproduced with a mocked two-domain run where the first domain always fails: upstream never reaches the second domain. <code>fetch_url_content()</code> now returns <code>None</code> on exhausted retries, and <code>fetch_and_clean_urls()</code> logs and skips that domain instead of crashing.</p>\n<h3>Fixed: non-deterministic output order</h3>\n<p><code>clean_urls()</code> built its result in a <code>set()</code> and returned <code>list(cleaned_urls)</code>, whose iteration order is arbitrary and can differ between two runs over the exact same input, which makes the output hard to diff or deduplicate against a previous scan. It now returns <code>sorted(cleaned_urls)</code>.</p>\n<h3>Housekeeping</h3>\n<p>The ASCII-art banner was a plain triple-quoted string containing <code>\\/</code>, an invalid escape sequence that Python warns about on every run (<code>SyntaxWarning: invalid escape sequence</code>). Made it a raw string.</p>"
+    },
+    {
+     "id": "testing",
+     "label": "Testing",
+     "known": true,
+     "html": "<pre><code>pip install -r requirements.txt pytest\npytest -q</code></pre>\n<p>9 tests. A local HTTP server backs the timeout/retry tests (one endpoint that never responds, one that always 500s); the URL-cleaning tests run with no network access. GitHub Actions runs them on Python 3.10, 3.12 and 3.13.</p>"
+    },
+    {
+     "id": "limitations",
+     "label": "Limitations",
+     "known": true,
+     "html": "<ul><li>Entirely passive: a parameter that was never crawled by the Wayback Machine won't be found. Pair it with active tools (Arjun, in this list) for parameters the archive never saw.</li><li>Domain names from <code>-l</code>'s file aren't validated or normalised beyond lower-casing and stripping a leading scheme; a line with a path or query string on it is passed to the CDX API as-is.</li><li>Retries use a fixed 5-second backoff with no rate-limit (<code>429</code>) awareness; a heavily rate-limited run just retries at the same pace.</li></ul>"
+    },
+    {
+     "id": "responsible-use",
+     "label": "Responsible use",
+     "known": true,
+     "html": "<p>Only use discovered parameters against systems you own or have written permission to test. ParamSpider itself only talks to the Wayback Machine, never the target domain.</p>"
+    },
+    {
+     "id": "credits",
+     "label": "Credits",
+     "known": true,
+     "html": "<p>Built on <a href=\"https://github.com/devanshbatham/ParamSpider\" target=\"_blank\" rel=\"noopener noreferrer\">devanshbatham/ParamSpider</a> by Devansh Batham. Upstream's Wayback-mining approach and URL-cleaning logic are theirs. The fixes and tests above are in this fork.</p>"
+    },
+    {
+     "id": "license",
+     "label": "License",
+     "known": true,
+     "html": "<p>MIT, the same as upstream. See <a href=\"https://github.com/thecyberfarhan/ParamSpider/blob/master/LICENSE\" target=\"_blank\" rel=\"noopener noreferrer\">LICENSE</a>.</p>"
+    }
+   ]
+  },
+  {
    "slug": "sherlock",
    "name": "Sherlock",
    "tagline": "Finds a username across hundreds of sites, with a way to tell a confident hit from a false positive — upstream had no way to do that at all.",
