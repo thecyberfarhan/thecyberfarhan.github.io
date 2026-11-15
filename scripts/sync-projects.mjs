@@ -87,6 +87,29 @@ function mdToHtml(md, repo, branch) {
   out.push(textBlockToHtml(md.slice(last), repo, branch));
   return out.filter(Boolean).join('\n');
 }
+// a markdown list item that wraps across lines (common when a README is hand-wrapped at ~100
+// chars) has its continuation lines un-indented and with no '-'/'1.' marker; without this, the
+// loop that collects list items stopped at the first continuation line, closing the <ul> after
+// one line and dumping the rest of that sentence as a stray paragraph right after it
+function listToHtml(lines, start, markerRe, tag, repo, branch) {
+  const items = [];
+  let i = start;
+  while (i < lines.length) {
+    const l = lines[i];
+    if (markerRe.test(l)) {
+      items.push(l.replace(markerRe, ''));
+      i++;
+    } else if (l.trim() && !/^#{1,6}\s/.test(l) && !/^\|/.test(l.trim()) && !/^>\s?/.test(l) && !/^```/.test(l.trim())) {
+      items[items.length - 1] += ' ' + l.trim();
+      i++;
+    } else {
+      break;
+    }
+  }
+  const html = `<${tag}>${items.map((it) => `<li>${inline(it, repo, branch)}</li>`).join('')}</${tag}>`;
+  return { html, nextIndex: i };
+}
+
 function textBlockToHtml(text, repo, branch) {
   const lines = text.split('\n');
   const out = [];
@@ -113,16 +136,16 @@ function textBlockToHtml(text, repo, branch) {
     }
     if (/^[-*]\s+/.test(line)) {
       flushPara();
-      const items = [];
-      while (i < lines.length && /^[-*]\s+/.test(lines[i])) items.push(lines[i++].replace(/^[-*]\s+/, ''));
-      out.push(`<ul>${items.map((it) => `<li>${inline(it, repo, branch)}</li>`).join('')}</ul>`);
+      const { html, nextIndex } = listToHtml(lines, i, /^[-*]\s+/, 'ul', repo, branch);
+      out.push(html);
+      i = nextIndex;
       continue;
     }
     if (/^\d+\.\s+/.test(line)) {
       flushPara();
-      const items = [];
-      while (i < lines.length && /^\d+\.\s+/.test(lines[i])) items.push(lines[i++].replace(/^\d+\.\s+/, ''));
-      out.push(`<ol>${items.map((it) => `<li>${inline(it, repo, branch)}</li>`).join('')}</ol>`);
+      const { html, nextIndex } = listToHtml(lines, i, /^\d+\.\s+/, 'ol', repo, branch);
+      out.push(html);
+      i = nextIndex;
       continue;
     }
     if (/^!\[/.test(line.trim())) { i++; continue; } // images are dropped

@@ -28,7 +28,7 @@
      "id": "what-this-shows",
      "label": "What this shows",
      "known": true,
-     "html": "<ul><li>Web and API testing: the exact class of low-hanging misconfiguration that shows up in almost</li></ul>\n<p>every real assessment, automated into one pass.</p>\n<ul><li>A checker that knows the difference between &quot;indicator&quot; and &quot;proof&quot;: every finding says where to</li></ul>\n<p>look, not that a vulnerability is confirmed, and soft-404 sites are detected and excluded from the exposure check to avoid false positives.</p>\n<ul><li>Tested against both a deliberately misconfigured server and a hardened one, so it's shown to</li></ul>\n<p>flag the first and stay quiet on the second — not just to run without crashing.</p>"
+     "html": "<ul><li>Web and API testing: the exact class of low-hanging misconfiguration that shows up in almost every real assessment, automated into one pass.</li><li>A checker that knows the difference between &quot;indicator&quot; and &quot;proof&quot;: every finding says where to look, not that a vulnerability is confirmed, and soft-404 sites are detected and excluded from the exposure check to avoid false positives.</li><li>Tested against both a deliberately misconfigured server and a hardened one, so it's shown to flag the first and stay quiet on the second — not just to run without crashing.</li></ul>"
     },
     {
      "id": "requirements",
@@ -76,7 +76,7 @@
      "id": "limitations",
      "label": "Limitations",
      "known": true,
-     "html": "<ul><li>This is a checker, not an exploit tool: every finding is an indicator to verify by hand, not</li></ul>\n<p>proof that a vulnerability exists.</p>\n<ul><li>Read-only, GET-based checks; it doesn't attempt authentication bypass or injection itself.</li><li>The <code>auth</code> check compares response shape with and without a token; it can miss subtler</li></ul>\n<p>authorization bugs (e.g. one user reading another user's data at the same auth level).</p>"
+     "html": "<ul><li>This is a checker, not an exploit tool: every finding is an indicator to verify by hand, not proof that a vulnerability exists.</li><li>Read-only, GET-based checks; it doesn't attempt authentication bypass or injection itself.</li><li>The <code>auth</code> check compares response shape with and without a token; it can miss subtler authorization bugs (e.g. one user reading another user's data at the same auth level).</li></ul>"
     },
     {
      "id": "responsible-use",
@@ -119,7 +119,7 @@
      "id": "what-this-shows",
      "label": "What this shows",
      "known": true,
-     "html": "<ul><li>Recon and enumeration: the port scan, HTTP probe and subdomain brute force an engagement starts</li></ul>\n<p>with, as one tool instead of three separate scripts.</p>\n<ul><li>Writing tooling that holds up under test, not just under a demo: 8 unit tests, all run against a</li></ul>\n<p>local server so nothing touches the network, with CI on three Python versions.</p>\n<ul><li>A scope guard built into the tool itself, not left to the operator to remember: a public target</li></ul>\n<p>is refused without <code>--authorized</code>.</p>"
+     "html": "<ul><li>Recon and enumeration: the port scan, HTTP probe and subdomain brute force an engagement starts with, as one tool instead of three separate scripts.</li><li>Writing tooling that holds up under test, not just under a demo: 8 unit tests, all run against a local server so nothing touches the network, with CI on three Python versions.</li><li>A scope guard built into the tool itself, not left to the operator to remember: a public target is refused without <code>--authorized</code>.</li></ul>"
     },
     {
      "id": "requirements",
@@ -167,7 +167,7 @@
      "id": "limitations",
      "label": "Limitations",
      "known": true,
-     "html": "<ul><li>Port scan is TCP connect only, not SYN; it's slower than a raw-socket scanner but needs no</li></ul>\n<p>elevated privileges.</p>\n<ul><li>Banner grabbing is best-effort and may miss services that don't respond to a bare connection.</li><li>Wildcard-DNS detection catches a catch-all A record; it won't catch every form of subdomain</li></ul>\n<p>takeover or wildcard TLS cert.</p>"
+     "html": "<ul><li>Port scan is TCP connect only, not SYN; it's slower than a raw-socket scanner but needs no elevated privileges.</li><li>Banner grabbing is best-effort and may miss services that don't respond to a bare connection.</li><li>Wildcard-DNS detection catches a catch-all A record; it won't catch every form of subdomain takeover or wildcard TLS cert.</li></ul>"
     },
     {
      "id": "responsible-use",
@@ -180,6 +180,115 @@
      "label": "License",
      "known": true,
      "html": "<p>MIT. See <a href=\"https://github.com/thecyberfarhan/reconkit/blob/master/LICENSE\" target=\"_blank\" rel=\"noopener noreferrer\">LICENSE</a>.</p>"
+    }
+   ]
+  },
+  {
+   "slug": "arjun",
+   "name": "Arjun",
+   "tagline": "An HTTP parameter discovery tool: sends a huge wordlist against an endpoint and reports which parameter names actually change the response.",
+   "kind": "Fork",
+   "status": "Active",
+   "language": "Python",
+   "requires": "Python 3.10+",
+   "license": "AGPL-3.0",
+   "upstream": "s0md3v/Arjun",
+   "upstreamStars": null,
+   "scope": "Authorized testing only",
+   "skillArea": "Tooling and automation",
+   "stars": 0,
+   "pushedAt": "2026-11-15",
+   "href": "https://github.com/thecyberfarhan/Arjun",
+   "sections": [
+    {
+     "id": "why",
+     "label": "Why",
+     "known": true,
+     "html": "<p>Plenty of endpoints accept a parameter nobody documented: a debug flag, an old filter, an <code>admin</code> switch left in from testing. Arjun finds those by sending a large wordlist of likely names and watching for any response that looks different from the baseline. This fork keeps that approach and fixes the parts where &quot;look different&quot; or &quot;load the targets&quot; quietly did the wrong thing.</p>"
+    },
+    {
+     "id": "what-this-shows",
+     "label": "What this shows",
+     "known": true,
+     "html": "<ul><li>Web and API testing: parameter discovery is a normal step before fuzzing or exploiting an endpoint, and this is a tool I run for it, not just read the code of.</li><li>Finding bugs by reproducing them first, not guessing from a bug title: every fix below starts with a script that triggers the exact failure before any line of the fix is written. See <a href=\"#what-changed\">What changed</a>.</li><li>Tracing a crash back through the actual call chain (<code>--import burp.xml</code> → <code>importer()</code> → <code>requester()</code>) instead of patching the symptom at the point it happened to surface.</li></ul>"
+    },
+    {
+     "id": "requirements",
+     "label": "Requirements",
+     "known": true,
+     "html": "<ul><li>Python 3.10 or newer (CI runs 3.10, 3.12 and 3.13; also run by hand on 3.13 and 3.14)</li><li><code>requests</code>, <code>dicttoxml</code>, <code>ratelimit</code> (see <code>requirements.txt</code>)</li><li>Tried on: Arch Linux</li></ul>"
+    },
+    {
+     "id": "install",
+     "label": "Install",
+     "known": true,
+     "html": "<h3>Arch Linux</h3>\n<pre><code>sudo pacman -S --needed python python-pip git\ngit clone https://github.com/thecyberfarhan/Arjun.git\ncd Arjun\npython -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -r requirements.txt\npip install -e .</code></pre>\n<h3>Kali Linux, Parrot OS</h3>\n<pre><code>sudo apt update &amp;&amp; sudo apt install -y python3 python3-pip python3-venv git\ngit clone https://github.com/thecyberfarhan/Arjun.git\ncd Arjun\npython3 -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -r requirements.txt\npip install -e .</code></pre>\n<p>Check it worked:</p>\n<pre><code>arjun -h</code></pre>\n<p>The virtual environment only needs activating in the shell you use it from. Run <code>deactivate</code>, or open a new terminal, to leave it.</p>"
+    },
+    {
+     "id": "usage",
+     "label": "Usage",
+     "known": true,
+     "html": "<h3>Scan one URL</h3>\n<pre><code>arjun -u https://example.com/api/userinfo</code></pre>\n<p>Sends the default wordlist (25,890 names) against the URL and prints any parameter that changes the response.</p>\n<h3>Scan a list of URLs</h3>\n<pre><code>arjun -i urls.txt -oT found.txt</code></pre>\n<p>One URL per line. <code>-oT</code> writes <code>url?param=value</code> for every parameter found, one per line.</p>\n<h3>Replay captured requests from Burp</h3>\n<pre><code>arjun -i export.xml -oJ found.json</code></pre>\n<p>Imports every request Burp exported as XML, including its captured body, and tests each one.</p>\n<h3>Send data in every request</h3>\n<pre><code>arjun -u https://example.com/api/search -m JSON --include '{&quot;q&quot;: &quot;test&quot;}'</code></pre>\n<p>Keeps <code>q</code> present on every probe, for an endpoint that 400s without it.</p>\n<h3>Through Burp or another proxy</h3>\n<pre><code>arjun -u https://example.com --headers &quot;Cookie: SESSION=abc123&quot;</code></pre>\n<h3>Use a smaller, faster wordlist</h3>\n<pre><code>arjun -u https://example.com -w my_params.txt -t 10</code></pre>"
+    },
+    {
+     "id": "options",
+     "label": "Options",
+     "known": true,
+     "html": "<div class=\"table-wrap\"><table><thead><tr><th>Flag</th><th>What it does</th><th>Default</th></tr></thead><tbody><tr><td><code>-u URL</code></td><td>Target URL</td><td>none</td></tr><tr><td><code>-i [FILE]</code></td><td>Import targets: URL list, raw request, or Burp XML export</td><td>none</td></tr><tr><td><code>-o</code>, <code>-oJ FILE</code></td><td>Write findings as JSON</td><td>off</td></tr><tr><td><code>-oT FILE</code></td><td>Write findings as plain text (<code>url?param=value</code>)</td><td>off</td></tr><tr><td><code>-oB [HOST:PORT]</code></td><td>Send findings to Burp's proxy</td><td>off</td></tr><tr><td><code>-w FILE</code></td><td>Wordlist of parameter names</td><td>bundled 25,890-name list</td></tr><tr><td><code>-m METHOD</code></td><td><code>GET</code>, <code>POST</code>, <code>JSON</code> or <code>XML</code></td><td><code>GET</code></td></tr><tr><td><code>-t N</code></td><td>Concurrent threads</td><td><code>5</code></td></tr><tr><td><code>-d SECONDS</code></td><td>Delay between requests</td><td><code>0</code></td></tr><tr><td><code>-T SECONDS</code></td><td>Per-request timeout</td><td><code>15</code></td></tr><tr><td><code>-c N</code></td><td>Parameters sent per request (chunk size)</td><td>auto</td></tr><tr><td><code>-q</code></td><td>Quiet mode</td><td>off</td></tr><tr><td><code>--rate-limit N</code></td><td>Max requests per second</td><td><code>9999</code></td></tr><tr><td><code>--headers [HEADERS]</code></td><td>Extra request headers</td><td>browser-style defaults</td></tr><tr><td><code>--include DATA</code></td><td>JSON object or query string sent with every request</td><td>none</td></tr><tr><td><code>--stable</code></td><td>Prefer reliability over speed on a flaky target</td><td>off</td></tr><tr><td><code>--disable-redirects</code></td><td>Don't follow redirects</td><td>off</td></tr><tr><td><code>--casing STYLE</code></td><td>Parameter casing: <code>like_this</code>, <code>likeThis</code>, <code>likethis</code></td><td><code>like_this</code></td></tr><tr><td><code>--passive [SOURCE]</code></td><td>Pull extra names from Wayback, CommonCrawl, OTX</td><td>off</td></tr></tbody></table></div>"
+    },
+    {
+     "id": "example-output",
+     "label": "Example output",
+     "known": true,
+     "html": "<p>Against a local test server with a hidden <code>secret_admin_flag</code> parameter:</p>\n<pre><code>[*] Scanning 0/1: http://127.0.0.1:33225/\n[*] Probing the target for stability\n[*] Analysing HTTP response for anomalies\n[*] Logicforcing the URL endpoint\n[✓] parameter detected: secret_admin_flag, based on: body length\n[+] Parameters found: secret_admin_flag</code></pre>\n<p><code>-oJ</code> for the same run:</p>\n<pre><code>{\n    &quot;http://127.0.0.1:33225/&quot;: {\n        &quot;headers&quot;: { &quot;...&quot;: &quot;...&quot; },\n        &quot;method&quot;: &quot;GET&quot;,\n        &quot;params&quot;: [&quot;secret_admin_flag&quot;]\n    }\n}</code></pre>"
+    },
+    {
+     "id": "how-it-works",
+     "label": "How it works",
+     "known": true,
+     "html": "<p>Arjun first probes the target to get a baseline response, then sends the wordlist in chunks (binary-search style, narrowing on the chunk that changed something) rather than one parameter per request, so it can go through tens of thousands of names in a small number of requests. A chunk is flagged if the response's status code, headers, body length, or reflected text differ from the baseline; flagged chunks are split and retested until a single parameter is isolated.</p>"
+    },
+    {
+     "id": "comparison",
+     "label": "Comparison",
+     "known": true,
+     "html": "<div class=\"table-wrap\"><table><thead><tr><th></th><th>Upstream <code>s0md3v/Arjun</code></th><th>This fork</th></tr></thead><tbody><tr><td><code>--import</code> on a file with a leading blank line or comment</td><td>Returns no targets, silently</td><td>Skips blank lines and finds the real format</td></tr><tr><td><code>-i urls.txt --include '...'</code></td><td><code>--include</code> is silently ignored (wrong dict key)</td><td>Applied to every request</td></tr><tr><td><code>-i export.xml</code> (Burp) on a request with a body</td><td>Crashes: <code>ValueError: dictionary update sequence element #0 has length 1; 2 is required</code></td><td>Body is parsed into parameters and sent normally</td></tr><tr><td><code>--include 'a=1&amp;flag&amp;b=2'</code></td><td>The stray <code>flag</code> token wipes <code>a</code> and <code>b</code> too; <code>--include</code> becomes <code>{}</code></td><td>Only the bad token is skipped</td></tr><tr><td>Requests that rely on <code>requester()</code>'s default payload</td><td>A mutable default dict is shared and mutated across every call that omits it</td><td>Each call starts from a clean dict</td></tr><tr><td>A target that replies with <code>text/plain</code> or no Content-Type</td><td>Rejected as &quot;not a webpage&quot;</td><td>Accepted; only binary/media Content-Types are rejected</td></tr><tr><td>Automated tests</td><td>None</td><td>14 tests, run in CI</td></tr></tbody></table></div>"
+    },
+    {
+     "id": "what-changed",
+     "label": "What changed",
+     "known": true,
+     "html": "<h3>Fixed: <code>--import</code> silently returning nothing on a leading blank line</h3>\n<p><code>importer()</code> picked an import format by reading lines one at a time and returning <code>[]</code> unconditionally as soon as a line didn't start with <code>&lt;?xml</code>, <code>http(s)://</code>, <code>GET</code> or <code>POST</code> — including a blank line, which real target-list files often start with. Reproduced with a two-URL file that had one leading blank line: <code>importer()</code> returned <code>[]</code> for it and a plain list of the same two URLs with no leading blank line correctly returned two requests. Blank lines are now skipped before the format is checked; a genuinely unrecognised first line still returns <code>[]</code>.</p>\n<h3>Fixed: <code>--include</code> ignored for <code>-i urls.txt</code> imports</h3>\n<p><code>urls_import()</code> built each request dict with the key <code>'data'</code>, but <code>requester()</code> only ever reads <code>request['include']</code>. Every <code>--include</code> value passed alongside <code>-i urls.txt</code> was silently dropped; only single-URL (<code>-u</code>) scans actually used it. The key is now <code>'include'</code>, parsed through the same <code>parse_params()</code> used everywhere else.</p>\n<h3>Fixed: <code>-i export.xml</code> crashing on any captured request with a body</h3>\n<p><code>burp_import()</code> took the raw captured HTTP request body (a string like <code>username=admin&amp;password=secret</code>) and stored it directly as <code>request['include']</code>. <code>requester()</code> then calls <code>payload.update(request['include'])</code> on it, and <code>dict.update()</code> on a string iterates its characters — each a length-1 string — and raises <code>ValueError: dictionary update sequence element #0 has length 1; 2 is required</code>. Reproduced by importing a one-item Burp XML export with a POST body: the import crashed before a single request was sent. The body is now parsed into a parameter dict before being stored.</p>\n<h3>Fixed: a bad <code>--include</code> token silently discarding everything parsed before it</h3>\n<p>The query-string branch of <code>get_params()</code> built up <code>params</code> one <code>&amp;</code>-separated token at a time, and on any token without an <code>=</code> (a bare flag, or a stray trailing <code>&amp;</code>) it caught the resulting <code>IndexError</code> by resetting <code>params = {}</code> — discarding every parameter already parsed, not just the bad token. Reproduced with <code>a=1&amp;b=2&amp;flag&amp;c=3</code>: upstream returns <code>{'c': '3'}</code>, losing <code>a</code> and <code>b</code>. This parsing logic moved into a new <code>arjun/core/parsing.py</code> (shared by <code>utils.py</code> and <code>importer.py</code>, which needed it too) and now skips only the one malformed token.</p>\n<h3>Fixed: <code>requester()</code>'s mutable default argument</h3>\n<p><code>def requester(request, payload={})</code> evaluates <code>{}</code> once, at import time, and every call that omits <code>payload</code> reuses and mutates that same dict via <code>payload.update(...)</code>. No current call site omits it, but it's a real foot-gun for anyone using <code>requester()</code> as a library function (which the new test suite does) or for a future call site that relies on the default. <code>payload</code> is now <code>None</code> by default, with a fresh dict created per call. <code>payload.update()</code> is also now guarded to only run when <code>include</code> is actually a dict, so a caller that still hands it a raw string gets ignored instead of crashing.</p>\n<h3>Fixed: legitimate non-HTML/JSON/XML targets rejected as &quot;not a webpage&quot;</h3>\n<p><code>stable_request()</code> only accepted a response whose <code>Content-Type</code> contained <code>text</code>, <code>html</code>, <code>json</code> or <code>xml</code>, rejecting everything else outright — including <code>text/plain</code>, a missing <code>Content-Type</code> header, or <code>application/x-www-form-urlencoded</code>, all of which real APIs return. This is now a blocklist of actually-binary types (<code>image/</code>, <code>video/</code>, <code>audio/</code>, <code>font/</code>, <code>application/pdf</code>, <code>application/zip</code>, <code>application/octet-stream</code> and a few others) instead of an allowlist, so an unusual-but-text target is scanned instead of skipped.</p>"
+    },
+    {
+     "id": "testing",
+     "label": "Testing",
+     "known": true,
+     "html": "<pre><code>pip install -r requirements.txt pytest\npytest -q</code></pre>\n<p>14 tests. A local HTTP server backs the <code>requester()</code>/<code>stable_request()</code> tests; the importer and parsing tests use real file fixtures (including a Burp-XML-shaped one) with no network access. GitHub Actions runs them on Python 3.10, 3.12 and 3.13.</p>"
+    },
+    {
+     "id": "limitations",
+     "label": "Limitations",
+     "known": true,
+     "html": "<ul><li>Still a wordlist-based tool: a parameter not in <code>-w</code>'s list (or <code>--passive</code>'s sources) won't be found.</li><li>Anomaly detection compares status code, headers, body length and reflected text; a parameter that changes something else (a side effect with no visible response difference) won't be caught.</li><li><code>--rate-limit</code>'s ceiling is read once, at import time, from the CLI argument — it can't be changed after the process starts.</li></ul>"
+    },
+    {
+     "id": "responsible-use",
+     "label": "Responsible use",
+     "known": true,
+     "html": "<p>Only scan targets you own or have written permission to test. Arjun sends a large number of requests per target; <code>--rate-limit</code>, <code>--stable</code> and <code>-d</code> exist to keep that polite.</p>"
+    },
+    {
+     "id": "credits",
+     "label": "Credits",
+     "known": true,
+     "html": "<p>Built on <a href=\"https://github.com/s0md3v/Arjun\" target=\"_blank\" rel=\"noopener noreferrer\">s0md3v/Arjun</a> by Somdev Sangwan and contributors. Upstream's wordlist, anomaly-detection approach and chunking strategy are theirs. The fixes and tests above are in this fork.</p>"
+    },
+    {
+     "id": "license",
+     "label": "License",
+     "known": true,
+     "html": "<p>AGPL-3.0, the same as upstream. See <a href=\"https://github.com/thecyberfarhan/Arjun/blob/master/LICENSE\" target=\"_blank\" rel=\"noopener noreferrer\">LICENSE</a>.</p>"
     }
    ]
   },
@@ -210,7 +319,7 @@
      "id": "what-this-shows",
      "label": "What this shows",
      "known": true,
-     "html": "<ul><li>Web and API testing: CORS misconfiguration is a standard part of an API assessment, and this is</li></ul>\n<p>a tool I actually run for it.</p>\n<ul><li>Finding a real concurrency bug by testing under load, not just reading the code: the fix for</li></ul>\n<p>threaded scans corrupting each other's findings was reproduced before it was fixed. See <a href=\"#what-changed\">What changed</a>.</p>\n<ul><li>Noticing when a tool's own output can't be trusted (a failed request looked identical to a clean</li></ul>\n<p>host) and fixing the gap instead of only adding features.</p>"
+     "html": "<ul><li>Web and API testing: CORS misconfiguration is a standard part of an API assessment, and this is a tool I actually run for it.</li><li>Finding a real concurrency bug by testing under load, not just reading the code: the fix for threaded scans corrupting each other's findings was reproduced before it was fixed. See <a href=\"#what-changed\">What changed</a>.</li><li>Noticing when a tool's own output can't be trusted (a failed request looked identical to a clean host) and fixing the gap instead of only adding features.</li></ul>"
     },
     {
      "id": "requirements",
@@ -276,7 +385,7 @@
      "id": "limitations",
      "label": "Limitations",
      "known": true,
-     "html": "<ul><li>GET requests only. It does not send preflight <code>OPTIONS</code> requests.</li><li>It reports the first misconfiguration it finds on a URL and stops, so a URL with two problems</li></ul>\n<p>shows one.</p>\n<ul><li><code>invalid value</code> appears in the checks database and in upstream's list of tests, but no code</li></ul>\n<p>ever emits it, so Corsy effectively runs 10 checks, not 11.</p>\n<ul><li>It sends no cookies or tokens unless you pass <code>--headers</code>, so it tests the anonymous view of an</li></ul>\n<p>endpoint unless you give it a session.</p>\n<ul><li>TLS certificates are not verified, so scans work against lab hosts with self-signed certs.</li></ul>"
+     "html": "<ul><li>GET requests only. It does not send preflight <code>OPTIONS</code> requests.</li><li>It reports the first misconfiguration it finds on a URL and stops, so a URL with two problems shows one.</li><li><code>invalid value</code> appears in the checks database and in upstream's list of tests, but no code ever emits it, so Corsy effectively runs 10 checks, not 11.</li><li>It sends no cookies or tokens unless you pass <code>--headers</code>, so it tests the anonymous view of an endpoint unless you give it a session.</li><li>TLS certificates are not verified, so scans work against lab hosts with self-signed certs.</li></ul>"
     },
     {
      "id": "responsible-use",
@@ -325,7 +434,7 @@
      "id": "what-this-shows",
      "label": "What this shows",
      "known": true,
-     "html": "<ul><li>Web and API testing: this is the tool I reach for whenever an engagement touches</li></ul>\n<p>authentication tokens, and this fork is what I use.</p>\n<ul><li>Reading and fixing someone else's code under real constraints: four independent crashes</li></ul>\n<p>diagnosed from a 2,200-line single file, each reproduced with a crafted token before being fixed, not patched blind. See <a href=\"#what-changed\">What changed</a>.</p>\n<ul><li>Writing tests that prove a fix instead of just exercising the code: the suite below drives the</li></ul>\n<p>real CLI against each crash case and asserts it no longer happens.</p>"
+     "html": "<ul><li>Web and API testing: this is the tool I reach for whenever an engagement touches authentication tokens, and this fork is what I use.</li><li>Reading and fixing someone else's code under real constraints: four independent crashes diagnosed from a 2,200-line single file, each reproduced with a crafted token before being fixed, not patched blind. See <a href=\"#what-changed\">What changed</a>.</li><li>Writing tests that prove a fix instead of just exercising the code: the suite below drives the real CLI against each crash case and asserts it no longer happens.</li></ul>"
     },
     {
      "id": "requirements",
@@ -385,7 +494,7 @@
      "id": "limitations",
      "label": "Limitations",
      "known": true,
-     "html": "<ul><li>The test suite checks that the four fixed crashes no longer happen and that ordinary tokens</li></ul>\n<p>still decode correctly. It doesn't cover the rest of this file's 2,200 lines (the sign, exploit and crack paths), which are upstream's long-standing, separately-tested logic.</p>\n<ul><li><code>-C</code>/crack speed depends entirely on the wordlist; it does not brute-force arbitrary secrets.</li><li>Live scanning (<code>-t</code>/<code>-M</code>) sends real HTTP requests to whatever URL you give it.</li></ul>"
+     "html": "<ul><li>The test suite checks that the four fixed crashes no longer happen and that ordinary tokens still decode correctly. It doesn't cover the rest of this file's 2,200 lines (the sign, exploit and crack paths), which are upstream's long-standing, separately-tested logic.</li><li><code>-C</code>/crack speed depends entirely on the wordlist; it does not brute-force arbitrary secrets.</li><li>Live scanning (<code>-t</code>/<code>-M</code>) sends real HTTP requests to whatever URL you give it.</li></ul>"
     },
     {
      "id": "responsible-use",
@@ -434,13 +543,13 @@
      "id": "what-this-shows",
      "label": "What this shows",
      "known": true,
-     "html": "<ul><li>Social engineering: this is the toolkit I use for authorized phishing-simulation campaigns, and</li></ul>\n<p>this fork is why it still runs.</p>\n<ul><li>Diagnosing a dead import chain down to the exact removed stdlib module, then rebuilding the</li></ul>\n<p>affected code on its modern replacement instead of patching around it.</p>\n<ul><li>Verifying a fix actually works end-to-end (a real SMTP client, not just &quot;it imports now&quot;) — see</li></ul>\n<p><a href=\"#what-changed\">What changed</a>.</p>"
+     "html": "<ul><li>Social engineering: this is the toolkit I use for authorized phishing-simulation campaigns, and this fork is why it still runs.</li><li>Diagnosing a dead import chain down to the exact removed stdlib module, then rebuilding the affected code on its modern replacement instead of patching around it.</li><li>Verifying a fix actually works end-to-end (a real SMTP client, not just &quot;it imports now&quot;) — see <a href=\"#what-changed\">What changed</a>.</li></ul>"
     },
     {
      "id": "requirements",
      "label": "Requirements",
      "known": true,
-     "html": "<ul><li>Python 3.12 or newer for the server/dev side this fork touches</li><li>System packages for the full client+server install: GTK, PostgreSQL (handled by</li></ul>\n<p><code>tools/install.sh</code>)</p>\n<ul><li>Tried on: Arch Linux, Kali Linux, Parrot OS</li></ul>"
+     "html": "<ul><li>Python 3.12 or newer for the server/dev side this fork touches</li><li>System packages for the full client+server install: GTK, PostgreSQL (handled by <code>tools/install.sh</code>)</li><li>Tried on: Arch Linux, Kali Linux, Parrot OS</li></ul>"
     },
     {
      "id": "install",
@@ -488,7 +597,7 @@
      "id": "limitations",
      "label": "Limitations",
      "known": true,
-     "html": "<ul><li>The GTK client needs system GObject-introspection libraries that are outside pip's scope and</li></ul>\n<p>weren't available to verify in the environment this fork was built in; that part of <code>INSTALL.md</code>/<code>tools/install.sh</code> is unchanged from upstream and untested by this fork.</p>\n<ul><li>Campaign logic, templates, the web server for landing pages, and the rest of the server beyond</li></ul>\n<p>the two fixes above are unchanged from upstream — including whatever else may not work on a Python this new, since upstream stopped testing against one.</p>"
+     "html": "<ul><li>The GTK client needs system GObject-introspection libraries that are outside pip's scope and weren't available to verify in the environment this fork was built in; that part of <code>INSTALL.md</code>/<code>tools/install.sh</code> is unchanged from upstream and untested by this fork.</li><li>Campaign logic, templates, the web server for landing pages, and the rest of the server beyond the two fixes above are unchanged from upstream — including whatever else may not work on a Python this new, since upstream stopped testing against one.</li></ul>"
     },
     {
      "id": "responsible-use",
@@ -537,7 +646,7 @@
      "id": "what-this-shows",
      "label": "What this shows",
      "known": true,
-     "html": "<ul><li>OSINT: judging whether a tool's detection logic is actually trustworthy, not just whether it</li></ul>\n<p>runs. <code>--verify</code> below is a method for catching a detector's own false positives, demonstrated against a real site.</p>\n<ul><li>Finding and fixing real data-loss bugs (the <code>{?}</code> wildcard and the <code>--csv</code>/<code>--xlsx</code> cases</li></ul>\n<p>below), both reproduced before being fixed.</p>\n<ul><li>Contributing upstream: the export fixes are filed as <a href=\"https://github.com/sherlock-project/sherlock/pull/3172\" target=\"_blank\" rel=\"noopener noreferrer\">sherlock-project/sherlock#3172</a>,</li></ul>\n<p>open at the time of writing.</p>"
+     "html": "<ul><li>OSINT: judging whether a tool's detection logic is actually trustworthy, not just whether it runs. <code>--verify</code> below is a method for catching a detector's own false positives, demonstrated against a real site.</li><li>Finding and fixing real data-loss bugs (the <code>{?}</code> wildcard and the <code>--csv</code>/<code>--xlsx</code> cases below), both reproduced before being fixed.</li><li>Contributing upstream: the export fixes are filed as <a href=\"https://github.com/sherlock-project/sherlock/pull/3172\" target=\"_blank\" rel=\"noopener noreferrer\">sherlock-project/sherlock#3172</a>, open at the time of writing.</li></ul>"
     },
     {
      "id": "requirements",
@@ -597,7 +706,7 @@
      "id": "limitations",
      "label": "Limitations",
      "known": true,
-     "html": "<ul><li><code>--verify</code> roughly doubles the requests sent to sites that claimed a hit (none for sites that</li></ul>\n<p>didn't), so a run with many hits takes longer.</p>\n<ul><li>Verification only catches a detector that can't distinguish a real account from a random one on</li></ul>\n<p>the *same* site; it says nothing about sites not checked.</p>\n<ul><li>This fork doesn't touch detection logic, the site list, or proxy/Tor support — those are</li></ul>\n<p>upstream's, unchanged.</p>"
+     "html": "<ul><li><code>--verify</code> roughly doubles the requests sent to sites that claimed a hit (none for sites that didn't), so a run with many hits takes longer.</li><li>Verification only catches a detector that can't distinguish a real account from a random one on the *same* site; it says nothing about sites not checked.</li><li>This fork doesn't touch detection logic, the site list, or proxy/Tor support — those are upstream's, unchanged.</li></ul>"
     },
     {
      "id": "responsible-use",
@@ -646,7 +755,7 @@
      "id": "what-this-shows",
      "label": "What this shows",
      "known": true,
-     "html": "<ul><li>Reporting: scope and rules of engagement, a summary a non-technical reader can act on, findings</li></ul>\n<p>with evidence and risk ratings, and fixes in priority order — not just &quot;I found a bug.&quot;</p>\n<ul><li>Using my own tools as part of a real engagement, not just running them standalone: the DVWA</li></ul>\n<p>report's appendix is the actual <a href=\"https://github.com/thecyberfarhan/lab-reports/blob/master/../reconkit\" target=\"_blank\" rel=\"noopener noreferrer\">reconkit</a> and <a href=\"https://github.com/thecyberfarhan/lab-reports/blob/master/../apicheck\" target=\"_blank\" rel=\"noopener noreferrer\">apicheck</a> output from that test.</p>\n<ul><li>Confirming findings by hand, not trusting a scanner's output: the report says explicitly that</li></ul>\n<p>the vulnerabilities were confirmed with minimal, safe proof-of-concept requests.</p>"
+     "html": "<ul><li>Reporting: scope and rules of engagement, a summary a non-technical reader can act on, findings with evidence and risk ratings, and fixes in priority order — not just &quot;I found a bug.&quot;</li><li>Using my own tools as part of a real engagement, not just running them standalone: the DVWA report's appendix is the actual <a href=\"https://github.com/thecyberfarhan/lab-reports/blob/master/../reconkit\" target=\"_blank\" rel=\"noopener noreferrer\">reconkit</a> and <a href=\"https://github.com/thecyberfarhan/lab-reports/blob/master/../apicheck\" target=\"_blank\" rel=\"noopener noreferrer\">apicheck</a> output from that test.</li><li>Confirming findings by hand, not trusting a scanner's output: the report says explicitly that the vulnerabilities were confirmed with minimal, safe proof-of-concept requests.</li></ul>"
     },
     {
      "id": "whats-inside",
@@ -664,7 +773,7 @@
      "id": "limitations",
      "label": "Limitations",
      "known": true,
-     "html": "<ul><li>Every target here is a training app built to be broken; findings and fixes reflect that, not a</li></ul>\n<p>production system's full threat model.</p>\n<ul><li>Only one report (DVWA, low security setting) is complete; WebGoat is planned but not started.</li></ul>"
+     "html": "<ul><li>Every target here is a training app built to be broken; findings and fixes reflect that, not a production system's full threat model.</li><li>Only one report (DVWA, low security setting) is complete; WebGoat is planned but not started.</li></ul>"
     },
     {
      "id": "responsible-use",

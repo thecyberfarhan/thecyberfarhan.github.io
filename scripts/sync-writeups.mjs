@@ -150,6 +150,29 @@ function mdToHtml(md) {
   return out.filter(Boolean).join('\n');
 }
 
+// a markdown list item that wraps across lines (common when a write-up is hand-wrapped at ~100
+// chars) has its continuation lines un-indented and with no '-'/'1.' marker; without this, the
+// loop that collects list items stopped at the first continuation line, closing the <ul> after
+// one line and dumping the rest of that sentence as a stray paragraph right after it
+function listToHtml(lines, start, markerRe, tag) {
+  const items = [];
+  let i = start;
+  while (i < lines.length) {
+    const l = lines[i];
+    if (markerRe.test(l)) {
+      items.push(l.replace(markerRe, ''));
+      i++;
+    } else if (l.trim() && !/^#{1,6}\s/.test(l) && !/^\|/.test(l.trim()) && !/^>\s?/.test(l) && !/^```/.test(l.trim())) {
+      items[items.length - 1] += ' ' + l.trim();
+      i++;
+    } else {
+      break;
+    }
+  }
+  const html = `<${tag}>${items.map((it) => `<li>${inline(it)}</li>`).join('')}</${tag}>`;
+  return { html, nextIndex: i };
+}
+
 function textBlockToHtml(text) {
   const lines = text.split('\n');
   const out = [];
@@ -175,16 +198,16 @@ function textBlockToHtml(text) {
     }
     if (/^[-*]\s+/.test(line)) {
       flushPara();
-      const items = [];
-      while (i < lines.length && /^[-*]\s+/.test(lines[i])) items.push(lines[i++].replace(/^[-*]\s+/, ''));
-      out.push(`<ul>${items.map((it) => `<li>${inline(it)}</li>`).join('')}</ul>`);
+      const { html, nextIndex } = listToHtml(lines, i, /^[-*]\s+/, 'ul');
+      out.push(html);
+      i = nextIndex;
       continue;
     }
     if (/^\d+\.\s+/.test(line)) {
       flushPara();
-      const items = [];
-      while (i < lines.length && /^\d+\.\s+/.test(lines[i])) items.push(lines[i++].replace(/^\d+\.\s+/, ''));
-      out.push(`<ol>${items.map((it) => `<li>${inline(it)}</li>`).join('')}</ol>`);
+      const { html, nextIndex } = listToHtml(lines, i, /^\d+\.\s+/, 'ol');
+      out.push(html);
+      i = nextIndex;
       continue;
     }
     if (/^\*[^*]/.test(line.trim()) && line.trim().endsWith('*') && !line.includes('**')) {
