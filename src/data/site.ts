@@ -53,6 +53,7 @@ export const PROJECTS: Project[] = [
   { kind: 'Fork', name: 'Sherlock', body: 'Fork of a 50k-star username OSINT tool: confidence checks, retries on transient errors and Markdown export. Two fixes went back upstream as a pull request.', tags: ['Python', 'Upstream PR'], status: 'Fork', href: 'https://github.com/thecyberfarhan/sherlock' },
   { kind: 'Fork', name: 'King Phisher', body: 'Fork of a phishing-campaign toolkit: fixed a Python 3.12+ crash and a SQLAlchemy break the unmaintained upstream never got, and modernised its dependencies.', tags: ['Python', 'asyncio'], status: 'Fork', href: 'https://github.com/thecyberfarhan/king-phisher' },
   { kind: 'Fork', name: 'Corsy', body: 'Fork of a CORS misconfiguration scanner: fixed threaded scans corrupting each other’s findings and -i being ignored off a TTY, added request timeouts, proxy and a CI exit code, with a pytest suite and CI.', tags: ['Python', 'Tests'], status: 'Fork', href: 'https://github.com/thecyberfarhan/corsy' },
+  { kind: 'Fork', name: 'jwt_tool', body: 'Fork of the 6.8k-star JWT testing toolkit: fixed four crashes (Python 3.14, Firebase-style nested claims, and odd timestamps) and added a per-run proxy flag, with a pytest suite and CI.', tags: ['Python', 'JWT'], status: 'Fork', href: 'https://github.com/thecyberfarhan/jwt_tool' },
   { kind: 'Original', name: 'Virtual-Env Manager', body: 'A Python virtual-environment manager built for my own workflow, about 1,800 lines, with Rich and InquirerPy.', tags: ['Python', 'Rich'], status: 'Private' },
 ];
 
