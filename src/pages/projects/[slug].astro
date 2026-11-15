@@ -1,0 +1,198 @@
+---
+import Base from '../../layouts/Base.astro';
+import Contact from '../../components/Contact.astro';
+import { syncedProjects, SITE, type SyncedProject } from '../../data/site';
+
+export function getStaticPaths() {
+  return syncedProjects.map((p, i) => ({
+    params: { slug: p.slug },
+    props: { p, newer: syncedProjects[i - 1] ?? null, older: syncedProjects[i + 1] ?? null },
+  }));
+}
+interface Props { p: SyncedProject; newer: SyncedProject | null; older: SyncedProject | null }
+const { p, newer, older } = Astro.props;
+
+const TONE: Record<string, string> = { Original: '#3f6e8c', Fork: '#a8642a', 'Field note': '#24704d' };
+const tone = TONE[p.kind] ?? TONE.Original;
+const path = `/projects/${p.slug}.html`;
+const description = p.tagline;
+const words = p.sections.map((s) => s.html).join(' ').replace(/<[^>]+>/g, ' ').split(/\s+/).length;
+const minutes = Math.max(2, Math.round(words / 220));
+const jsonld = {
+  '@context': 'https://schema.org',
+  '@type': 'TechArticle',
+  headline: `${p.name}: ${p.kind.toLowerCase()}`,
+  description,
+  author: { '@type': 'Person', '@id': `${SITE.url}/#me`, name: SITE.name, url: `${SITE.url}/` },
+  url: `${SITE.url}${path}`,
+  mainEntityOfPage: `${SITE.url}${path}`,
+  about: [p.language, p.skillArea].filter(Boolean),
+};
+const facts: [string, string][] = [
+  ['Kind', p.kind],
+  ['Status', p.status],
+  ...(p.language ? [['Language', p.language] as [string, string]] : []),
+  ...(p.requires ? [['Requires', p.requires] as [string, string]] : []),
+  ...(p.license ? [['License', p.license] as [string, string]] : []),
+  ...(p.upstream ? [['Upstream', p.upstream + (p.upstreamStars ? ` (${p.upstreamStars.toLocaleString()}★)` : '')] as [string, string]] : []),
+  ...(p.scope ? [['Scope', p.scope] as [string, string]] : []),
+  ['Skill area', p.skillArea],
+];
+const repoPath = p.href.replace('https://github.com/', '');
+---
+<Base title={`${p.name} | Farhan Hussain`} description={description} path={path} type="article" jsonld={jsonld} tone={tone}>
+  <div class="progress" aria-hidden="true"><span id="bar"></span></div>
+  <article class="wrap doc">
+    <header class="head" data-enter="kids">
+      <a class="back label" href="/projects/">← All projects</a>
+      <p class="label kicker">{p.kind}{p.stars ? ` · ${p.stars.toLocaleString()}★` : ''}</p>
+      <h1>{p.name}</h1>
+      <p class="tagline">{p.tagline}</p>
+      <ul class="meta">
+        <li class="lvl">{p.status}</li>
+        {p.pushedAt && <li>Updated <time datetime={p.pushedAt}>{p.pushedAt}</time></li>}
+        <li>{minutes} min read</li>
+      </ul>
+    </header>
+
+    <div class="layout">
+      <aside class="side">
+        <nav class="toc" aria-label="On this page" data-scout="toc">
+          <p class="label">On this page</p>
+          <ol>{p.sections.map((s) => <li><a href={`#${s.id}`}>{s.label}</a></li>)}</ol>
+        </nav>
+        <div class="facts">
+          <p class="label">At a glance</p>
+          <dl>{facts.map(([k, v]) => <div><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
+        </div>
+        <a class="btn solid sm gh" href={p.href} target="_blank" rel="noopener">View {repoPath} on GitHub ↗</a>
+      </aside>
+
+      <div class="prose" id="prose">
+        {p.sections.map((s) => (
+          <section id={s.id}>
+            <h2>{s.label}</h2>
+            <Fragment set:html={s.html} />
+          </section>
+        ))}
+
+        <div class="end">
+          <a class="btn solid" href={p.href} target="_blank" rel="noopener">Full source on GitHub ↗</a>
+          <a class="btn line" href="/projects/">All projects</a>
+        </div>
+        <nav class="pn" aria-label="More projects">
+          {older ? <a href={`/projects/${older.slug}.html`}><span class="label">← Older</span><span class="pt">{older.name}</span></a> : <span />}
+          {newer ? <a class="nx" href={`/projects/${newer.slug}.html`}><span class="label">Newer →</span><span class="pt">{newer.name}</span></a> : <span />}
+        </nav>
+      </div>
+    </div>
+  </article>
+  <Contact slot="after" />
+</Base>
+
+<style>
+  .progress { position: fixed; inset: 0 0 auto; height: 3px; z-index: 60; }
+  .progress span { display: block; height: 100%; width: 100%; background: var(--tone); transform: scaleX(0); transform-origin: left; }
+  .doc { padding-top: clamp(110px, 13vw, 150px); }
+  .back { text-decoration: none; display: inline-block; margin-bottom: 34px; }
+  .back:hover { color: var(--accent); }
+  .kicker { color: var(--tone-ink); }
+  .head h1 { font-size: clamp(2.8rem, 7vw, 5.6rem); line-height: 0.98; letter-spacing: -0.035em; margin: 14px 0 16px; overflow-wrap: anywhere; }
+  .tagline { color: var(--soft); font-size: clamp(1.05rem, 1.6vw, 1.25rem); max-width: 60ch; margin-bottom: 24px; }
+  .meta { list-style: none; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; font-size: 14px; color: var(--muted); padding-bottom: 30px; border-bottom: 1px solid var(--ink); }
+  .meta .lvl { font: 500 12.5px var(--mono); color: var(--tone-ink); border: 1px solid color-mix(in srgb, var(--tone) 50%, transparent); padding: 4px 11px; border-radius: 999px; }
+  .layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: clamp(30px, 5vw, 70px); margin-top: 44px; }
+  .side { position: sticky; top: 96px; align-self: start; display: flex; flex-direction: column; gap: 28px; max-height: calc(100vh - 120px); overflow: auto; }
+  .toc ol { list-style: none; margin-top: 12px; border-left: 1px solid var(--rule); }
+  .toc a { display: block; padding: 6px 0 6px 14px; margin-left: -1px; border-left: 2px solid transparent; font-size: 14px; color: var(--muted); text-decoration: none; transition: color 0.2s, border-color 0.2s; }
+  .toc a:hover { color: var(--ink); }
+  .toc a.on { color: var(--ink); border-color: var(--tone); }
+  .facts dl { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+  .facts div { display: flex; flex-direction: column; gap: 2px; }
+  .facts dt { font: 500 10.5px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .facts dd { font-size: 14px; color: var(--ink); overflow-wrap: anywhere; }
+  .gh { font-size: 13px; text-align: center; }
+
+  .prose { max-width: 720px; font-size: 17px; line-height: 1.75; color: var(--soft); }
+  .prose section { scroll-margin-top: 90px; }
+  .prose section + section { margin-top: 54px; }
+  .prose h2 { font-size: clamp(1.7rem, 3vw, 2.2rem); color: var(--ink); margin-bottom: 18px; display: flex; align-items: baseline; gap: 12px; }
+  .prose h2::before { content: ''; width: 18px; height: 2px; background: var(--tone); transform: translateY(-6px); flex: none; }
+  .prose :global(h3) { font: 600 1.05rem var(--sans); color: var(--ink); margin: 32px 0 10px; letter-spacing: -0.005em; }
+  .prose :global(p) { margin-bottom: 16px; }
+  .prose :global(a:not(.btn)) { color: var(--ink); text-underline-offset: 3px; text-decoration-color: var(--rule-strong); }
+  .prose :global(a:hover) { text-decoration-color: var(--tone); }
+  .prose :global(strong) { color: var(--ink); font-weight: 600; }
+  .prose :global(code) { font: 500 0.86em var(--mono); background: var(--paper-2); color: var(--ink); padding: 2px 6px; border-radius: 5px; }
+  .prose :global(pre) { position: relative; margin: 0 0 22px; padding: 18px 18px; background: var(--code-bg); color: var(--code-fg); border-radius: 12px; overflow-x: auto; font: 13px/1.65 var(--mono); }
+  .prose :global(pre code) { background: none; color: inherit; padding: 0; font-size: inherit; }
+  .prose :global(.copy) { position: absolute; top: 8px; right: 8px; font: 500 11px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 10px; border-radius: 6px; background: #2c2f36; color: #c9c6bf; opacity: 0; transition: opacity 0.2s, background 0.2s; }
+  .prose :global(pre:hover .copy), .prose :global(.copy:focus-visible) { opacity: 1; }
+  .prose :global(.copy.done) { background: var(--ok); color: #fff; }
+  @media (hover: none) {
+    .prose :global(.copy) { opacity: 1; }
+    .prose :global(pre) { padding-top: 42px; }
+  }
+  .prose :global(ul), .prose :global(ol) { padding-left: 22px; margin-bottom: 18px; }
+  .prose :global(li) { margin-bottom: 6px; }
+  .prose :global(blockquote) { margin: 0 0 18px; padding: 4px 0 4px 18px; border-left: 2px solid var(--tone); color: var(--soft); font-style: italic; }
+  .prose :global(.table-wrap) { overflow-x: auto; margin: 0 0 24px; border: 1px solid var(--rule); border-radius: 10px; }
+  .prose :global(table) { width: 100%; border-collapse: collapse; font-size: 14.5px; background: var(--card); }
+  .prose :global(th), .prose :global(td) { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  .prose :global(th) { font: 500 11.5px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); background: var(--paper-2); }
+  .prose :global(tr:last-child td) { border-bottom: 0; }
+
+  .end { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 60px; padding-top: 30px; border-top: 1px solid var(--rule); }
+  .pn { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 30px; }
+  .pn a { display: flex; flex-direction: column; gap: 6px; padding: 18px; border: 1px solid var(--rule); border-radius: 12px; text-decoration: none; background: var(--card); transition: border-color 0.2s; }
+  .pn a:hover { border-color: var(--ink); }
+  .pn .nx { text-align: right; }
+  .pt { font: 400 1.2rem var(--serif); color: var(--ink); }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: minmax(0, 1fr); }
+    .side { position: static; max-height: none; flex-direction: column-reverse; gap: 22px; padding: 18px; border: 1px solid var(--rule); border-radius: 14px; background: var(--card); }
+    .toc ol { columns: 2; column-gap: 20px; }
+    .pn { grid-template-columns: 1fr; }
+    .pn .nx { text-align: left; }
+  }
+</style>
+
+<script>
+  import { animate, onScroll, stagger } from 'animejs';
+  import { reduced } from '../../scripts/motion';
+
+  const bar = document.getElementById('bar')!;
+  const prose = document.getElementById('prose')!;
+  animate(bar, { scaleX: [0, 1], ease: 'linear', autoplay: onScroll({ target: prose, enter: 'start start', leave: 'end end', sync: true }) });
+
+  if (!reduced) {
+    animate('.head > *', { opacity: [0, 1], y: [18, 0], duration: 800, delay: stagger(80), ease: 'outQuart' });
+  }
+
+  prose.querySelectorAll('pre').forEach((pre) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'copy';
+    b.textContent = 'Copy';
+    b.setAttribute('aria-label', 'Copy code');
+    b.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(pre.querySelector('code')?.textContent ?? pre.textContent ?? '');
+        b.textContent = 'Copied';
+        b.classList.add('done');
+        setTimeout(() => { b.textContent = 'Copy'; b.classList.remove('done'); }, 1500);
+      } catch { /* clipboard blocked */ }
+    });
+    pre.appendChild(b);
+  });
+
+  const links = new Map([...document.querySelectorAll<HTMLAnchorElement>('.toc a')].map((a) => [a.hash.slice(1), a]));
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e) => {
+      if (!e.isIntersecting) return;
+      links.forEach((a) => a.classList.remove('on'));
+      links.get(e.target.id)?.classList.add('on');
+    });
+  }, { rootMargin: '-30% 0px -60% 0px' });
+  prose.querySelectorAll('section[id]').forEach((s) => io.observe(s));
+</script>

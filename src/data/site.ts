@@ -1,4 +1,5 @@
 import data from './writeups.json';
+import projectsData from './projects.json';
 
 export const writeups = data.writeups;
 export type Writeup = (typeof writeups)[number];
@@ -45,16 +46,25 @@ export const ABOUT = {
   ],
 };
 
-export type Project = { kind: 'Original' | 'Fork' | 'Field note'; name: string; body: string; tags: string[]; status: string; href?: string };
+// The live project list: everything tagged `portfolio-project` on GitHub, synced from each
+// repo's own README by scripts/sync-projects.mjs. Every one of these has a page at
+// /projects/<slug>.html, built from the same README sections.
+export const syncedProjects = projectsData.projects;
+export type SyncedProject = (typeof syncedProjects)[number];
+export const projectBySlug = (slug: string) => syncedProjects.find((p) => p.slug === slug);
+
+// Private or non-GitHub work: kept by hand, shown as a card with no link and no page. Never synced.
+export type ManualProject = { kind: 'Original' | 'Fork' | 'Field note'; name: string; tagline: string; status: string; language?: string };
+export const manualProjects: ManualProject[] = [
+  { kind: 'Original', name: 'Virtual-Env Manager', tagline: 'A Python virtual-environment manager built for my own workflow, about 1,800 lines, with Rich and InquirerPy.', status: 'Private', language: 'Python' },
+];
+
+// What the home page's card grid reads: synced projects first (in the sync's own kind/name
+// order), then the manual ones, each normalised to the same shape.
+export type Project = { kind: 'Original' | 'Fork' | 'Field note'; name: string; tagline: string; status: string; language?: string | null; href?: string; slug?: string; skillArea?: string };
 export const PROJECTS: Project[] = [
-  { kind: 'Original', name: 'ReconKit', body: 'Recon automation: threaded port scan, HTTP and security-header probing, subdomain brute force, with a built-in scope guard. Standard library only, with tests.', tags: ['Python', 'Stdlib', 'Tests'], status: 'Active', href: 'https://github.com/thecyberfarhan/reconkit' },
-  { kind: 'Original', name: 'APICheck', body: 'Web and API misconfiguration checker: headers, cookies, CORS, leftover sensitive files, directory listing, verbose errors and auth comparison.', tags: ['Python', 'Stdlib', 'Tests'], status: 'Active', href: 'https://github.com/thecyberfarhan/apicheck' },
-  { kind: 'Field note', name: 'Lab Reports', body: 'A pentest-style report on DVWA: SQL injection, OS command injection and reflected XSS, each with evidence, a risk rating and a fix.', tags: ['Markdown', 'DVWA'], status: 'Written', href: 'https://github.com/thecyberfarhan/lab-reports' },
-  { kind: 'Fork', name: 'Sherlock', body: 'Fork of a 50k-star username OSINT tool: confidence checks, retries on transient errors and Markdown export. Two fixes went back upstream as a pull request.', tags: ['Python', 'Upstream PR'], status: 'Fork', href: 'https://github.com/thecyberfarhan/sherlock' },
-  { kind: 'Fork', name: 'King Phisher', body: 'Fork of a phishing-campaign toolkit: fixed a Python 3.12+ crash and a SQLAlchemy break the unmaintained upstream never got, and modernised its dependencies.', tags: ['Python', 'asyncio'], status: 'Fork', href: 'https://github.com/thecyberfarhan/king-phisher' },
-  { kind: 'Fork', name: 'Corsy', body: 'Fork of a CORS misconfiguration scanner: fixed threaded scans corrupting each other’s findings and -i being ignored off a TTY, added request timeouts, proxy and a CI exit code, with a pytest suite and CI.', tags: ['Python', 'Tests'], status: 'Fork', href: 'https://github.com/thecyberfarhan/corsy' },
-  { kind: 'Fork', name: 'jwt_tool', body: 'Fork of the 6.8k-star JWT testing toolkit: fixed four crashes (Python 3.14, Firebase-style nested claims, and odd timestamps) and added a per-run proxy flag, with a pytest suite and CI.', tags: ['Python', 'JWT'], status: 'Fork', href: 'https://github.com/thecyberfarhan/jwt_tool' },
-  { kind: 'Original', name: 'Virtual-Env Manager', body: 'A Python virtual-environment manager built for my own workflow, about 1,800 lines, with Rich and InquirerPy.', tags: ['Python', 'Rich'], status: 'Private' },
+  ...syncedProjects.map((p): Project => ({ kind: p.kind as Project['kind'], name: p.name, tagline: p.tagline, status: p.status, language: p.language, href: p.href, slug: p.slug, skillArea: p.skillArea })),
+  ...manualProjects.map((p): Project => ({ ...p })),
 ];
 
 export const STACK = ['Kali', 'Linux', 'Windows', 'Python', 'Bash', 'PowerShell', 'JavaScript', 'SQL', 'Docker', 'GitHub'];

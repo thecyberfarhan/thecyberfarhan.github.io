@@ -1,0 +1,119 @@
+---
+import Base from '../../layouts/Base.astro';
+import Contact from '../../components/Contact.astro';
+import { syncedProjects, SITE } from '../../data/site';
+
+const kinds = ['Original', 'Fork', 'Field note'].filter((k) => syncedProjects.some((p) => p.kind === k));
+const skills = [...new Set(syncedProjects.map((p) => p.skillArea))].sort();
+const TONE: Record<string, string> = { Original: '#3f6e8c', Fork: '#a8642a', 'Field note': '#24704d' };
+const description = `All ${syncedProjects.length} of Farhan Hussain's public security-tooling projects: original tools, forks with real fixes, and written reports. Search or filter by kind and skill.`;
+---
+<Base title="Projects | Farhan Hussain" description={description} path="/projects/">
+  <section class="hub wrap">
+    <header class="head">
+      <p class="label accent">Projects</p>
+      <h1>Every project, written up.</h1>
+      <p class="lead">What I built, what I fixed in someone else's code, and what it proves. {syncedProjects.length} so far.</p>
+    </header>
+
+    <form class="filters" role="search" id="filters">
+      <label class="search" data-scout="search">
+        <span class="sr-only">Search projects</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-4-4" /></svg>
+        <input type="search" id="q" placeholder="Search by name or skill" maxlength="80" autocomplete="off" spellcheck="false" />
+      </label>
+      <label class="sel"><span class="sr-only">Kind</span>
+        <select id="kind"><option value="">All kinds</option>{kinds.map((k) => <option value={k}>{k}</option>)}</select>
+      </label>
+      <label class="sel"><span class="sr-only">Skill area</span>
+        <select id="skill"><option value="">All skills</option>{skills.map((s) => <option value={s}>{s}</option>)}</select>
+      </label>
+    </form>
+    <p class="count label" id="count" aria-live="polite">Showing {syncedProjects.length} of {syncedProjects.length}</p>
+
+    <ol class="list" id="list">
+      {syncedProjects.map((p, i) => (
+        <li data-enter={i < 10 ? '' : undefined} data-kind={p.kind} data-skill={p.skillArea} data-search={`${p.name} ${p.tagline} ${p.skillArea} ${p.language ?? ''}`.toLowerCase()}>
+          <a href={`/projects/${p.slug}.html`} style={`--tone:${TONE[p.kind]}`}>
+            <span class="plat">{p.kind}</span>
+            <span class="t">{p.name}<small>{p.tagline}</small></span>
+            <span class="meta"><span class="lvl">{p.skillArea}</span>{p.stars ? <span class="stars">{p.stars.toLocaleString()}★ upstream</span> : null}</span>
+          </a>
+        </li>
+      ))}
+    </ol>
+    <p class="empty" id="empty" hidden>No projects match that. <button type="button" id="reset" class="link-arrow">Clear filters</button></p>
+    <p class="source">Synced automatically from every repo tagged <code>portfolio-project</code> on <a class="link-arrow" href={SITE.github} target="_blank" rel="noopener">github.com/thecyberfarhan</a>.</p>
+  </section>
+  <Contact slot="after" />
+</Base>
+
+<style>
+  .hub { padding-top: clamp(120px, 14vw, 170px); padding-bottom: 110px; }
+  .head h1 { font-size: clamp(3rem, 7.5vw, 6rem); line-height: 0.98; letter-spacing: -0.035em; margin: 16px 0 18px; }
+  .lead { font: 300 clamp(1.15rem, 2vw, 1.45rem)/1.5 var(--serif); color: var(--soft); max-width: 40ch; }
+  .filters { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; margin: 56px 0 16px; position: sticky; top: 72px; z-index: 5; padding: 10px; border-radius: 14px; background: color-mix(in srgb, var(--paper) 92%, transparent); backdrop-filter: blur(8px); border: 1px solid var(--rule); }
+  .search { position: relative; }
+  .search svg { position: absolute; left: 14px; top: 50%; translate: 0 -50%; width: 17px; height: 17px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; pointer-events: none; }
+  input, select { width: 100%; font: 400 15px var(--sans); color: var(--ink); background: var(--card); border: 1px solid var(--rule); border-radius: 10px; padding: 12px 14px; transition: border-color 0.2s; }
+  input { padding-left: 42px; }
+  select { appearance: none; padding-right: 38px; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2361656f' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 16px; }
+  input:focus, select:focus { outline: none; border-color: var(--ink); }
+  .count { margin: 0 0 10px 4px; }
+  .list { list-style: none; border-top: 1px solid var(--ink); }
+  .list li[hidden] { display: none; }
+  .list a { display: grid; grid-template-columns: 130px 1fr auto; gap: 24px; align-items: baseline; padding: 22px 0; border-bottom: 1px solid var(--rule); text-decoration: none; position: relative; }
+  .list a::after { content: ''; position: absolute; left: 0; bottom: -1px; height: 1px; width: 100%; background: var(--tone); transform: scaleX(0); transform-origin: left; transition: transform 0.5s var(--ease-out); }
+  .list a:hover::after, .list a:focus-visible::after { transform: scaleX(1); }
+  .list a:hover .t { color: var(--tone-ink); }
+  .plat { font: 500 11.5px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .t { font: 400 1.5rem/1.2 var(--serif); letter-spacing: -0.01em; transition: color 0.25s; }
+  .t small { display: block; font: 400 15px/1.55 var(--sans); color: var(--muted); margin-top: 6px; max-width: 66ch; }
+  .meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .lvl { font: 500 12px var(--mono); color: var(--tone-ink); border: 1px solid color-mix(in srgb, var(--tone) 45%, transparent); padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+  .stars { font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+  .empty { padding: 40px 0; color: var(--soft); text-align: center; }
+  .source { margin-top: 40px; font-size: 14px; color: var(--muted); }
+  .source code { font: 500 0.9em var(--mono); background: var(--paper-2); color: var(--ink); padding: 2px 6px; border-radius: 5px; }
+  @media (max-width: 760px) {
+    .filters { grid-template-columns: 1fr 1fr; top: 66px; }
+    .search { grid-column: 1 / -1; }
+    .list a { grid-template-columns: 1fr auto; gap: 8px 14px; }
+    .plat { grid-column: 1 / -1; }
+    .meta { grid-row: 2; grid-column: 2; }
+  }
+</style>
+
+<script>
+  import { animate, stagger } from 'animejs';
+  import { reduced } from '../../scripts/motion';
+
+  const q = document.getElementById('q') as HTMLInputElement;
+  const kind = document.getElementById('kind') as HTMLSelectElement;
+  const skill = document.getElementById('skill') as HTMLSelectElement;
+  const items = [...document.querySelectorAll<HTMLLIElement>('#list > li')];
+  const count = document.getElementById('count')!;
+  const empty = document.getElementById('empty')!;
+
+  function apply() {
+    const term = q.value.trim().toLowerCase().slice(0, 80);
+    const shown: HTMLLIElement[] = [];
+    items.forEach((li) => {
+      const ok = (!kind.value || li.dataset.kind === kind.value) && (!skill.value || li.dataset.skill === skill.value) && (!term || li.dataset.search!.includes(term));
+      const was = !li.hidden;
+      li.hidden = !ok;
+      if (ok && !was) shown.push(li);
+    });
+    const n = items.filter((li) => !li.hidden).length;
+    count.textContent = `Showing ${n} of ${items.length}`;
+    empty.hidden = n > 0;
+    if (!reduced && shown.length) animate(shown, { opacity: [0, 1], x: [-12, 0], duration: 450, delay: stagger(30), ease: 'outQuart' });
+  }
+  document.getElementById('filters')!.addEventListener('submit', (e) => e.preventDefault());
+  q.addEventListener('input', apply);
+  kind.addEventListener('change', apply);
+  skill.addEventListener('change', apply);
+  document.getElementById('reset')!.addEventListener('click', () => { q.value = ''; kind.value = ''; skill.value = ''; apply(); q.focus(); });
+
+  if (!reduced) animate(items.slice(0, 10), { opacity: [0, 1], y: [16, 0], duration: 700, delay: stagger(45, { start: 150 }), ease: 'outQuart' });
+</script>

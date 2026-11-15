@@ -4,14 +4,16 @@ const filters = [['all', 'All'], ['Original', 'Built'], ['Fork', 'Forked and fix
 const count = (f: string) => (f === 'all' ? PROJECTS.length : PROJECTS.filter((p) => p.kind === f).length);
 const TONE: Record<string, string> = { Original: '#3f6e8c', Fork: '#a8642a', 'Field note': '#24704d' };
 const TAB: Record<string, string> = { Original: 'Built', Fork: 'Fork', 'Field note': 'Field note' };
-const perch: Record<string, string> = { ReconKit: 'reconkit', Sherlock: 'sherlock' };
-const repo = (h?: string) => (h ? h.replace('https://', '') : 'private repository');
+// a project's own page, not the GitHub repo directly, so the detail (what changed, how it was
+// tested) shows before anyone leaves the site
+const cardHref = (p: (typeof PROJECTS)[number]) => (p.slug ? `/projects/${p.slug}.html` : undefined);
+const repo = (p: (typeof PROJECTS)[number]) => (p.href ? p.href.replace('https://github.com/', '') : 'private repository');
 ---
 <section class="block projects" id="projects" aria-labelledby="projects-title">
   <div class="wrap">
     <div class="sec-head" data-reveal>
       <div><p class="label accent">Projects</p><h2 id="projects-title">Things I built, not just labs I finished.</h2></div>
-      <p>Small, tested tools and written reports. The source for each one is public on <a class="link-arrow" href={SITE.github} target="_blank" rel="noopener">GitHub</a>.</p>
+      <p>Small, tested tools and written reports, each with its own write-up. <a class="link-arrow" href="/projects/">Browse all projects</a>, or see the source on <a class="link-arrow" href={SITE.github} target="_blank" rel="noopener">GitHub</a>.</p>
     </div>
     <div class="filters" role="group" aria-label="Filter projects" data-reveal data-scout="filters">
       <span class="ind" aria-hidden="true"></span>
@@ -19,17 +21,18 @@ const repo = (h?: string) => (h ? h.replace('https://', '') : 'private repositor
     </div>
     <ul class="grid" data-reveal="stagger">
       {PROJECTS.map((p, i) => {
-        const Tag = p.href ? 'a' : 'div';
+        const href = cardHref(p);
+        const Tag = href ? 'a' : 'div';
         return (
-          <li data-kind={p.kind} style={`--tone:${TONE[p.kind]}`} data-scout={perch[p.name]}>
-            <Tag class="case" {...(p.href ? { href: p.href, target: '_blank', rel: 'noopener' } : {})}>
+          <li data-kind={p.kind} style={`--tone:${TONE[p.kind]}`} data-scout={p.slug}>
+            <Tag class="case" {...(href ? { href } : {})}>
               <span class="tab">{TAB[p.kind]}</span>
-              <span class="sheet" aria-hidden="true"><b>Case {String(i + 1).padStart(2, '0')}</b><span>{repo(p.href)}</span></span>
+              <span class="sheet" aria-hidden="true"><b>Case {String(i + 1).padStart(2, '0')}</b><span>{repo(p)}</span></span>
               <span class="front">
-                <span class="top"><span class="status">{p.status}</span>{p.href && <span class="go" aria-hidden="true">↗</span>}</span>
+                <span class="top"><span class="status">{p.status}</span>{href && <span class="go" aria-hidden="true">↗</span>}</span>
                 <h3>{p.name}</h3>
-                <p>{p.body}</p>
-                <ul class="tags">{p.tags.map((t) => <li>{t}</li>)}</ul>
+                <p>{p.tagline}</p>
+                <ul class="tags">{[p.language, p.skillArea].filter(Boolean).map((t) => <li>{t}</li>)}</ul>
               </span>
             </Tag>
           </li>
