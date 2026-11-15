@@ -1,0 +1,33 @@
+---
+// On phones the lab works, but a terminal wants a keyboard. This says so, once, with a way out.
+---
+<aside class="phone-note" id="phone-note" hidden aria-label="Better on a computer">
+  <p class="label">Small screen detected</p>
+  <p class="pn-lead">Bro. A terminal on a phone? Respect, but this lab was built for a keyboard. Open it on a PC for the full thing.</p>
+  <p class="pn-how">Still here? Switch your browser to desktop mode: in Chrome tap <b>⋮</b> and tick <b>Desktop site</b>; in Safari tap <b>aA</b> and pick <b>Request Desktop Website</b>.</p>
+  <div class="pn-row">
+    <button type="button" class="btn solid sm" id="pn-ok">I'm persistent, let me in</button>
+  </div>
+</aside>
+
+<style>
+  .phone-note { margin: 18px 0 6px; padding: 18px; border-radius: 14px; background: var(--card); border: 1px solid var(--rule); border-left: 3px solid var(--accent); }
+  .phone-note[hidden] { display: none; }
+  .phone-note .label { color: var(--accent); margin-bottom: 8px; }
+  .pn-lead { font: 400 1.15rem/1.35 var(--serif); color: var(--ink); margin-bottom: 8px; }
+  .pn-how { font-size: 14.5px; color: var(--soft); margin-bottom: 14px; }
+  .pn-how b { color: var(--ink); font-weight: 600; }
+</style>
+
+<script>
+  // only on narrow touch screens, and only until it has been dismissed once
+  const note = document.getElementById('phone-note')!;
+  const KEY = 'fh-phone-note';
+  let seen = false;
+  try { seen = localStorage.getItem(KEY) === '1'; } catch { /* storage blocked: show it */ }
+  if (!seen && matchMedia('(max-width: 900px) and (pointer: coarse)').matches) note.hidden = false;
+  document.getElementById('pn-ok')!.addEventListener('click', () => {
+    note.hidden = true;
+    try { localStorage.setItem(KEY, '1'); } catch { /* shown again next time */ }
+  });
+</script>

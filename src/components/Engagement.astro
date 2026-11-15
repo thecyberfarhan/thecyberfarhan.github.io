@@ -1,0 +1,334 @@
+---
+import { METHOD, STATS } from '../data/site';
+
+// one network map, in viewBox units (1600 x 1000)
+const N = {
+  internet: { x: 150, y: 520, label: 'INTERNET' },
+  login: { x: 480, y: 330, label: 'LOGIN PORTAL' },
+  api: { x: 760, y: 560, label: 'ORDERS API' },
+  internal: { x: 1060, y: 330, label: 'INTERNAL SERVER' },
+  dc: { x: 1340, y: 520, label: 'DIRECTORY' },
+};
+const HOSTS = [
+  { x: 470, y: 700, label: 'MAIL' },
+  { x: 760, y: 200, label: 'CDN' },
+  { x: 1060, y: 710, label: 'BACKUPS' },
+];
+const curve = (a: { x: number; y: number }, b: { x: number; y: number }) => {
+  const mx = (a.x + b.x) / 2;
+  return `M${a.x} ${a.y} C ${mx} ${a.y}, ${mx} ${b.y}, ${b.x} ${b.y}`;
+};
+const ATTACK = [[N.internet, N.login], [N.login, N.api], [N.api, N.internal], [N.internal, N.dc]].map(([a, b]) => curve(a, b));
+const NETWORK = [[N.login, HOSTS[1]], [N.login, HOSTS[0]], [N.api, HOSTS[2]], [N.internal, HOSTS[2]], [N.internal, HOSTS[1]]].map(([a, b]) => curve(a, b));
+const FINDINGS = [
+  { at: { x: N.login.x + 30, y: N.login.y + 30 }, id: 'F-01', text: 'Weak admin password', sev: 'HIGH' },
+  { at: { x: N.internal.x + 30, y: N.internal.y + 30 }, id: 'F-02', text: 'Jenkins reachable inside', sev: 'CRITICAL' },
+  { at: { x: N.dc.x - 185, y: N.dc.y + 44 }, id: 'F-03', text: 'Plaintext root password', sev: 'CRITICAL' },
+];
+const nodes = Object.values(N);
+---
+<section class="engage" id="engage" aria-labelledby="engage-title" data-nodes={JSON.stringify({ internet: N.internet, login: N.login, api: N.api, internal: N.internal, dc: N.dc })}>
+  <div class="intro wrap">
+    <p class="label accent">How I work</p>
+    <h2 id="engage-title">One test, start to finish.</h2>
+    <p>Scroll through a typical engagement. The network is made up; the steps are the ones I follow on every lab and would follow on yours.</p>
+    <a class="skip-walk label" href="#about">Skip the walkthrough ↓</a>
+  </div>
+
+  <div class="stage">
+    <svg class="map" aria-hidden="true" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid meet">
+      <g class="grid"></g>
+      <path class="scope" d="M300 130 H1440 a20 20 0 0 1 20 20 V800 a20 20 0 0 1 -20 20 H300 a20 20 0 0 1 -20 -20 V150 a20 20 0 0 1 20 -20 Z" />
+      <text class="scope-label" x="300" y="112">IN SCOPE · ACME CORP</text>
+
+      <g class="oos">
+        <circle cx="1530" cy="250" r="15" />
+        <text x="1530" y="210" text-anchor="middle">PAYMENTS</text>
+        <text class="small" x="1530" y="300" text-anchor="middle">OUT OF SCOPE</text>
+        <path class="strike" d="M1512 232 L1548 268" />
+      </g>
+
+      {NETWORK.map((d) => <path class="net" d={d} />)}
+      {ATTACK.map((d) => <path class="base" d={d} />)}
+      {ATTACK.map((d) => <path class="attack" d={d} />)}
+
+      {HOSTS.map((h) => (
+        <g class="host"><circle cx={h.x} cy={h.y} r="13" /><text x={h.x + 26} y={h.y + 8}>{h.label}</text></g>
+      ))}
+      {nodes.map((n, i) => (
+        <g class={`node${i === 0 ? ' entry' : ''}`}>
+          <circle class="ring" cx={n.x} cy={n.y} r="22" />
+          <circle class="dot" cx={n.x} cy={n.y} r="18" />
+          <path class="tick" d={`M${n.x - 8} ${n.y} l5 5 l11 -12`} />
+          <text x={n.x} y={n.y - 40} text-anchor="middle">{n.label}</text>
+        </g>
+      ))}
+
+      {FINDINGS.map((f) => (
+        <g transform={`translate(${f.at.x} ${f.at.y})`}>
+          <g class="finding">
+            <rect width="370" height="82" rx="10" />
+            <text x="18" y="33" class="fid">{f.id} · <tspan class={f.sev === 'CRITICAL' ? 'crit' : 'high'}>{f.sev}</tspan></text>
+            <text x="18" y="63">{f.text}</text>
+            <g class="fixed"><rect x="250" y="13" width="104" height="30" rx="15" /><text x="302" y="34" text-anchor="middle">FIXED</text></g>
+          </g>
+        </g>
+      ))}
+
+      <g class="report">
+        <rect x="110" y="168" width="80" height="102" rx="8" />
+        <path d="M128 198 h44 M128 216 h44 M128 234 h30" />
+        <text x="150" y="150" text-anchor="middle">REPORT</text>
+      </g>
+    </svg>
+
+    <ol class="steps" data-scout="steps" aria-hidden="true">
+      {METHOD.map((m) => <li><span>{m.n}</span>{m.name}</li>)}
+    </ol>
+
+    <div class="cards" aria-hidden="true">
+      {METHOD.map((m) => (
+        <article class="card">
+          <p class="label accent">{m.n} · {m.name}</p>
+          <h3>{m.title}</h3>
+          <p>{m.body}</p>
+        </article>
+      ))}
+    </div>
+
+    <div class="outro">
+      <p>{STATS.writeups} engagements like this one,<br /><em>written up in full.</em></p>
+      <a class="btn solid" href="/writeups/">Read the writeups</a>
+    </div>
+  </div>
+
+  <!-- the same six steps as plain content: read aloud by screen readers, and shown to people who turn motion off -->
+  <ol class="static wrap">
+    {METHOD.map((m) => (
+      <li><p class="label accent">{m.n} · {m.name}</p><h3>{m.title}</h3><p>{m.body}</p></li>
+    ))}
+  </ol>
+</section>
+
+<style>
+  .engage { position: relative; height: 540vh; background: var(--paper-2); border-block: 1px solid var(--rule); }
+  .intro { position: absolute; top: 0; left: 0; right: 0; z-index: 3; padding-top: clamp(84px, 11vw, 130px); pointer-events: none; }
+  .intro > * { pointer-events: auto; }
+  .intro h2 { margin: 14px 0 16px; max-width: 14ch; }
+  .intro > p:not(.label) { color: var(--soft); max-width: 46ch; }
+  .skip-walk { display: inline-block; margin-top: 18px; text-decoration: none; color: var(--muted); }
+  .skip-walk:hover { color: var(--accent); }
+
+  .stage { position: sticky; top: 0; height: 100svh; overflow: hidden; }
+  .map { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .map :global(.grid line) { stroke: var(--rule); stroke-width: 1; opacity: 0.7; }
+  .scope { fill: none; stroke: var(--ink); stroke-width: 2.5; stroke-dasharray: 14 10; }
+  .scope-label, .oos text, .host text, .node text, .report text, .finding text { font: 500 23px var(--mono); letter-spacing: 0.05em; }
+  .scope-label { fill: var(--muted); font-size: 19px; }
+  .oos circle { fill: none; stroke: var(--rule-strong); stroke-width: 2; stroke-dasharray: 3 4; }
+  .oos text { fill: var(--muted); }
+  .oos .small { font-size: 16px; fill: var(--accent); }
+  .oos .strike { stroke: var(--accent); stroke-width: 2; }
+  .net, .base { fill: none; stroke: var(--rule-strong); stroke-width: 2.5; stroke-dasharray: 4 9; }
+  .attack { fill: none; stroke: var(--accent); stroke-width: 5; stroke-linecap: round; }
+  .host circle { fill: var(--card); stroke: var(--rule-strong); stroke-width: 2; }
+  .host text { fill: var(--muted); }
+  .node .dot { fill: var(--card); stroke: var(--ink); stroke-width: 2.5; }
+  .node .ring { fill: none; stroke: var(--accent); stroke-width: 2; opacity: 0; }
+  .node .tick { fill: none; stroke: var(--card); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+  .node text { fill: var(--ink); }
+  .finding, .fixed, .report { transform-box: fill-box; transform-origin: center; }
+  .finding rect { fill: var(--card); stroke: var(--rule-strong); }
+  .finding text { fill: var(--soft); font-size: 20px; letter-spacing: 0.01em; }
+  .finding .fid { fill: var(--muted); }
+  .finding .crit { fill: var(--accent); }
+  .finding .high { fill: var(--warn); }
+  .finding .fixed rect { fill: var(--ok); stroke: none; }
+  .finding .fixed text { fill: #fff; font-size: 15px; letter-spacing: 0.1em; }
+  .report rect { fill: var(--card); stroke: var(--ink); stroke-width: 2; }
+  .report path { stroke: var(--rule-strong); stroke-width: 3; stroke-linecap: round; }
+  .report text { fill: var(--ink); }
+
+  .steps { position: absolute; top: 78px; left: 50%; translate: -50% 0; display: flex; gap: 4px; list-style: none; z-index: 2; padding: 5px; border-radius: 999px; background: color-mix(in srgb, var(--paper) 80%, transparent); border: 1px solid var(--rule); }
+  .steps li { font: 500 11px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 6px 11px; border-radius: 999px; transition: color 0.3s, background 0.3s; white-space: nowrap; }
+  .steps li span { opacity: 0.55; margin-right: 6px; }
+  .steps li.on { background: var(--ink); color: var(--paper); }
+  .steps li.done { color: var(--ink); }
+
+  .cards { position: absolute; left: max(var(--gutter), calc((100vw - var(--wrap)) / 2 + var(--gutter))); top: 54%; width: min(390px, 38vw); z-index: 2; }
+  .card { position: absolute; left: 0; right: 0; top: 0; translate: 0 -50%; opacity: 0; background: var(--card); border: 1px solid var(--rule); border-radius: 14px; padding: 26px 26px 24px; box-shadow: var(--shadow); }
+  .card h3 { font-size: 1.75rem; line-height: 1.15; letter-spacing: -0.015em; margin: 10px 0 12px; }
+  .card p:not(.label) { color: var(--soft); font-size: 15.5px; }
+
+  .outro { position: absolute; inset: auto 0 11% 0; text-align: center; opacity: 0; z-index: 2; }
+  .outro p { font: 400 clamp(1.6rem, 3.4vw, 2.6rem)/1.2 var(--serif); letter-spacing: -0.02em; margin-bottom: 22px; }
+  .outro em { color: var(--accent); }
+
+  /* off screen but still read by screen readers, since the animated version is hidden from them */
+  .static { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+  @media (max-width: 860px) {
+    .engage { height: 500vh; }
+    .steps { top: 70px; left: var(--gutter); right: var(--gutter); translate: none; justify-content: space-between; overflow: hidden; }
+    .steps li { padding: 6px 7px; font-size: 9.5px; letter-spacing: 0.04em; }
+    .steps li span { display: none; }
+    .cards { left: 14px; right: 14px; width: auto; top: auto; bottom: 20px; height: 250px; }
+    .card { top: auto; bottom: 0; translate: none; padding: 20px; }
+    .card h3 { font-size: 1.4rem; }
+    .card p:not(.label) { font-size: 14.5px; }
+    .outro { inset: auto 16px 34% 16px; }
+  }
+
+  /* no scroll story: a normal list of the six steps */
+  @media (prefers-reduced-motion: reduce) {
+    .engage { height: auto; padding: clamp(84px, 11vw, 130px) 0; }
+    .intro { position: static; padding-top: 0; }
+    .skip-walk, .stage { display: none; }
+    .static { position: static; width: auto; height: auto; overflow: visible; clip-path: none; white-space: normal; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; list-style: none; margin-top: 40px; }
+    .static li { background: var(--card); border: 1px solid var(--rule); border-radius: 14px; padding: 22px; }
+    .static h3 { font-size: 1.4rem; margin: 8px 0; }
+    .static p:not(.label) { color: var(--soft); font-size: 15px; }
+  }
+</style>
+
+<script>
+  import { createTimeline, createDrawable, onScroll, stagger, utils, type Timeline } from 'animejs';
+  import { reduced } from '../scripts/motion';
+
+  const section = document.getElementById('engage')!;
+  const map = section.querySelector<SVGSVGElement>('.map')!;
+  const P = JSON.parse(section.dataset.nodes!) as Record<string, { x: number; y: number }>;
+
+  // a faint survey grid well past the edges, so wide screens never see where it ends
+  const grid = map.querySelector('.grid')!;
+  let g = '';
+  for (let x = -1600; x <= 3200; x += 80) g += `<line x1="${x}" y1="-1200" x2="${x}" y2="2200"/>`;
+  for (let y = -1200; y <= 2200; y += 80) g += `<line x1="-1600" y1="${y}" x2="3200" y2="${y}"/>`;
+  grid.innerHTML = g;
+
+  type View = { x: number; y: number; w: number; h: number };
+  const box = (pts: { x: number; y: number }[], pad = [130, 100]) => ({
+    x0: Math.min(...pts.map((p) => p.x)) - pad[0], x1: Math.max(...pts.map((p) => p.x)) + pad[0],
+    y0: Math.min(...pts.map((p) => p.y)) - pad[1], y1: Math.max(...pts.map((p) => p.y)) + pad[1],
+  });
+  // fit a box into the part of the screen the cards leave free: right ~55% on desktop, top ~55% on phones
+  function frame(b: ReturnType<typeof box>, mode: 'free' | 'full' | 'outro' = 'free'): View {
+    // before layout settles the map can measure 0 high; fall back to a screen-like ratio instead of NaN
+    const r = map.getBoundingClientRect(), asp = r.width && r.height ? r.width / r.height : 16 / 9, mobile = innerWidth < 860;
+    const fx = mode === 'full' ? [0.04, 0.96] : mode === 'outro' ? [0.08, 0.92] : mobile ? [0.05, 0.95] : [0.43, 0.95];
+    const fy = mode === 'full' ? [0.14, 0.9] : mode === 'outro' ? [0.14, mobile ? 0.56 : 0.66] : mobile ? [0.16, 0.6] : [0.16, 0.9];
+    const bw = b.x1 - b.x0, bh = b.y1 - b.y0;
+    const w = Math.max(bw / (fx[1] - fx[0]), (bh / (fy[1] - fy[0])) * asp), h = w / asp;
+    return { x: b.x0 - fx[0] * w - (w * (fx[1] - fx[0]) - bw) / 2, y: (b.y0 + b.y1) / 2 - h * (fy[0] + fy[1]) / 2, w, h };
+  }
+
+  let tl: Timeline | undefined;
+  function build() {
+    tl?.revert();
+    const view = frame(box([{ x: 80, y: 120 }, { x: 1580, y: 860 }], [20, 20]), 'full');
+    const setView = () => map.setAttribute('viewBox', `${view.x} ${view.y} ${view.w} ${view.h}`);
+    setView();
+
+    const attack = createDrawable(map.querySelectorAll('.attack'));
+    const nets = createDrawable(map.querySelectorAll('.net, .base'));
+    const scope = createDrawable(map.querySelector('.scope')!);
+    const strike = createDrawable(map.querySelector('.oos .strike')!);
+    const dots = map.querySelectorAll('.node .dot');
+    const rings = map.querySelectorAll('.node .ring');
+    const ticks = map.querySelectorAll('.node .tick');
+    const cards = section.querySelectorAll('.card');
+    const steps = section.querySelectorAll('.steps li');
+
+    utils.set([...attack, ...nets, scope, strike], { draw: '0 0' });
+    utils.set('.engage .host, .engage .node:not(.entry), .engage .finding, .engage .report, .engage .oos, .engage .scope-label', { opacity: 0 });
+    utils.set('.engage .fixed', { opacity: 0 });
+    const css = getComputedStyle(document.documentElement);
+    const CARD = css.getPropertyValue('--card').trim(), GREEN = css.getPropertyValue('--ok').trim(), RED = css.getPropertyValue('--accent').trim();
+    utils.set(dots, { fill: CARD });
+
+    const shots = [
+      frame(box([{ x: 80, y: 120 }, { x: 1580, y: 860 }], [10, 10])),
+      frame(box([{ x: 280, y: 130 }, { x: 1460, y: 820 }], [40, 40])),
+      frame(box([P.internet, P.login, P.api])),
+      frame(box([P.api, P.internal, P.dc])),
+      frame(box([{ x: 110, y: 140 }, { x: 1600, y: 760 }], [20, 30])),
+      frame(box([{ x: 110, y: 140 }, { x: 1600, y: 760 }], [20, 30])),
+    ];
+
+    tl = createTimeline({
+      defaults: { ease: 'inOutSine' },
+      autoplay: onScroll({ target: section, enter: 'start start', leave: 'end end', sync: 0.28 }),
+      onUpdate: (self) => {
+        const t = self.currentTime;
+        const i = t < 150 || t > 6050 ? -1 : Math.min(5, Math.floor(t / 1000));
+        steps.forEach((s, k) => { s.classList.toggle('on', k === i); s.classList.toggle('done', i > k || t > 6050); });
+      },
+    });
+
+    shots.forEach((s, i) => tl!.add(view, { ...s, duration: 550, onUpdate: setView }, i * 1000));
+    cards.forEach((c, i) => {
+      tl!.add(c, { opacity: [0, 1], y: [30, 0], duration: 300 }, i * 1000 + 150);
+      tl!.add(c, { opacity: 0, y: -30, duration: 250 }, i * 1000 + 850);
+    });
+    tl!
+      // scope
+      .add(scope, { draw: ['0 0', '0 1'], duration: 600 }, 200)
+      .add('.engage .scope-label', { opacity: 1, duration: 200 }, 500)
+      .add('.engage .oos', { opacity: 1, duration: 250 }, 450)
+      .add(strike, { draw: ['0 0', '0 1'], duration: 200 }, 700)
+      // recon
+      .add('.engage .node:not(.entry), .engage .host', { opacity: [0, 1], duration: 250, delay: stagger(60) }, 1200)
+      .add(nets, { draw: ['0 0', '0 1'], duration: 450, delay: stagger(40) }, 1350)
+      // exploit + escalate: the path draws node to node
+      .add(dots[0], { fill: RED, duration: 150 }, 2250);
+    [[2300, 0], [2600, 1], [3300, 2], [3600, 3]].forEach(([t, k]) => {
+      tl!.add(attack[k], { draw: ['0 0', '0 1'], duration: 300 }, t)
+        .add(dots[k + 1], { fill: RED, duration: 120 }, t + 290)
+        .add(rings[k + 1], { opacity: [0.9, 0], r: [22, 56], duration: 350, ease: 'outQuad' }, t + 290);
+    });
+    tl!
+      // report
+      .add('.engage .report', { opacity: [0, 1], y: [12, 0], duration: 300 }, 4200)
+      .add('.engage .finding', { opacity: [0, 1], scale: [0.92, 1], duration: 300, delay: stagger(120) }, 4400)
+      // retest: every finding closed
+      .add(attack, { stroke: GREEN, duration: 400 }, 5300)
+      .add([...dots].slice(1), { fill: GREEN, duration: 300, delay: stagger(60) }, 5300)
+      .add(dots[0], { fill: CARD, duration: 300 }, 5300)
+      .add([...ticks].slice(1), { opacity: [0, 1], duration: 200, delay: stagger(60) }, 5450)
+      .add('.engage .fixed', { opacity: [0, 1], scale: [0.6, 1], duration: 250, delay: stagger(120) }, 5500)
+      // outro
+      .add(cards[5], { opacity: 0, y: -30, duration: 250 }, 6050)
+      .add(view, { ...frame(box([{ x: 100, y: 130 }, { x: 1600, y: 830 }], [10, 10]), 'outro'), duration: 450, onUpdate: setView }, 6050)
+      .add('.engage .outro', { opacity: [0, 1], y: [20, 0], duration: 300 }, 6150)
+      .add({ hold: 0 }, { hold: 1, duration: 650 }, 6450);
+  }
+
+  // the heading scrolls up past the step bar, so the heading fades first and the bar only
+  // arrives once it has gone; read straight from the scroll position so a fast flick can't overlap them
+  const intro = section.querySelector<HTMLElement>('.intro')!;
+  const bar = section.querySelector<HTMLElement>('.steps')!;
+  function handoff() {
+    const p = -section.getBoundingClientRect().top;
+    intro.style.opacity = String(Math.min(1, Math.max(0, 1 - p / 110)));
+    const k = Math.min(1, Math.max(0, (p - 130) / 70));
+    bar.style.opacity = String(k);
+    bar.style.transform = `translateY(${(1 - k) * -10}px)`;
+    bar.style.visibility = k === 0 ? 'hidden' : '';
+  }
+
+  if (!reduced) {
+    handoff();
+    addEventListener('scroll', handoff, { passive: true });
+    build();
+    // colours are read from the theme, so redraw when it changes
+    addEventListener('fh:theme', () => build());
+    let rz = 0, lastW = innerWidth;
+    // phones fire resize when the address bar hides; only rebuild on a real width change
+    addEventListener('resize', () => {
+      if (innerWidth === lastW) return;
+      lastW = innerWidth;
+      clearTimeout(rz);
+      rz = window.setTimeout(build, 200);
+    });
+  }
+</script>

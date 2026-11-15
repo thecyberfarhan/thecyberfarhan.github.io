@@ -1,0 +1,42 @@
+---
+import { ROOMS } from '../data/rooms';
+const tones: Record<string, string> = { Easy: '#8fb3cc', Medium: '#e0a458', Hard: '#e6a1a9' };
+---
+<section class="lab-cta" id="lab-invite" aria-labelledby="lab-title">
+  <div class="wrap inner" data-reveal>
+    <div class="copy">
+      <p class="label">Off the clock</p>
+      <h2 id="lab-title" data-scout="labcta">I built a small CTF. <em>Play if you like.</em></h2>
+      <p>Three practice rooms with an attack box that runs in your browser. The first one needs no experience at all, and there is a certificate at the end.</p>
+      <a class="btn" href="/lab/">Enter the lab →</a>
+    </div>
+    <ol class="mini">
+      {ROOMS.map((r) => (
+        <li><a href={`/lab/${r.slug}.html`} style={`--t:${tones[r.level]}`}><span class="lvl">{r.level}</span><span class="nm">{r.name}</span><span class="mn">{r.minutes}</span></a></li>
+      ))}
+    </ol>
+  </div>
+</section>
+
+<style>
+  .lab-cta { padding: 0 0 clamp(84px, 11vw, 140px); }
+  .inner { display: grid; grid-template-columns: 1.2fr 1fr; gap: 40px; align-items: center; padding-top: clamp(30px, 5vw, 56px); padding-bottom: clamp(30px, 5vw, 56px); background: var(--deep); color: var(--on-dark); border-radius: 22px; }
+  .inner .label { color: var(--on-dark-muted); }
+  h2 { margin: 12px 0 14px; font-size: clamp(2rem, 4vw, 3rem); }
+  h2 em { color: var(--hi); }
+  .copy p:not(.label) { color: var(--on-dark-muted); max-width: 44ch; margin-bottom: 24px; }
+  .btn { background: var(--on-dark); color: var(--deep); border-color: var(--on-dark); }
+  .btn:hover { background: var(--hi); border-color: var(--hi); }
+  .mini { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .mini a { display: grid; grid-template-columns: 80px 1fr auto; align-items: center; gap: 14px; padding: 16px 18px; border-radius: 14px; border: 1px solid #ffffff1f; text-decoration: none; transition: border-color 0.25s, background 0.25s, transform 0.35s var(--ease-out); }
+  .mini a:hover { border-color: var(--t); background: #ffffff08; transform: translateX(4px); }
+  .lvl { font: 500 11.5px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--t); }
+  .nm { font: 400 1.3rem var(--serif); }
+  .mn { font-size: 13px; color: var(--on-dark-muted); }
+  @media (max-width: 860px) { .inner { grid-template-columns: 1fr; border-radius: 0; } }
+</style>
+
+<script>
+  import { initReveals } from '../scripts/motion';
+  initReveals(document.querySelector('.lab-cta')!);
+</script>

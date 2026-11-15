@@ -1,0 +1,243 @@
+---
+import { JOURNEY } from '../data/site';
+const detours = JOURNEY.filter((s) => s.kind === 'detour').length;
+// a main stop shares its rows with the detours that follow it, so side skills sit beside it on wide screens
+const rows: string[] = [];
+let row = 0;
+JOURNEY.forEach((s, i) => {
+  if (s.kind === 'detour') return;
+  row++;
+  let n = 0;
+  while (JOURNEY[i + 1 + n]?.kind === 'detour') { rows[i + 1 + n] = String(row + n); n++; }
+  rows[i] = n ? `${row} / span ${n}` : String(row);
+  row += Math.max(0, n - 1);
+});
+---
+<section class="block journey" id="journey" aria-labelledby="journey-title">
+  <div class="wrap">
+    <div class="sec-head" data-reveal>
+      <div><p class="label accent">Journey</p><h2 id="journey-title">How I got here.</h2></div>
+      <p>During intermediate I tried {detours} other things on the side before the one that stuck.</p>
+    </div>
+    <div class="map" id="journey-map">
+      <svg class="road" aria-hidden="true">
+        <path class="track" />
+        <path class="trail" />
+        <g class="pins"></g>
+      </svg>
+      <span class="walker" aria-hidden="true"><i></i></span>
+      <ol data-scout="journey">
+        {JOURNEY.map((s, i) => (
+          <li class:list={[s.kind, { now: i === JOURNEY.length - 1, first: s.kind === 'detour' && JOURNEY[i - 1]?.kind !== 'detour' }]} style={`--row:${rows[i]}`}>
+            <p class="when label">{s.when}</p>
+            <h3>{s.title}</h3>
+            <p class="body">{s.body}</p>
+            {s.tags && <ul class="tags">{s.tags.map((t) => <li>{t}</li>)}</ul>}
+            {s.kind === 'detour' && <span class="stamp" aria-label="Verdict: not for me">Not for me</span>}
+          </li>
+        ))}
+      </ol>
+    </div>
+  </div>
+</section>
+
+<style>
+  /* a faint dotted map behind the road */
+  .map { position: relative; max-width: 980px; margin: 0 auto; padding: 8px 0 24px; }
+  .map::before { content: ''; position: absolute; inset: -20px 0; background: radial-gradient(circle, var(--rule-strong) 1px, transparent 1.4px) 0 0 / 22px 22px; mask: linear-gradient(to bottom, transparent, #000 12%, #000 88%, transparent); opacity: 0.55; pointer-events: none; }
+  .road { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+  .track { fill: none; stroke: var(--rule-strong); stroke-width: 2; stroke-dasharray: 2 7; stroke-linecap: round; }
+  .trail { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+  .road :global(.pin) { fill: var(--paper); stroke: var(--rule-strong); stroke-width: 2; transition: fill 0.3s, stroke 0.3s; }
+  .road :global(.pin.reached) { fill: var(--accent); stroke: var(--accent); }
+  .road :global(.x) { stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-dasharray: 20; stroke-dashoffset: 20; transition: stroke-dashoffset 0.35s 0.1s var(--ease-out); }
+  .road :global(.x.reached) { stroke-dashoffset: 0; }
+  .road :global(.ico) { font: 600 10px var(--mono); fill: var(--muted); text-anchor: middle; dominant-baseline: central; transition: fill 0.3s; }
+  .road :global(.ico.reached) { fill: var(--on-accent); }
+  .road :global(.span) { fill: none; stroke: var(--rule-strong); stroke-width: 1.5; transition: stroke 0.4s; }
+  .road :global(.span.reached) { stroke: color-mix(in srgb, var(--accent) 60%, transparent); }
+  .walker { position: absolute; left: 0; top: 0; width: 18px; height: 18px; margin: -9px 0 0 -9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 22%, transparent); z-index: 2; will-change: transform; }
+  .walker i { position: absolute; inset: -5px; border-radius: 50%; border: 1.5px solid var(--accent); animation: walker 1.8s ease-out infinite; }
+  @keyframes walker { from { transform: scale(0.6); opacity: 1; } to { transform: scale(2.2); opacity: 0; } }
+
+  ol { position: relative; list-style: none; display: grid; grid-template-columns: 1fr 1fr; column-gap: 220px; }
+  ol > li { position: relative; grid-column: 1; grid-row: var(--row); align-self: start; padding: 6px 0 56px; text-align: right; opacity: 0.28; translate: 0 14px; transition: opacity 0.6s var(--ease-out), translate 0.6s var(--ease-out); }
+  ol > li.detour { grid-column: 2; text-align: left; min-height: 150px; padding-bottom: 34px; }
+  /* the first side skill starts a little below its main stop, so the road reaches the stop before it branches */
+  ol > li.detour.first { margin-top: 84px; }
+  ol > li.reached { opacity: 1; translate: none; }
+  .when { margin-bottom: 6px; }
+  .detour .when { color: var(--muted); }
+  h3 { font-size: 1.75rem; line-height: 1.12; margin-bottom: 6px; }
+  .detour h3 { font-size: 1.4rem; }
+  .body { color: var(--soft); font-size: 15.5px; max-width: 40ch; margin-left: auto; }
+  .detour .body { margin-left: 0; font-size: 15px; }
+  .tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; list-style: none; }
+  .tags li { font: 500 11px var(--mono); padding: 3px 8px; border-radius: 999px; border: 1px solid var(--rule); color: var(--muted); }
+  .stamp { position: absolute; top: 2px; right: 0; padding: 4px 9px; border: 1.5px solid var(--accent); border-radius: 4px; color: var(--accent); font: 600 10.5px var(--mono); letter-spacing: 0.12em; text-transform: uppercase; rotate: -7deg; opacity: 0; scale: 1.7; transition: opacity 0.25s 0.35s, scale 0.35s 0.35s cubic-bezier(0.3, 1.6, 0.5, 1); }
+  .detour.reached .stamp { opacity: 0.9; scale: 1; }
+  .now h3 { color: var(--accent); }
+  .now .when::before { content: ''; display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: var(--ok); vertical-align: 1px; box-shadow: 0 0 0 4px color-mix(in srgb, var(--ok) 20%, transparent); }
+  ol > li:last-child { padding-bottom: 0; }
+  :global(:root:not(.js-motion)) ol > li { opacity: 1; translate: none; }
+  :global(:root:not(.js-motion)) .stamp { opacity: 0.9; scale: 1; }
+
+  @media (max-width: 760px) {
+    ol { grid-template-columns: 1fr; column-gap: 0; padding-left: 86px; }
+    ol > li, ol > li.detour { grid-column: 1; grid-row: auto; text-align: left; }
+    ol > li.detour.first { margin-top: 0; }
+    .body { margin-left: 0; }
+    .stamp { position: static; display: inline-block; margin-top: 10px; }
+  }
+</style>
+
+<script>
+  import { initReveals, reduced } from '../scripts/motion';
+
+  const root = document.getElementById('journey')!;
+  initReveals(root);
+  const map = root.querySelector<HTMLElement>('#journey-map')!;
+  const svg = map.querySelector<SVGSVGElement>('.road')!;
+  const track = svg.querySelector<SVGPathElement>('.track')!;
+  const trail = svg.querySelector<SVGPathElement>('.trail')!;
+  const pins = svg.querySelector<SVGGElement>('.pins')!;
+  const walker = map.querySelector<HTMLElement>('.walker')!;
+  const stops = [...map.querySelectorAll<HTMLLIElement>('ol > li')];
+  const NS = 'http://www.w3.org/2000/svg';
+  // a badge on each detour's pin, in the order the detours appear
+  const ICONS = ['</>', '✎', '$', '▶'];
+
+  let total = 1;
+  let pts: { l: number; x: number; y: number }[] = [];
+  let marks: { li: HTMLLIElement; at: number; pin: SVGElement[] }[] = [];
+
+  // the road is built from where the stops actually sit, so it fits any width or text length
+  function build() {
+    // desktop: the spine runs down the gutter between the columns; phone: down the left edge
+    const narrow = matchMedia('(max-width: 760px)').matches;
+    const x = narrow ? 18 : (map.clientWidth - 220) / 2 + 50;
+    const apex = narrow ? 38 : 120;
+    let d = `M ${x} 0`;
+    let y = 0;
+    pins.textContent = '';
+    const anchors: { li: HTMLLIElement; ax: number; ay: number; kind: string; until?: number; icon?: string }[] = [];
+    let detourN = 0;
+    let owner: (typeof anchors)[number] | undefined;
+    stops.forEach((li) => {
+      const a = li.offsetTop + 22;
+      if (li.classList.contains('detour')) {
+        // every detour gets its own road, so no two side quests look alike
+        const k = detourN++ % 4;
+        const top = a - 52, bot = a + 62, A = apex;
+        d += ` C ${x + 10} ${(y + top) / 2}, ${x - 10} ${(y + top) / 2}, ${x} ${top}`;
+        if (k === 0) {
+          // front-end: one tidy loop, like a component that renders and goes nowhere
+          d += ` C ${x} ${a - 24}, ${x + A} ${a - 34}, ${x + A} ${a}`;
+          d += ` C ${x + A} ${a + 34}, ${x} ${a + 30}, ${x} ${bot}`;
+        } else if (k === 1) {
+          // graphic design: a pen squiggle out and back
+          d += ` Q ${x + A * 0.2} ${a - 52}, ${x + A * 0.38} ${a - 30} T ${x + A * 0.7} ${a - 16} T ${x + A} ${a}`;
+          d += ` Q ${x + A * 0.85} ${a + 30}, ${x + A * 0.55} ${a + 26} T ${x} ${bot}`;
+        } else if (k === 2) {
+          // marketing: straight into the funnel, squeezed out the bottom
+          d += ` L ${x + A + 18} ${a - 40} L ${x + A} ${a} L ${x + A * 0.5} ${a + 34} Q ${x} ${a + 44}, ${x} ${bot}`;
+        } else {
+          // video editing: round the edge of a film frame
+          d += ` Q ${x} ${a - 30}, ${x + 14} ${a - 30} L ${x + A - 14} ${a - 30} Q ${x + A} ${a - 30}, ${x + A} ${a - 16} L ${x + A} ${a + 16} Q ${x + A} ${a + 30}, ${x + A - 14} ${a + 30} L ${x + 14} ${a + 30} Q ${x} ${a + 30}, ${x} ${bot}`;
+        }
+        anchors.push({ li, ax: x + A, ay: a, kind: 'detour', icon: ICONS[k] });
+        if (owner) owner.until = bot;
+        y = bot;
+      } else {
+        const mid = (y + a) / 2;
+        d += ` C ${x + 16} ${mid - (a - y) / 6}, ${x - 16} ${mid + (a - y) / 6}, ${x} ${a}`;
+        owner = { li, ax: x, ay: a, kind: 'main' };
+        anchors.push(owner);
+        y = a;
+      }
+    });
+    track.setAttribute('d', d);
+    trail.setAttribute('d', d);
+    total = trail.getTotalLength();
+    trail.style.strokeDasharray = `${total}`;
+
+    // where along the road each stop sits: sample the path and keep the closest point
+    const samples = Math.ceil(total / 4);
+    pts = [];
+    for (let i = 0; i <= samples; i++) { const l = (i / samples) * total; const p = trail.getPointAtLength(l); pts.push({ l, x: p.x, y: p.y }); }
+    marks = anchors.map(({ li, ax, ay, kind, until, icon }) => {
+      let best = pts[0], bd = Infinity;
+      for (const p of pts) { const dd = (p.x - ax) ** 2 + (p.y - ay) ** 2; if (dd < bd) { bd = dd; best = p; } }
+      const els: SVGElement[] = [];
+      const c = document.createElementNS(NS, 'circle');
+      c.setAttribute('cx', String(ax)); c.setAttribute('cy', String(ay)); c.setAttribute('r', kind === 'detour' ? '12' : '8');
+      c.classList.add('pin');
+      pins.appendChild(c); els.push(c);
+      if (kind === 'detour') {
+        const t = document.createElementNS(NS, 'text');
+        t.setAttribute('x', String(ax)); t.setAttribute('y', String(ay + 0.5));
+        t.classList.add('ico');
+        t.textContent = icon ?? '';
+        pins.appendChild(t); els.push(t);
+        const xg = document.createElementNS(NS, 'path');
+        xg.setAttribute('d', `M ${ax + 18} ${ay - 6} l 12 12 M ${ax + 30} ${ay - 6} l -12 12`);
+        xg.classList.add('x');
+        pins.appendChild(xg); els.push(xg);
+      }
+      // a main stop with side skills gets a bracket down its side for as long as they ran
+      if (until && !narrow) {
+        const bx = ax - 30;
+        const br = document.createElementNS(NS, 'path');
+        br.setAttribute('d', `M ${bx - 8} ${ay} H ${bx} V ${until} H ${bx - 8}`);
+        br.classList.add('span');
+        pins.appendChild(br); els.push(br);
+      }
+      return { li, at: best.l, pin: els };
+    });
+  }
+
+  // the road only ever heads down, so a height maps to one distance along it
+  function lenAt(y: number) {
+    if (y <= 0) return 0;
+    let i = pts.findIndex((p) => p.y > y);
+    if (i === -1) return total;
+    if (i === 0) return 0;
+    const a = pts[i - 1], b = pts[i];
+    return a.l + (b.l - a.l) * ((y - a.y) / Math.max(0.001, b.y - a.y));
+  }
+
+  function render(y: number) {
+    const len = lenAt(y);
+    trail.style.strokeDashoffset = String(total - len);
+    const pt = trail.getPointAtLength(len);
+    walker.style.transform = `translate3d(${pt.x}px, ${pt.y}px, 0)`;
+    // a stop, its pin and its text all switch on the moment the walker reaches it
+    marks.forEach((m) => {
+      const on = len >= m.at - 2;
+      m.li.classList.toggle('reached', on);
+      m.pin.forEach((e) => e.classList.toggle('reached', on));
+    });
+  }
+
+  // progress is read straight from the map's position and eased toward, so it never depends
+  // on offsets cached before the page settled
+  const state = { p: 0, goal: 0, raf: 0 };
+  // the walker sits a little below the middle of the screen
+  const target = () => innerHeight * 0.58 - map.getBoundingClientRect().top;
+  const tick = () => {
+    state.p += (state.goal - state.p) * 0.18;
+    if (Math.abs(state.goal - state.p) < 0.3) state.p = state.goal;
+    render(state.p);
+    state.raf = state.p === state.goal ? 0 : requestAnimationFrame(tick);
+  };
+  build();
+  if (reduced) {
+    render(Infinity);
+  } else {
+    state.p = state.goal = target();
+    render(state.p);
+    addEventListener('scroll', () => { state.goal = target(); if (!state.raf) state.raf = requestAnimationFrame(tick); }, { passive: true });
+  }
+  let rz = 0;
+  new ResizeObserver(() => { clearTimeout(rz); rz = window.setTimeout(() => { build(); render(reduced ? Infinity : state.p); }, 120); }).observe(map);
+</script>

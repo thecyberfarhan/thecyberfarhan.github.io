@@ -1,0 +1,51 @@
+---
+import Base from '../layouts/Base.astro';
+import Hero from '../components/Hero.astro';
+import Engagement from '../components/Engagement.astro';
+import About from '../components/About.astro';
+import Record from '../components/Record.astro';
+import Projects from '../components/Projects.astro';
+import Toolkit from '../components/Toolkit.astro';
+import LabCta from '../components/LabCta.astro';
+import Journey from '../components/Journey.astro';
+import Contact from '../components/Contact.astro';
+import { SITE, STATS } from '../data/site';
+
+const description = `Farhan Hussain, CPENT-certified penetration tester focused on web and API security. TryHackMe top ${STATS.thmRank}%, ${STATS.writeups} published writeups.`;
+const jsonld = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    {
+      '@type': 'Person',
+      '@id': `${SITE.url}/#me`,
+      name: SITE.name,
+      alternateName: 'thecyberfarhan',
+      jobTitle: 'Penetration Tester',
+      description: `CPENT-certified web and API penetration tester. TryHackMe top ${STATS.thmRank}%, ${STATS.writeups} published writeups.`,
+      url: `${SITE.url}/`,
+      email: `mailto:${SITE.email}`,
+      address: { '@type': 'PostalAddress', addressLocality: 'Bahawalnagar', addressRegion: 'Punjab', addressCountry: 'PK' },
+      sameAs: [SITE.linkedin, SITE.github, SITE.tryhackme],
+      knowsAbout: ['Penetration testing', 'Web application security', 'API security', 'Active Directory', 'OWASP Top 10', 'Python', 'Bash'],
+      hasCredential: {
+        '@type': 'EducationalOccupationalCredential',
+        name: 'CPENT, Certified Penetration Testing Professional',
+        credentialCategory: 'certification',
+        recognizedBy: { '@type': 'Organization', name: 'EC-Council' },
+      },
+    },
+    { '@type': 'WebSite', '@id': `${SITE.url}/#site`, url: `${SITE.url}/`, name: `${SITE.name} | Penetration Tester`, author: { '@id': `${SITE.url}/#me` } },
+  ],
+};
+---
+<Base title="Farhan Hussain | Penetration Tester" description={description} jsonld={jsonld}>
+  <Hero />
+  <Engagement />
+  <About />
+  <Record />
+  <Projects />
+  <LabCta />
+  <Toolkit />
+  <Journey />
+  <Contact slot="after" />
+</Base>

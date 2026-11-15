@@ -1,0 +1,75 @@
+{
+  "name": "Scout",
+  "body": {
+    "primary": {
+      "type": "capsule",
+      "width": 200,
+      "height": 250,
+      "depth": 190,
+      "roundness": 1
+    },
+    "nodes": [
+      {
+        "color": "#16181d",
+        "surface": {
+          "type": "cylinder",
+          "width": 10,
+          "height": 42,
+          "depth": 10,
+          "roundness": 1
+        },
+        "position": [
+          0,
+          -140,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "color": "#9e1b2c",
+        "surface": {
+          "type": "sphere",
+          "width": 32,
+          "height": 32,
+          "depth": 32,
+          "roundness": 1
+        },
+        "position": [
+          0,
+          -166,
+          0
+        ],
+        "rotation": [
+          0,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  "colors": {
+    "body": "#eef0f3",
+    "eyes": "#16181d"
+  },
+  "style": {
+    "outline": {
+      "enabled": true,
+      "color": "#16181d",
+      "width": 6,
+      "opacity": 1
+    }
+  },
+  "face": {
+    "eyes": {
+      "width": 0.9,
+      "height": 1,
+      "gap": 1.05,
+      "shiftY": 0
+    },
+    "perspective": 0.7
+  }
+}

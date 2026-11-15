@@ -1,26 +1,21 @@
 # sync-writeups.mjs
 
-Pulls every writeup from [CTF-Writeups](https://github.com/thecyberfarhan/CTF-Writeups) (the `TryHackme/` and `HackTheBox/` folders), parses the shared template they're all written in, and regenerates everything in `writeups/`.
+Pulls every writeup from [CTF-Writeups](https://github.com/thecyberfarhan/CTF-Writeups) (the `TryHackme/` and `HackTheBox/` folders), parses the template they're written in, and writes `src/data/writeups.json`. Astro builds every writeup page, the writeup count, the home-page ledger, the sitemap and `llms.txt` from that one file, so nothing on the site is patched by find-and-replace.
 
-- **The total count** (both folders, every difficulty) drives the "N writeups" stat on the main site, in the og/meta descriptions, and in `llms.txt`. That's a raw fact, not curated -- it updates every run.
-- **The on-site pages** are curated down to Medium/Hard/unrated (anything that isn't explicitly Easy or Very Easy, including HTB's Starting Point track, which is treated the same as Very Easy since it never self-reports a difficulty word). The easy ones stay on GitHub only.
-- **Nothing here is append-only.** A writeup renamed or deleted upstream has its page removed here on the next run.
+- Every writeup gets a page, all difficulties included.
+- Nothing is append-only: a writeup renamed or deleted upstream disappears on the next build.
+- The file is only rewritten when a writeup actually changed, so CI does not commit noise.
 
 Run it locally:
 
 ```bash
-node scripts/sync-writeups.mjs
-```
-
-A `GITHUB_TOKEN` env var is optional locally (raises the GitHub API rate limit from 60/hr to 5000/hr -- useful if you're iterating and hitting 403s):
-
-```bash
-GITHUB_TOKEN=$(gh auth token) node scripts/sync-writeups.mjs
+npm run sync
+GITHUB_TOKEN=$(gh auth token) npm run sync   # higher GitHub API rate limit
 ```
 
 ## Automation
 
-`.github/workflows/sync-writeups.yml` runs this on a schedule (every 3 hours), on manual dispatch, and on a `repository_dispatch` event -- so a new writeup pushed to CTF-Writeups shows up here automatically within a few hours at most, with zero setup. No PAT or secret needed for this part; the workflow's automatic `GITHUB_TOKEN` is enough to read a public repo.
+`.github/workflows/site.yml` runs the sync, commits the JSON if it changed, builds and deploys. It runs on every push to `main`, every 3 hours, on manual dispatch, and on a `repository_dispatch` event of type `writeups-updated`.
 
 ### Optional: instant sync instead of a 3-hour wait
 
@@ -52,8 +47,8 @@ That needs a one-time setup step only you can do (creating a token requires GitH
 3. Permissions: Repository permissions -> **Contents: Read and write** (that's what `repository_dispatch` needs).
 4. Generate it, then in `CTF-Writeups` -> Settings -> Secrets and variables -> Actions -> **New repository secret** -> name it `PORTFOLIO_DISPATCH_TOKEN`, paste the token.
 
-Without this, the 3-hour scheduled sync still covers it -- this step is purely for "instant" instead of "within a few hours."
+Without this, the 3-hour scheduled run still covers it -- this step is purely for "instant" instead of "within a few hours."
 
 ## Template assumptions
 
-The parser is defensive but it is written against the specific template every writeup so far has used: a leading `# THM — Name` or `# Name — TryHackMe Writeup` heading (or, failing that, the last line of the ASCII-art banner), a `> **Difficulty:** X` metadata line (or, failing that, a known difficulty word in the banner's last line), and `## Heading` sections named TL;DR, Introduction, Recon, Foothold, Shell / Access, Escalation, Exploitation, Rabbit Holes, Mitigations, Key Takeaway, If I Did It Again. If a future writeup drops this template entirely, its difficulty/title detection may need a new fallback added to `parseWriteup()` -- the script fails loudly (throws) rather than silently publishing a mangled page if it can't find the writeup-count anchors in `index.html`, but a single malformed writeup file currently degrades gracefully (missing pieces just don't render) rather than aborting the whole sync.
+The parser handles both templates used so far: the older one (`**Difficulty:**` line, bullet list under "Tools Used", headings like "Shell / Access") and the newer one (difficulty in the ASCII banner, a `| Tool | Purpose |` table, "Shell / Initial Access", "Escalation Path", dates in the Changelog table). Section headings are matched by aliases in `SECTION_ORDER`; a writeup with a heading it does not know simply leaves that section out rather than failing the build.

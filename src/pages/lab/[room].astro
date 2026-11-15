@@ -1,0 +1,321 @@
+---
+import Base from '../../layouts/Base.astro';
+import PhoneNote from '../../components/PhoneNote.astro';
+import { ROOMS, countQuestions, type Room } from '../../data/rooms';
+
+export function getStaticPaths() {
+  return ROOMS.map((r, i) => ({ params: { room: r.slug }, props: { r, n: i + 1, next: ROOMS[i + 1] ?? null } }));
+}
+interface Props { r: Room; n: number; next: Room | null }
+const { r, n, next } = Astro.props;
+const total = countQuestions(r);
+const tone = r.level === 'Hard' ? '#9e1b2c' : r.level === 'Medium' ? '#a8642a' : '#3f6e8c';
+---
+<Base title={`${r.name} · Lab | Farhan Hussain`} description={`${r.level} practice room: ${r.blurb}`} path={`/lab/${r.slug}.html`} tone={tone}>
+  <div class="room" id="room" data-slug={r.slug} data-view="tasks">
+    <header class="head wrap">
+      <a class="label back" href="/lab/">← The lab</a>
+      <div class="title-row">
+        <div>
+          <p class="label kicker">Room {n} · {r.level} · {r.minutes}</p>
+          <h1>{r.name}</h1>
+        </div>
+        <div class="stats">
+          <div><span class="label">Progress</span><b id="prog-n">0 of {total}</b></div>
+          {r.hints && <div><span class="label">Hints used</span><b id="hints-n">0</b></div>}
+          {!r.hints && <span id="hints-n" hidden>0</span>}
+          {r.limit > 0 && <div class="clock"><span class="label">Clock</span><b id="clock-n">{Math.floor(r.limit / 60)}:00</b></div>}
+          {r.strikes > 0 && <div><span class="label">Strikes</span><b id="strikes-n">0/{r.strikes}</b></div>}
+        </div>
+      </div>
+      <div class="prog" aria-hidden="true"><span id="prog-bar"></span></div>
+      <PhoneNote />
+    </header>
+    <div class="view-switch wrap" role="group" aria-label="Show">
+      <button type="button" data-view-btn="tasks" aria-pressed="true">Tasks</button>
+      <button type="button" data-view-btn="box" aria-pressed="false">Lab box</button>
+    </div>
+
+    <div class="layout wrap">
+      <section class="tasks" aria-label="Tasks">
+        <div class="intro">{r.intro.map((p) => <p>{p}</p>)}</div>
+        <ol class="task-list">
+          {r.tasks.map((t, ti) => (
+            <li class="task">
+              <details open={ti === 0}>
+                <summary><span class="tn">Task {ti + 1}</span><span class="tt">{t.title}</span><span class="tick" aria-hidden="true">✓</span></summary>
+                <div class="task-body">
+                  <p>{t.body}</p>
+                  {(t.cmd || t.browse) && (
+                    <div class="run-row">
+                      {t.cmd && r.guided && <code>{t.cmd}</code>}
+                      {t.cmd && r.guided && <button type="button" class="btn solid sm" data-run={t.cmd}>Run</button>}
+                      {t.browse && r.guided && <button type="button" class="btn line sm" data-browse={t.browse}>Open in browser</button>}
+                    </div>
+                  )}
+                  {r.hints && t.hint && (<><button type="button" class="hint-btn label">Show hint (counted)</button><p class="hint" hidden>{t.hint}</p></>)}
+                  {t.questions.map((q, qi) => (
+                    <form class="q" data-id={`${ti}-${qi}`}>
+                      <label for={`q-${ti}-${qi}`}>{q.q}</label>
+                      <div class="q-row">
+                        <input id={`q-${ti}-${qi}`} placeholder={q.ph ?? 'Answer'} autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="80" />
+                        <button type="submit" class="btn solid sm">Submit</button>
+                      </div>
+                    </form>
+                  ))}
+                </div>
+              </details>
+            </li>
+          ))}
+        </ol>
+
+        <section class="complete" id="done" hidden aria-labelledby="done-title">
+          <p class="label accent">Room complete</p>
+          <h2 id="done-title">You broke into {r.name}.</h2>
+          <dl class="done-stats"><div><dt class="label">Time</dt><dd id="done-time">—</dd></div><div><dt class="label">Hints</dt><dd id="done-hints">0</dd></div></dl>
+          <p class="badges-new" id="done-badges"></p>
+          <div class="debrief">
+            <h3>{r.debrief.title}</h3>
+            <ul>{r.debrief.points.map((p) => <li>{p}</li>)}</ul>
+            <h3>How the owner should fix it</h3>
+            <ul>{r.debrief.fix.map((p) => <li>{p}</li>)}</ul>
+          </div>
+          <div class="cert-box">
+            <h3>Your certificate</h3>
+            <form id="cert-form" class="q-row">
+              <label class="sr-only" for="cert-name">Name on the certificate</label>
+              <input id="cert-name" placeholder="Your name" maxlength="40" autocomplete="name" />
+              <button type="submit" class="btn line sm">Done</button>
+            </form>
+            <canvas id="cert" hidden aria-label="Your completion certificate"></canvas>
+            <button type="button" id="cert-dl" class="btn solid" disabled>Download certificate (PDF)</button>
+          </div>
+          <div class="done-next">
+            {next ? <a class="btn solid" href={`/lab/${next.slug}.html`}>Next room: {next.name} →</a> : <a class="btn solid" href="/lab/">Back to the lab</a>}
+            <a class="btn line" href="/writeups/">Read real writeups</a>
+          </div>
+        </section>
+      </section>
+
+      <section class="machine" aria-label="Lab box">
+        <div class="m-bar">
+          <span id="m-status" class="m-status off">Machine off</span>
+          <span id="m-ip-wrap" class="m-ip" hidden>
+            <span class="m-k">Target</span><button type="button" id="m-ip" class="m-copy" title="Copy the IP"></button>
+            <code class="m-var" title="Use it in any command: nmap $TARGET, curl http://$TARGET/">$TARGET</code>
+          </span>
+          <span id="m-up" class="m-up" hidden></span>
+          <button type="button" id="m-start" class="btn solid sm">Start machine</button>
+          <span id="m-prog" class="m-prog" hidden aria-hidden="true"><i></i></span>
+        </div>
+        <div class="box">
+          <div class="box-start" id="box-start">
+            <p class="label">Lab box</p>
+            <h3>Your attack machine, in the browser.</h3>
+            <p>A terminal and a web browser on the target's network. Nothing here touches the real internet.</p>
+            <ul class="box-feats"><li>Tabs you can drag around</li><li><code>$TARGET</code> ready to use</li><li>Survives a refresh</li></ul>
+            <button type="button" class="btn line" id="box-start-btn">Start lab box</button>
+          </div>
+          <div class="boot" id="boot" hidden></div>
+          <div class="desk" id="desk" hidden>
+            <div class="tabs" id="tabs" role="tablist"><button type="button" id="tab-new" class="tab-new" aria-label="New terminal">+</button></div>
+            <div class="panes" id="panes"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</Base>
+
+<style>
+  .room { padding-top: clamp(96px, 11vw, 120px); padding-bottom: 80px; }
+  .back { text-decoration: none; }
+  .back:hover { color: var(--accent); }
+  .title-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 20px; margin-top: 18px; }
+  .kicker { color: var(--tone-ink); }
+  h1 { font-size: clamp(2.4rem, 5.6vw, 4.2rem); line-height: 1; letter-spacing: -0.03em; margin-top: 8px; }
+  .stats { display: flex; gap: 26px; }
+  .stats div { display: flex; flex-direction: column; gap: 2px; }
+  .stats b { font: 400 1.5rem var(--serif); }
+  .clock.low b { color: var(--accent); }
+  .prog { height: 3px; background: var(--rule); margin: 22px 0 0; border-radius: 3px; overflow: hidden; }
+  .prog span { display: block; height: 100%; background: var(--tone); transform: scaleX(0); transform-origin: left; transition: transform 0.6s var(--ease-out); }
+  .view-switch { display: none; }
+
+  .layout { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 28px; margin-top: 28px; align-items: start; }
+  .intro p { color: var(--soft); margin-bottom: 12px; }
+  .task-list { list-style: none; margin-top: 22px; display: flex; flex-direction: column; gap: 10px; }
+  .task details { background: var(--card); border: 1px solid var(--rule); border-radius: 14px; overflow: hidden; }
+  .task summary { display: flex; align-items: center; gap: 14px; padding: 16px 18px; cursor: pointer; list-style: none; }
+  .task summary::-webkit-details-marker { display: none; }
+  .tn { font: 500 11.5px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+  .tt { font: 400 1.2rem var(--serif); flex: 1; }
+  .tick { width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--rule-strong); display: grid; place-items: center; font-size: 12px; color: transparent; transition: background 0.3s, color 0.3s, border-color 0.3s; }
+  .task.done .tick { background: var(--ok); border-color: var(--ok); color: #fff; }
+  .task-body { padding: 0 18px 18px; color: var(--soft); font-size: 15.5px; }
+  .task-body > p { margin-bottom: 14px; }
+  .run-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .run-row code { font: 500 13px var(--mono); background: var(--code-bg); color: var(--code-fg); padding: 8px 12px; border-radius: 8px; overflow-wrap: anywhere; }
+  .hint-btn { color: var(--accent); margin-bottom: 8px; }
+  .hint-btn:disabled { color: var(--muted); }
+  .hint { font-size: 14.5px; padding: 10px 12px; border-left: 2px solid var(--tone); background: var(--paper-2); border-radius: 0 8px 8px 0; margin-bottom: 12px; }
+  .q { padding-top: 12px; border-top: 1px solid var(--rule); margin-top: 12px; }
+  .q label { display: block; font-weight: 500; color: var(--ink); margin-bottom: 8px; font-size: 15px; }
+  .q-row { display: flex; gap: 8px; }
+  .q-row input { flex: 1; min-width: 0; font: 500 14px var(--mono); padding: 10px 12px; border: 1px solid var(--rule-strong); border-radius: 10px; background: var(--paper); color: var(--ink); }
+  .q-row input:focus { outline: none; border-color: var(--ink); }
+  .q.ok input { border-color: var(--ok); color: var(--ok); background: color-mix(in srgb, var(--ok) 8%, transparent); }
+  .q.ok button { background: var(--ok); border-color: var(--ok); }
+  .q.bad .q-row { animation: shake 0.4s; }
+  .q.bad input { border-color: var(--accent); }
+
+  .machine { position: sticky; top: 84px; display: flex; flex-direction: column; height: calc(100svh - 110px); min-height: 480px; border: 1px solid var(--rule-strong); border-radius: 16px; overflow: hidden; background: var(--code-bg); }
+  .m-bar { position: relative; display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: var(--deep); color: var(--on-dark); flex-wrap: wrap; }
+  .m-status { font: 500 12px var(--mono); letter-spacing: 0.06em; display: flex; align-items: center; gap: 8px; }
+  .m-status::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: #6b6f78; }
+  .m-status.busy::before { background: #e0a458; animation: blink 0.8s infinite; }
+  .m-status.on::before { background: #59b37f; box-shadow: 0 0 0 3px #59b37f33; }
+  .m-ip { display: inline-flex; align-items: center; gap: 6px; font: 500 12px var(--mono); color: var(--on-dark-muted); }
+  .m-ip[hidden] { display: none; }
+  .m-k { text-transform: uppercase; letter-spacing: 0.08em; font-size: 10.5px; }
+  .m-copy { position: relative; font: 600 12.5px var(--mono); color: var(--on-dark); padding: 3px 8px; border-radius: 6px; background: #ffffff14; }
+  .m-copy:hover { background: #ffffff26; }
+  .m-copy[data-copied]::after { content: 'copied'; position: absolute; left: 50%; top: calc(100% + 6px); translate: -50% 0; padding: 2px 6px; border-radius: 4px; background: var(--on-dark); color: var(--deep); font-size: 10.5px; white-space: nowrap; }
+  .m-var { font: 600 12px var(--mono); color: #8fd1a6; padding: 3px 7px; border-radius: 6px; border: 1px dashed #8fd1a666; cursor: help; }
+  .m-up { font: 500 11.5px var(--mono); color: var(--on-dark-muted); }
+  .m-up[hidden] { display: none; }
+  .m-bar .btn { margin-left: auto; background: var(--on-dark); color: var(--deep); border-color: var(--on-dark); }
+  .m-bar .btn:hover { background: var(--hi); border-color: var(--hi); }
+  .m-bar .btn:disabled { opacity: 0.6; cursor: default; }
+  /* Scout's "you forgot the machine" nudge: the button pulses so there is no doubt which one */
+  .m-bar .btn.nudge { animation: nudge 0.9s 3 var(--ease-out); }
+  @keyframes nudge { 0% { box-shadow: 0 0 0 0 #e5534bcc; transform: scale(1); } 30% { transform: scale(1.06); } 100% { box-shadow: 0 0 0 14px #e5534b00; transform: scale(1); } }
+  /* deploy progress: a thin bar along the bottom edge of the machine bar */
+  .m-prog { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: #ffffff14; }
+  .m-prog[hidden] { display: none; }
+  .m-prog i { position: absolute; inset: 0; background: #e0a458; transform-origin: left; transform: scaleX(0); }
+  .m-prog.run i { animation: deploy var(--ms, 4s) linear forwards; }
+  @keyframes deploy { to { transform: scaleX(1); } }
+  .box { position: relative; flex: 1; min-height: 0; display: flex; }
+  .box > [hidden] { display: none !important; }
+  .box-start { margin: auto; max-width: 400px; text-align: center; color: #c9c6bf; padding: 30px; cursor: pointer; }
+  .box-start .label { color: #8d9099; }
+  .box-start h3 { color: #f4f1ea; font-size: 1.6rem; margin: 10px 0; }
+  .box-start p { font-size: 15px; margin-bottom: 14px; }
+  .box-feats { list-style: none; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin-bottom: 20px; }
+  .box-feats li { font: 500 11.5px var(--mono); color: #c9c6bf; padding: 4px 10px; border-radius: 999px; border: 1px solid #ffffff22; }
+  .box-feats code { color: #8fd1a6; }
+  .box-start .btn { color: #f4f1ea; border-color: #f4f1ea; }
+  .box-start:hover .btn { background: #f4f1ea; color: #16181d; }
+  .boot { margin: auto 0; padding: 22px; align-self: center; font: 13px/1.85 var(--mono); color: #c9c6bf; }
+  .boot :global(.ok) { color: #8fd1a6; }
+  .desk { position: relative; flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+  .tabs { display: flex; gap: 2px; padding: 6px 6px 0; background: #121418; overflow-x: auto; scrollbar-width: none; }
+  .tabs :global(.tab), .tab-new { font: 500 12px var(--mono); color: #8d9099; padding: 8px 10px 8px 12px; border-radius: 8px 8px 0 0; white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+  .tabs :global(.tab) { max-width: 200px; touch-action: none; user-select: none; cursor: grab; transition: background 0.2s, color 0.2s; }
+  .tabs :global(.tab:hover) { color: #c9c6bf; background: #191b20; }
+  .tabs :global(.tab[aria-selected='true']) { background: #1b1d22; color: #f4f1ea; }
+  .tabs :global(.tab.dragging) { cursor: grabbing; z-index: 2; position: relative; background: #23262c; color: #f4f1ea; box-shadow: 0 8px 18px -8px #000c; }
+  .tabs :global(.tab-ic) { font-size: 10.5px; color: #8fd1a6; }
+  .tabs :global(.tab-brw .tab-ic) { color: #8ab4f8; font-size: 12px; }
+  .tabs :global(.tab-l) { overflow: hidden; text-overflow: ellipsis; }
+  .tabs :global(.tab-x) { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 5px; opacity: 0.55; }
+  .tabs :global(.tab-x:hover) { opacity: 1; background: #ffffff1a; }
+  .tabs :global(.tab-x[hidden]) { display: none; }
+  .tab-new { font-size: 16px; padding: 4px 12px; }
+  .tab-new:hover { color: #f4f1ea; }
+  .desk :global(.tab-menu) { position: absolute; z-index: 5; min-width: 170px; padding: 5px; border-radius: 10px; background: #23262c; border: 1px solid #ffffff1a; box-shadow: 0 16px 30px -12px #000d; display: flex; flex-direction: column; }
+  .desk :global(.tab-menu[hidden]) { display: none; }
+  .desk :global(.tab-menu button) { text-align: left; font: 500 12.5px var(--mono); color: #e6e3dc; padding: 8px 10px; border-radius: 6px; white-space: pre; }
+  .desk :global(.tab-menu button:hover), .desk :global(.tab-menu button:focus-visible) { background: #ffffff14; outline: none; }
+  .panes { flex: 1; min-height: 0; position: relative; }
+  .panes :global(.pane) { position: absolute; inset: 0; display: flex; }
+  .panes :global(.pane[hidden]) { display: none; }
+
+  :global(.term) { flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; font: 13px/1.6 var(--mono); color: #e6e3dc; padding: 12px 14px; }
+  :global(.t-out) { flex: 1; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+  :global(.t-out .c) { color: #f4f1ea; }
+  :global(.t-out .a) { color: #c9c6bf; }
+  :global(.t-out .m) { color: #8d9099; }
+  :global(.t-out .r) { color: #f08a8a; }
+  :global(.t-out .y) { color: #e0c27a; }
+  :global(.t-out .ok) { color: #8fd1a6; }
+  :global(.t-in) { display: flex; gap: 8px; align-items: center; padding-top: 6px; }
+  :global(.t-ps) { color: #8fd1a6; white-space: nowrap; }
+  :global(.t-in input) { flex: 1; min-width: 0; background: none; border: 0; color: #f4f1ea; font: inherit; outline: none; caret-color: #e6a1a9; }
+
+  :global(.brw) { position: relative; flex: 1; display: flex; flex-direction: column; background: #f7f8fa; min-height: 0; min-width: 0; }
+  :global(.brw-bar) { display: flex; gap: 4px; align-items: center; padding: 8px; background: #eceef2; border-bottom: 1px solid #d6dae0; }
+  :global(.brw-bar > button) { width: 30px; height: 30px; border-radius: 8px; color: #3b3f47; font-size: 15px; }
+  :global(.brw-bar > button:hover:not(:disabled)) { background: #dfe2e7; }
+  :global(.brw-bar > button:disabled) { color: #b4b8bf; cursor: default; }
+  :global(.brw-bar .src[aria-pressed='true']) { background: #16181d; color: #f4f1ea; }
+  :global(.brw-url) { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; padding: 0 6px 0 10px; border-radius: 999px; border: 1px solid #d6dae0; background: #fff; }
+  :global(.brw-url:focus-within) { border-color: #8ab4f8; box-shadow: 0 0 0 3px #8ab4f833; }
+  :global(.brw-url input) { flex: 1; min-width: 0; font: 13px var(--mono); padding: 7px 0; border: 0; background: none; color: #16181d; outline: none; }
+  :global(.brw-sec) { font: 600 10.5px var(--sans); color: #b3261e; padding: 2px 7px; border-radius: 999px; background: #fce8e6; white-space: nowrap; cursor: help; }
+  :global(.brw-sec[hidden]), :global(.brw-code[hidden]) { display: none; }
+  :global(.brw-code) { font: 600 10.5px var(--mono); color: #1e7e46; padding: 2px 7px; border-radius: 999px; background: #e6f4ea; }
+  :global(.brw-code.bad) { color: #b3261e; background: #fce8e6; }
+  :global(.brw-load) { height: 2px; background: transparent; position: relative; overflow: hidden; }
+  :global(.brw.loading .brw-load)::after { content: ''; position: absolute; inset: 0; background: #1a73e8; transform-origin: left; animation: brwload 0.3s ease-out forwards; }
+  @keyframes brwload { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+  :global(.brw-view) { flex: 1; overflow: auto; padding: 22px; color: #16181d; font-family: 'Times New Roman', serif; transition: opacity 0.2s; }
+  :global(.brw-view.loading) { opacity: 0.3; }
+  :global(.brw-status) { position: absolute; left: 0; bottom: 0; max-width: 70%; padding: 3px 10px; font: 11.5px var(--sans); color: #3b3f47; background: #eceef2; border: 1px solid #d6dae0; border-left: 0; border-bottom: 0; border-radius: 0 6px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; opacity: 0; transition: opacity 0.15s; pointer-events: none; }
+  :global(.brw-status.on) { opacity: 1; }
+  :global(.brw-doc .brw-h1) { font: 700 2rem 'Times New Roman', serif; margin-bottom: 10px; letter-spacing: 0; }
+  :global(.brw-doc p) { margin-bottom: 10px; }
+  :global(.brw-doc pre), :global(.brw-src) { font: 13px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+  :global(.brw-doc small) { color: #666; display: block; margin-top: 18px; }
+  :global(.brw-doc a) { color: #0b57d0; }
+  :global(.brw-home) { text-align: center; margin-top: 48px; color: #61656f; font-family: var(--sans); font-size: 14px; }
+  :global(.brw-logo) { font: 400 1.6rem var(--serif); color: #16181d; margin-bottom: 8px; }
+  :global(.brw-tiles) { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+  :global(.brw-tile) { display: flex; flex-direction: column; gap: 2px; width: 150px; padding: 14px; border-radius: 12px; background: #fff; border: 1px solid #d6dae0; text-decoration: none; color: #16181d; text-align: left; transition: border-color 0.2s, transform 0.2s; }
+  :global(.brw-tile:hover) { border-color: #8ab4f8; transform: translateY(-2px); }
+  :global(.brw-tile b) { font: 600 13.5px var(--mono); }
+  :global(.brw-tile span) { font-size: 12px; color: #61656f; }
+  :global(.brw-login) { display: flex; flex-direction: column; gap: 10px; max-width: 280px; font-family: var(--sans); font-size: 14px; }
+  :global(.brw-login label) { display: flex; flex-direction: column; gap: 4px; }
+  :global(.brw-login input) { padding: 8px; border: 1px solid #999; border-radius: 4px; }
+  :global(.brw-login button) { padding: 8px; background: #16181d; color: #fff; border-radius: 4px; }
+  :global(.brw-msg) { color: #b00020; min-height: 1.2em; }
+
+  .complete { margin-top: 30px; padding: 26px; background: var(--card); border: 1px solid var(--rule); border-left: 3px solid var(--ok); border-radius: 16px; }
+  .complete h2 { font-size: clamp(1.8rem, 3.6vw, 2.6rem); margin: 10px 0 18px; }
+  .done-stats { display: flex; gap: 30px; margin-bottom: 8px; }
+  .done-stats dd { font: 400 1.8rem var(--serif); }
+  .badges-new { color: var(--ok); font-weight: 500; margin-bottom: 8px; }
+  .debrief { margin: 18px 0 26px; color: var(--soft); }
+  .debrief h3 { font: 600 1rem var(--sans); color: var(--ink); margin: 18px 0 8px; }
+  .debrief ul { padding-left: 20px; }
+  .debrief li { margin-bottom: 6px; }
+  .cert-box h3 { font-size: 1.4rem; margin-bottom: 10px; }
+  .cert-box canvas { width: 100%; height: auto; border-radius: 6px; margin: 14px 0; box-shadow: 0 18px 40px -26px #16181d88; }
+  .done-next { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+
+  :global(.room.shake) .machine { animation: shake 0.4s; }
+  :global(.confetti) { position: fixed; inset: 0; pointer-events: none; z-index: 90; overflow: hidden; }
+  :global(.confetti i) { position: absolute; top: 0; width: 9px; height: 14px; border-radius: 2px; }
+  @keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+  @keyframes blink { 50% { opacity: 0.3; } }
+
+  @media (max-width: 900px) {
+    .view-switch { display: flex; gap: 6px; margin-top: 16px; position: sticky; top: 68px; z-index: 6; padding-top: 6px; padding-bottom: 6px; background: var(--paper); }
+    :global(.t-in) { padding-right: 72px; }
+    .view-switch button { flex: 1; padding: 10px; border-radius: 999px; border: 1px solid var(--ink); font-size: 14px; background: var(--paper); }
+    .view-switch button[aria-pressed='true'] { background: var(--ink); color: var(--paper); }
+    .layout { grid-template-columns: minmax(0, 1fr); margin-top: 18px; }
+    .room[data-view='tasks'] .machine { display: none; }
+    .room[data-view='box'] .tasks { display: none; }
+    .machine { position: relative; top: 0; height: calc(100svh - 190px); min-height: 420px; }
+    .stats { gap: 18px; }
+    .stats b { font-size: 1.2rem; }
+  }
+</style>
+
+<script>
+  import { initRoom } from '../../scripts/lab/room';
+  initRoom();
+</script>

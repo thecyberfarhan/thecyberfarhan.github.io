@@ -1,0 +1,166 @@
+---
+import { PROJECTS, SITE } from '../data/site';
+const filters = [['all', 'All'], ['Original', 'Built'], ['Fork', 'Forked and fixed'], ['Field note', 'Field notes']];
+const count = (f: string) => (f === 'all' ? PROJECTS.length : PROJECTS.filter((p) => p.kind === f).length);
+const TONE: Record<string, string> = { Original: '#3f6e8c', Fork: '#a8642a', 'Field note': '#24704d' };
+const TAB: Record<string, string> = { Original: 'Built', Fork: 'Fork', 'Field note': 'Field note' };
+const perch: Record<string, string> = { ReconKit: 'reconkit', Sherlock: 'sherlock' };
+const repo = (h?: string) => (h ? h.replace('https://', '') : 'private repository');
+---
+<section class="block projects" id="projects" aria-labelledby="projects-title">
+  <div class="wrap">
+    <div class="sec-head" data-reveal>
+      <div><p class="label accent">Projects</p><h2 id="projects-title">Things I built, not just labs I finished.</h2></div>
+      <p>Small, tested tools and written reports. The source for each one is public on <a class="link-arrow" href={SITE.github} target="_blank" rel="noopener">GitHub</a>.</p>
+    </div>
+    <div class="filters" role="group" aria-label="Filter projects" data-reveal data-scout="filters">
+      <span class="ind" aria-hidden="true"></span>
+      {filters.map(([v, l], i) => <button type="button" data-filter={v} aria-pressed={i === 0 ? 'true' : 'false'}>{l}<span class="c">{count(v)}</span></button>)}
+    </div>
+    <ul class="grid" data-reveal="stagger">
+      {PROJECTS.map((p, i) => {
+        const Tag = p.href ? 'a' : 'div';
+        return (
+          <li data-kind={p.kind} style={`--tone:${TONE[p.kind]}`} data-scout={perch[p.name]}>
+            <Tag class="case" {...(p.href ? { href: p.href, target: '_blank', rel: 'noopener' } : {})}>
+              <span class="tab">{TAB[p.kind]}</span>
+              <span class="sheet" aria-hidden="true"><b>Case {String(i + 1).padStart(2, '0')}</b><span>{repo(p.href)}</span></span>
+              <span class="front">
+                <span class="top"><span class="status">{p.status}</span>{p.href && <span class="go" aria-hidden="true">↗</span>}</span>
+                <h3>{p.name}</h3>
+                <p>{p.body}</p>
+                <ul class="tags">{p.tags.map((t) => <li>{t}</li>)}</ul>
+              </span>
+            </Tag>
+          </li>
+        );
+      })}
+    </ul>
+  </div>
+</section>
+
+<style>
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 34px; }
+  .filters button { display: inline-flex; align-items: center; gap: 8px; padding: 8px 10px 8px 16px; border-radius: 999px; border: 1px solid var(--rule-strong); font-size: 14px; color: var(--soft); transition: background 0.2s, color 0.2s, border-color 0.2s; }
+  .filters .c { min-width: 22px; padding: 1px 6px; border-radius: 999px; background: var(--paper-2); font: 500 11px/1.6 var(--mono); color: var(--muted); text-align: center; transition: inherit; }
+  .filters button:hover { border-color: var(--ink); color: var(--ink); }
+  .filters button[aria-pressed='true'] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
+  .filters button[aria-pressed='true'] .c { background: color-mix(in srgb, var(--paper) 18%, transparent); color: var(--paper); }
+  /* with script, one ink pill slides between the buttons instead of each button filling in */
+  .filters { position: relative; }
+  .filters button { position: relative; z-index: 1; }
+  .ind { position: absolute; left: 0; top: 0; z-index: 0; border-radius: 999px; background: var(--ink); opacity: 0; pointer-events: none; }
+  .filters.slide .ind { opacity: 1; }
+  .filters.slide button[aria-pressed='true'] { background: transparent; }
+
+  .grid { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 34px 18px; }
+  .grid > li[hidden] { display: none; }
+
+  /* a case folder: back panel with a tab, a sheet tucked inside, and the front cover */
+  .case { position: relative; display: flex; flex-direction: column; height: 100%; padding-top: 28px; text-decoration: none; perspective: 1100px; }
+  .case::before { content: ''; position: absolute; inset: 28px 0 0; border-radius: 0 14px 14px 14px; background: color-mix(in srgb, var(--tone) 16%, var(--card)); border: 1px solid color-mix(in srgb, var(--tone) 30%, var(--rule)); }
+  .tab { position: absolute; top: 1px; left: 0; height: 28px; padding: 0 16px; display: flex; align-items: center; border-radius: 10px 10px 0 0; background: color-mix(in srgb, var(--tone) 16%, var(--card)); border: 1px solid color-mix(in srgb, var(--tone) 30%, var(--rule)); border-bottom: 0; font: 500 11px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--tone-ink); }
+  .sheet { position: absolute; left: 16px; right: 16px; top: 38px; height: 70px; padding: 9px 12px; display: flex; justify-content: space-between; gap: 10px; background: var(--card); border: 1px solid var(--rule); border-radius: 6px; font: 500 10.5px var(--mono); color: var(--muted); transition: transform 0.45s var(--ease-out); }
+  .sheet b { color: var(--ink); font-weight: 500; white-space: nowrap; }
+  .sheet span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .front { position: relative; flex: 1; display: flex; flex-direction: column; margin-top: 40px; padding: 22px 24px 24px; background: var(--card); border: 1px solid var(--rule); border-top: 3px solid var(--tone); border-radius: 4px 4px 14px 14px; transform-origin: 50% 100%; transition: transform 0.5s var(--ease-out), box-shadow 0.5s, border-color 0.25s; }
+  a.case:hover .front { transform: rotateX(-9deg); box-shadow: 0 26px 40px -30px #0007; }
+  a.case:hover .sheet { transform: translateY(-14px); }
+  a.case:focus-visible { outline: none; }
+  a.case:focus-visible .front { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+  .status { font: 500 11px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .go { font-size: 18px; color: var(--muted); transition: transform 0.35s var(--ease-out), color 0.25s; }
+  a.case:hover .go { color: var(--tone-ink); transform: translate(2px, -2px); }
+  .front h3 { font-size: 1.65rem; margin-bottom: 10px; }
+  .front p { color: var(--soft); font-size: 15px; flex: 1; }
+  .tags { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px; }
+  .tags li { font: 500 11.5px var(--mono); padding: 4px 9px; border-radius: 6px; background: var(--paper-2); color: var(--soft); }
+  @media (max-width: 980px) { .grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+  @media (prefers-reduced-motion: reduce) { .front, .sheet { transition: none; } a.case:hover .front { transform: none; } }
+</style>
+
+<script>
+  import { animate, createLayout, stagger, utils } from 'animejs';
+  import { initReveals, reduced } from '../scripts/motion';
+
+  const root = document.getElementById('projects')!;
+  initReveals(root);
+  const grid = root.querySelector<HTMLElement>('.grid')!;
+  const bar = root.querySelector<HTMLElement>('.filters')!;
+  const ind = bar.querySelector<HTMLElement>('.ind')!;
+  const buttons = [...root.querySelectorAll<HTMLButtonElement>('[data-filter]')];
+  const items = [...root.querySelectorAll<HTMLElement>('.grid > li')];
+  const shows = (li: HTMLElement, f: string) => f === 'all' || li.dataset.kind === f;
+  const apply = (f: string) => items.forEach((li) => { li.hidden = !shows(li, f); });
+
+  // folders that stay slide to their new place; the ones arriving drop in
+  const layout = reduced ? null : createLayout(grid, {
+    children: '.grid > li',
+    duration: 650,
+    ease: 'outExpo',
+    enterFrom: { opacity: 0, scale: 0.9, y: -36, rotate: -3 },
+    leaveTo: { opacity: 0 },
+  });
+
+  // the pill behind the active filter, measured from the button so it follows wrapping on phones
+  function place(b: HTMLButtonElement, animated: boolean) {
+    const to = { x: b.offsetLeft, y: b.offsetTop, width: b.offsetWidth, height: b.offsetHeight };
+    if (animated) animate(ind, { ...to, duration: 520, ease: 'outElastic(1, .75)' });
+    else utils.set(ind, to);
+  }
+  if (!reduced) {
+    bar.classList.add('slide');
+    place(buttons[0], false);
+    addEventListener('resize', () => place(buttons.find((b) => b.getAttribute('aria-pressed') === 'true')!, false));
+  }
+
+  let current = 'all', busy = false, queued: string | null = null;
+  async function run(f: string) {
+    if (!layout) { apply(f); return; }
+    busy = true;
+    const leaving = items.filter((li) => !li.hidden && !shows(li, f));
+    const arriving = items.filter((li) => li.hidden && shows(li, f));
+    const drops: { revert: () => unknown }[] = [];
+    if (leaving.length) {
+      // each folder tucks its sheet away, then tips over and drops out, one after another
+      drops.push(animate(leaving.map((li) => li.querySelector('.sheet')!), { y: 34, opacity: 0, duration: 200, ease: 'inQuad', delay: stagger(45) }));
+      const drop = animate(leaving, {
+        y: [0, 70], scale: [1, 0.86], opacity: [1, 0],
+        rotate: (_: unknown, i: number) => (i % 2 ? 7 : -7),
+        duration: 420, ease: 'inBack(1.6)', delay: stagger(45, { start: 90 }),
+      });
+      drops.push(drop);
+      await drop;
+    }
+    const move = layout.update(() => {
+      apply(f);
+      // the leavers are hidden now; clear what the drop left on them so they come back clean
+      drops.forEach((a) => a.revert());
+    });
+    // the arrivals land with their sheet rising out of the folder
+    const sheets = arriving.map((li) => li.querySelector('.sheet')!);
+    if (sheets.length) {
+      const rise = animate(sheets, { y: [30, 0], opacity: [0, 1], duration: 480, ease: 'outBack(2)', delay: stagger(60, { start: 240 }) });
+      // hand the sheet back to the stylesheet so its hover lift still works
+      rise.then(() => rise.revert());
+    }
+    await move;
+    busy = false;
+    if (queued && queued !== current) { const q = queued; queued = null; current = q; run(q); } else queued = null;
+  }
+
+  buttons.forEach((b) => b.addEventListener('click', () => {
+    const f = b.dataset.filter!;
+    buttons.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    if (!reduced) {
+      place(b, true);
+      animate(b.querySelector('.c')!, { scale: [1, 1.35, 1], duration: 420, ease: 'outQuad' });
+    }
+    if (busy) { queued = f; return; }
+    if (f === current) return;
+    current = f;
+    run(f);
+  }));
+</script>

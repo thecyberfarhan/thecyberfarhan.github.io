@@ -1,0 +1,162 @@
+---
+import Base from '../../layouts/Base.astro';
+import PhoneNote from '../../components/PhoneNote.astro';
+import Contact from '../../components/Contact.astro';
+import { ROOMS, countQuestions } from '../../data/rooms';
+import { BADGES } from '../../scripts/lab/state';
+const tones: Record<string, string> = { Easy: '#3f6e8c', Medium: '#a8642a', Hard: '#9e1b2c' };
+---
+<Base title="The lab · Practice rooms | Farhan Hussain" description="Three small, TryHackMe-style practice rooms with a browser-based attack box. Break in, capture the flag, collect a certificate. No setup." path="/lab/">
+  <section class="lab wrap">
+    <header class="head" data-enter="kids">
+      <p class="label accent">The lab</p>
+      <h1>Three rooms. One box.<br /><em>No setup.</em></h1>
+      <p class="lead">I built a small CTF you can play in the browser. Each room is a made-up company with a hole in it. Start the machine, start the box, break in and capture the flag. The first room needs zero experience.</p>
+      <p class="note">Everything is simulated: commands are matched as text and nothing touches a real system.</p>
+    </header>
+    <PhoneNote />
+
+    <ol class="rooms" data-scout="rooms3">
+      {ROOMS.map((r, i) => (
+        <li>
+          <a class="room-card" data-enter href={`/lab/${r.slug}.html`} data-slug={r.slug} data-total={countQuestions(r)} style={`--tone:${tones[r.level]}`}>
+            <div class="top"><span class="label">Room {i + 1}</span><span class="lvl">{r.level}</span></div>
+            <h2>{r.name}</h2>
+            <p>{r.blurb}</p>
+            <ul class="tags">{r.tags.map((t) => <li>{t}</li>)}<li>{r.minutes}</li></ul>
+            <div class="state"><span class="ring"><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15" /><circle class="fg" cx="18" cy="18" r="15" /></svg></span><span class="st">Not started</span><span class="go">Enter room →</span></div>
+          </a>
+        </li>
+      ))}
+    </ol>
+
+    <section class="badges" aria-labelledby="badges-title">
+      <div class="badges-head">
+        <h2 id="badges-title">Badges</h2>
+        <p class="label" id="badge-count">0 of {BADGES.length}</p>
+      </div>
+      <p class="saved">Progress and badges are saved in this browser only. A different browser or a private window starts fresh, and clearing site data resets them.</p>
+      <ul class="badge-grid">
+        {BADGES.map((b) => (
+          <li data-badge={b.id}><span class="medal" aria-hidden="true">★</span><b>{b.name}</b><small>{b.how}</small></li>
+        ))}
+      </ul>
+    </section>
+
+    <section class="stray" aria-labelledby="stray-title">
+      <div>
+        <h2 id="stray-title">Found a stray flag?</h2>
+        <p>Not every flag is inside a room. If you found one somewhere else on this site, prove it.</p>
+      </div>
+      <form id="stray-form" class="q-row">
+        <label class="sr-only" for="stray">Flag</label>
+        <input id="stray" placeholder="FH{...}" autocomplete="off" spellcheck="false" maxlength="80" />
+        <button class="btn solid sm" type="submit">Submit</button>
+      </form>
+    </section>
+  </section>
+  <Contact slot="after" />
+</Base>
+
+<style>
+  .lab { padding-top: clamp(120px, 14vw, 170px); padding-bottom: 100px; }
+  .head h1 { font-size: clamp(2.8rem, 7vw, 5.6rem); line-height: 1; letter-spacing: -0.035em; margin: 16px 0 20px; }
+  .head h1 em { color: var(--accent); }
+  .lead { font: 300 clamp(1.15rem, 2vw, 1.45rem)/1.5 var(--serif); color: var(--soft); max-width: 46ch; }
+  .note { margin-top: 14px; font-size: 14px; color: var(--muted); }
+  .rooms { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 60px; }
+  .room-card { display: flex; flex-direction: column; height: 100%; padding: 24px; background: var(--card); border: 1px solid var(--rule); border-top: 3px solid var(--tone); border-radius: 16px; text-decoration: none; transition: transform 0.35s var(--ease-out), box-shadow 0.35s, border-color 0.25s; }
+  .room-card:hover { transform: translateY(-4px); box-shadow: 0 24px 50px -30px #16181d77; border-color: var(--ink); border-top-color: var(--tone); }
+  .top { display: flex; justify-content: space-between; align-items: center; }
+  .lvl { font: 500 12px var(--mono); color: var(--tone-ink); border: 1px solid color-mix(in srgb, var(--tone) 50%, transparent); padding: 3px 10px; border-radius: 999px; }
+  .room-card h2 { font-size: 2rem; margin: 18px 0 10px; }
+  .room-card p { color: var(--soft); font-size: 15px; flex: 1; }
+  .tags { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 18px 0; }
+  .tags li { font: 500 11.5px var(--mono); padding: 4px 9px; border-radius: 6px; background: var(--paper-2); color: var(--soft); }
+  .state { display: flex; align-items: center; gap: 10px; padding-top: 16px; border-top: 1px solid var(--rule); font-size: 14px; }
+  .ring svg { width: 30px; height: 30px; transform: rotate(-90deg); }
+  .ring circle { fill: none; stroke: var(--rule); stroke-width: 3.5; }
+  .ring .fg { stroke: var(--tone); stroke-dasharray: 94.25; stroke-dashoffset: var(--off, 94.25); stroke-linecap: round; transition: stroke-dashoffset 1s var(--ease-out); }
+  .st { color: var(--muted); flex: 1; }
+  .room-card.done .st { color: var(--ok); font-weight: 500; }
+  .go { font-weight: 500; }
+  .badges { margin-top: 90px; }
+  .saved { margin: -6px 0 18px; font-size: 13.5px; color: var(--muted); }
+  .badges-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 20px; }
+  .badges h2, .stray h2 { font-size: clamp(1.8rem, 3.6vw, 2.6rem); }
+  .badge-grid { list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .badge-grid li { display: flex; flex-direction: column; gap: 4px; padding: 18px; border: 1px dashed var(--rule-strong); border-radius: 14px; color: var(--muted); }
+  .badge-grid .medal { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--paper-2); color: var(--rule-strong); font-size: 16px; margin-bottom: 6px; }
+  .badge-grid b { font: 400 1.15rem var(--serif); color: var(--soft); }
+  .badge-grid small { font-size: 13px; }
+  .badge-grid li.got { border-style: solid; border-color: var(--ink); background: var(--card); color: var(--soft); }
+  .badge-grid li.got .medal { background: var(--accent); color: #fff; }
+  .badge-grid li.got b { color: var(--ink); }
+  .stray { margin-top: 80px; display: grid; grid-template-columns: 1fr 1fr; gap: 30px; align-items: center; padding: 28px; background: var(--deep); color: var(--on-dark); border-radius: 18px; }
+  .stray p { color: var(--on-dark-muted); margin-top: 8px; }
+  .q-row { display: flex; gap: 8px; }
+  .q-row input { flex: 1; min-width: 0; font: 500 14px var(--mono); padding: 12px; border-radius: 10px; border: 1px solid #ffffff33; background: #ffffff0d; color: var(--on-dark); }
+  .q-row input:focus { outline: none; border-color: var(--on-dark); }
+  .stray .btn { background: var(--on-dark); color: var(--deep); border-color: var(--on-dark); }
+  .stray.bad .q-row { animation: shake 0.4s; }
+  @keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+  @media (max-width: 980px) { .rooms { grid-template-columns: 1fr; } .badge-grid { grid-template-columns: 1fr 1fr; } .stray { grid-template-columns: 1fr; } }
+  @media (max-width: 480px) { .badge-grid { grid-template-columns: 1fr; } }
+</style>
+
+<script>
+  import { animate, stagger } from 'animejs';
+  import { getRoom, badges, award, BADGES } from '../../scripts/lab/state';
+  import { reduced } from '../../scripts/motion';
+
+  const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  function paint() {
+    document.querySelectorAll<HTMLAnchorElement>('.room-card').forEach((a) => {
+      const s = getRoom(a.dataset.slug!);
+      const total = Number(a.dataset.total);
+      const n = s.answered.length;
+      a.style.setProperty('--off', String(94.25 * (1 - (s.done ? 1 : n / total))));
+      const st = a.querySelector('.st')!;
+      if (s.done) { a.classList.add('done'); st.textContent = `Completed${s.best ? ' in ' + fmt(s.best) : ''}`; a.querySelector('.go')!.textContent = 'Play again →'; }
+      else if (n) st.textContent = `${n} of ${total} answered`;
+    });
+    const got = badges();
+    document.querySelectorAll<HTMLElement>('[data-badge]').forEach((li) => li.classList.toggle('got', got.includes(li.dataset.badge!)));
+    document.getElementById('badge-count')!.textContent = `${got.length} of ${BADGES.length}`;
+  }
+  paint();
+  // Scout greets with what it knows: first visit, progress so far, or everything done
+  setTimeout(async () => {
+    const [{ say }, { line }] = await Promise.all([import('../../scripts/scout'), import('../../scripts/lines')]);
+    const done = ['break-in', 'backup-blues', 'ghost-in-the-shell'].filter((r) => getRoom(r).done).length;
+    const started = done || ['break-in', 'backup-blues', 'ghost-in-the-shell'].some((r) => getRoom(r).answered.length);
+    say(done === 3 ? line('labAll') : started ? line('labBack', { done, left: 3 - done }) : line('labFirst'), { state: done === 3 ? 'proud' : 'happy', gesture: 'nod', ms: 5500 });
+  }, 1400);
+  if (!reduced) {
+    animate('.head > *', { opacity: [0, 1], y: [18, 0], duration: 800, delay: stagger(90), ease: 'outQuart' });
+    animate('.room-card', { opacity: [0, 1], y: [30, 0], duration: 900, delay: stagger(110, { start: 300 }), ease: 'outQuart' });
+  }
+
+  // the stray flag is compared by hash, so it is not sitting in this file in plain text
+  const HASH = '68d7d2df93eac93eceb26d85303ff7bcf137b6deb38972eb7eb143a0e3739fa0';
+  const form = document.getElementById('stray-form') as HTMLFormElement;
+  const input = document.getElementById('stray') as HTMLInputElement;
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const v = input.value.trim();
+    if (!v) return;
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v));
+    const hex = [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+    const [{ say }, { line }] = await Promise.all([import('../../scripts/scout'), import('../../scripts/lines')]);
+    if (hex === HASH) {
+      const fresh = award('curious');
+      input.disabled = true;
+      paint();
+      say(line(fresh ? 'strayOk' : 'strayAgain'), { state: 'proud', gesture: 'spin', ms: 6000 });
+    } else {
+      const sec = form.closest('.stray')!;
+      sec.classList.remove('bad'); void (sec as HTMLElement).offsetWidth; sec.classList.add('bad');
+      say(line(/^fh\{/i.test(v) ? 'strayWrong' : 'strayShape'), { state: 'confused', ms: 4000 });
+    }
+  });
+</script>

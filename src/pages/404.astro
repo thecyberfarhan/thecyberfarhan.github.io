@@ -1,0 +1,56 @@
+---
+import Base from '../layouts/Base.astro';
+import { writeups } from '../data/site';
+// slugs and titles only, so a missing writeup link can suggest the closest real ones
+const index = writeups.map((w) => [w.slug, w.title]);
+---
+<Base title="Page not found | Farhan Hussain" description="This page does not exist." path="/404.html" noindex>
+  <section class="nf wrap" id="nf" data-index={JSON.stringify(index)}>
+    <p class="label accent" id="nf-label">404 · Out of scope</p>
+    <h1 id="nf-title">This page isn't on the map.</h1>
+    <p id="nf-body">The link may be old, or the page moved when the site was rebuilt.</p>
+    <ul class="near" id="nf-near" hidden></ul>
+    <div class="cta"><a class="btn solid" href="/">Back to the homepage</a><a class="btn line" href="/writeups/">Browse writeups</a></div>
+  </section>
+</Base>
+
+<style>
+  .nf { min-height: 100svh; display: flex; flex-direction: column; justify-content: center; padding-top: 100px; padding-bottom: 60px; }
+  h1 { font-size: clamp(2.6rem, 7vw, 5.4rem); line-height: 1; letter-spacing: -0.035em; margin: 18px 0 18px; max-width: 14ch; }
+  p:not(.label) { color: var(--soft); font-size: 1.1rem; max-width: 52ch; }
+  .near { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+  .near :global(a) { display: inline-block; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--rule-strong); background: var(--card); text-decoration: none; font-size: 14.5px; }
+  .near :global(a:hover) { border-color: var(--ink); }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+</style>
+
+<script>
+  // a dead writeup link gets its own message and the nearest real writeups
+  const m = location.pathname.match(/^\/writeups\/([^/]+?)(?:\.html)?\/?$/);
+  if (m) {
+    const want = decodeURIComponent(m[1]).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const root = document.getElementById('nf')!;
+    let index: [string, string][] = [];
+    try { index = JSON.parse(root.dataset.index || '[]'); } catch { /* no suggestions */ }
+    document.getElementById('nf-label')!.textContent = '404 · Writeup not found';
+    document.getElementById('nf-title')!.textContent = 'No writeup by that name.';
+    document.getElementById('nf-body')!.textContent = 'Either it has not been written yet, or the box is still winning. These are the closest ones that do exist:';
+    // score by shared letter pairs, which forgives typos and missing words
+    const pairs = (s: string) => new Set(Array.from({ length: Math.max(0, s.length - 1) }, (_, i) => s.slice(i, i + 2)));
+    const a = pairs(want);
+    const near = index
+      .map(([slug, title]) => { const b = pairs(slug); let n = 0; a.forEach((p) => b.has(p) && n++); return { slug, title, score: (2 * n) / (a.size + b.size || 1) }; })
+      .sort((x, y) => y.score - x.score)
+      .slice(0, 4);
+    const ul = document.getElementById('nf-near')!;
+    near.forEach(({ slug, title }) => {
+      const li = document.createElement('li');
+      const link = document.createElement('a');
+      link.href = `/writeups/${encodeURIComponent(slug)}.html`;
+      link.textContent = title;
+      li.appendChild(link);
+      ul.appendChild(li);
+    });
+    ul.hidden = near.length === 0;
+  }
+</script>

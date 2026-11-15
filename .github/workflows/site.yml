@@ -1,0 +1,66 @@
+name: Build and deploy
+
+# One workflow does everything, because a commit pushed with GITHUB_TOKEN never
+# triggers a second workflow:
+#   1. pull the latest writeups from CTF-Writeups into src/data/writeups.json
+#   2. commit that file back if it changed
+#   3. build the Astro site and publish it to GitHub Pages
+#
+# Needs Settings > Pages > Source set to "GitHub Actions" (one-time).
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 */3 * * *'
+  workflow_dispatch: {}
+  repository_dispatch:
+    types: [writeups-updated]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Sync writeups
+        # a failed sync must never block a deploy; the last synced writeups are already in the repo
+        continue-on-error: true
+        timeout-minutes: 5
+        run: node scripts/sync-writeups.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Commit synced writeups if they changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/data/writeups.json
+          git diff --staged --quiet || { git commit -m "Sync writeups from CTF-Writeups [automated]" && git push; }
+      - run: npm run build
+        env:
+          ASTRO_TELEMETRY_DISABLED: 1
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

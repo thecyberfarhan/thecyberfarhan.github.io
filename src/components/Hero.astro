@@ -1,0 +1,300 @@
+---
+import { SITE, STATS } from '../data/site';
+
+// annotation callouts, placed in the photo's own coordinates (0 to 1 across and down)
+// each note has a small rotation of lines; the first shows on load, the rest take turns
+const NOTES = [
+  { id: 'pose', at: [0.6, 0.67], label: [-0.15, 0.38], tag: 'Fig. 01 · Pose', lines: [
+    'Arms crossed until someone patches that login form. I can wait. I have snacks.',
+    'Not angry. Just disappointed in your password policy.',
+    'This is my "you left admin:admin on prod" face.',
+    'Been standing like this since your last pentest. My arms filed a complaint.',
+  ] },
+  { id: 'wrist', at: [0.37, 0.739], label: [-0.15, 0.8], tag: 'Wrist', lines: [
+    'Watch says 2026. Your server\'s patch level says 2019.',
+    'Timing how long your session tokens live. Still counting. Still counting.',
+    'Synced to your patch cycle, so it stopped in March.',
+    'Ticks louder than your log alerts. Which is not hard.',
+  ] },
+  { id: 'fit', at: [0.8, 0.53], label: [0.56, 0.7], tag: 'Outfit', lines: [
+    'Red jacket, red team. The blue team still did not notice.',
+    'Wore red so your SOC finally flags something.',
+    'Critical findings deserve a matching outfit.',
+    'Dry clean only. Unlike your codebase.',
+  ] },
+];
+---
+<section class="hero" id="top" aria-labelledby="hero-name">
+  <canvas class="field" id="field" aria-hidden="true"></canvas>
+
+  <div class="wrap stage">
+    <div class="copy">
+      <p class="label kicker h-in"><span id="kicker">{SITE.role} · {SITE.focus}</span></p>
+      <h1 id="hero-name" class="name" data-scout="name">Farhan<br /><em>Hussain</em></h1>
+      <p class="lead h-in">I test web applications and APIs the way an attacker would, then write up exactly what I found and how to fix it.</p>
+      <p class="status h-in"><i aria-hidden="true"></i>Open to opportunities in offensive security</p>
+      <div class="cta h-in">
+        <a class="btn solid" href="#engage">See how I work</a>
+        <a class="btn line" href={SITE.resume}>Résumé <span class="sr-only">(PDF)</span></a>
+      </div>
+    </div>
+
+    <figure class="fig h-fig" id="fig" data-scout="photo">
+      <div class="backdrop" aria-hidden="true"></div>
+      <div class="glow" aria-hidden="true"></div>
+      <img src="/assets/farhan-portrait.webp" srcset="/assets/farhan-portrait-560.webp 560w, /assets/farhan-portrait.webp 1024w" sizes="(max-width: 980px) 340px, 500px" width="1024" height="1340" alt="Farhan Hussain in a red bomber jacket over a white T-shirt, arms crossed" fetchpriority="high" />
+      <svg class="marks" viewBox="0 0 1000 1309" preserveAspectRatio="none" aria-hidden="true">
+        <g class="brackets">
+          <path d="M300 40 h-46 v46" /><path d="M640 40 h46 v46" /><path d="M300 520 h-46 v-46" /><path d="M640 520 h46 v-46" />
+        </g>
+        {NOTES.map((n) => <path class="leader" data-note={n.id} d="" />)}
+      </svg>
+      <p class="subject label" aria-hidden="true"><i></i>Subject FH-01 · <span>locked</span></p>
+      {NOTES.map((n) => (
+        <div class="note" data-note={n.id} data-lines={JSON.stringify(n.lines)} style={`--ax:${n.at[0]};--ay:${n.at[1]};--lx:${n.label[0]};--ly:${n.label[1]}`}>
+          <span class="dot" aria-hidden="true"></span>
+          <div class="card"><span class="label tag">{n.tag}</span><span class="txt">{n.lines[0]}</span></div>
+        </div>
+      ))}
+      <figcaption class="label coords">29.99° N · 73.25° E · Bahawalnagar</figcaption>
+    </figure>
+  </div>
+
+  <div class="wrap">
+    <dl class="creds" data-count>
+      <div class="h-cred" data-scout="cpent"><dt>EC-Council certified · <a class="verify" href={SITE.certVerify} target="_blank" rel="noopener">verify ↗</a></dt><dd>CPENT</dd></div>
+      <div class="h-cred" data-scout="rank"><dt>TryHackMe global ranking</dt><dd>Top <span data-to={STATS.thmRank}>{STATS.thmRank}</span>%</dd></div>
+      <div class="h-cred" data-scout="rooms"><dt>Hands-on labs completed</dt><dd><span data-to={STATS.rooms}>{STATS.rooms}</span>+</dd></div>
+      <div class="h-cred"><dt>Published writeups</dt><dd><span data-to={STATS.writeups}>{STATS.writeups}</span></dd></div>
+    </dl>
+  </div>
+</section>
+
+<style>
+  :global(.js-motion) .h-in, :global(.js-motion) .h-fig, :global(.js-motion) .h-cred { opacity: 0; }
+  :global(.js-motion) .name { visibility: hidden; }
+
+  .hero { position: relative; min-height: 100svh; display: flex; flex-direction: column; justify-content: center; padding: 116px 0 0; overflow: clip; isolation: isolate; }
+  .hero > .wrap { width: 100%; }
+  .field { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; }
+  .stage { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); min-height: min(560px, 62svh); align-items: center; }
+  .copy { position: relative; z-index: 3; padding-bottom: 72px; }
+
+  .kicker { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; min-height: 1.4em; }
+  .kicker::before { content: ''; width: 28px; height: 1px; background: var(--accent); }
+  .name { font-size: clamp(4rem, 10.4vw, 9rem); line-height: 0.9; letter-spacing: -0.02em; }
+  .name em { color: var(--accent); padding-right: 0.06em; }
+  .lead { font: 400 clamp(1.05rem, 1.5vw, 1.22rem)/1.6 var(--sans); color: var(--soft); max-width: 40ch; margin: 28px 0 18px; }
+  .status { display: flex; align-items: center; gap: 10px; font: 500 12.5px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 28px; }
+  .status i { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 60%, transparent); animation: ping 2.4s infinite; }
+  @keyframes ping { 70% { box-shadow: 0 0 0 10px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+  .cta { display: flex; flex-wrap: wrap; gap: 12px; }
+
+  /* the photo stands on the rule below, inside the same margins as every other section, a step back from the camera */
+  .fig { position: absolute; z-index: 2; bottom: 0; right: calc(var(--gutter) + 64px); margin: 0; aspect-ratio: 1024 / 1340; height: calc(100% + 40px); pointer-events: none; }
+  .fig img { position: relative; z-index: 1; display: block; width: 100%; height: 100%; object-fit: contain; object-position: bottom; will-change: transform;
+    /* the crop at the bottom melts into the page instead of ending on a hard line */
+    -webkit-mask-image: linear-gradient(to bottom, #000 72%, transparent 98%); mask-image: linear-gradient(to bottom, #000 72%, transparent 98%); }
+  /* an arch behind the portrait, so the cut-out stands in front of something in either theme */
+  .backdrop { position: absolute; z-index: 0; left: 13%; right: 9%; top: 3%; bottom: 0; border-radius: 999px 999px 0 0; transform-origin: 50% 100%;
+    background: radial-gradient(circle, color-mix(in srgb, var(--accent) 22%, transparent) 1px, transparent 1.6px) 0 0 / 14px 14px,
+      linear-gradient(to bottom, color-mix(in srgb, var(--accent) 13%, var(--paper-2)), color-mix(in srgb, var(--accent) 5%, var(--paper)));
+    border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--rule)); border-bottom: 0;
+    -webkit-mask-image: linear-gradient(to bottom, #000 62%, transparent 96%); mask-image: linear-gradient(to bottom, #000 62%, transparent 96%); }
+  :global([data-theme='dark']) .fig img { filter: drop-shadow(0 0 1px rgb(255 255 255 / 0.35)) drop-shadow(0 0 22px rgb(255 255 255 / 0.05)); }
+  .glow { position: absolute; inset: 6% 8% 20% 14%; z-index: 0; border-radius: 50%; background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 16%, transparent), transparent 70%); filter: blur(10px); }
+  .marks { position: absolute; inset: 0; z-index: 2; width: 100%; height: 100%; overflow: visible; }
+  .brackets path { fill: none; stroke: var(--accent); stroke-width: 2.4; vector-effect: non-scaling-stroke; }
+  .leader { fill: none; stroke: var(--ink); stroke-width: 1; vector-effect: non-scaling-stroke; opacity: 0.55; }
+  .subject { position: absolute; z-index: 3; left: calc(686 / 1000 * 100% + 12px); top: calc(40 / 1309 * 100% - 6px); white-space: nowrap; display: flex; align-items: center; gap: 8px; color: var(--accent); font-size: 10.5px; }
+  .subject i { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: blink 1.2s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0.15; } }
+  .note { position: absolute; inset: 0; z-index: 4; }
+  .note .dot { position: absolute; left: calc(var(--ax) * 100%); top: calc(var(--ay) * 100%); width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%; background: var(--paper); border: 2px solid var(--accent); }
+  .note .dot::after { content: ''; position: absolute; inset: -7px; border-radius: 50%; border: 1px solid var(--accent); opacity: 0; animation: halo 2.6s 2.5s infinite; }
+  @keyframes halo { 0% { transform: scale(0.4); opacity: 0.8; } 80%, 100% { transform: scale(1.4); opacity: 0; } }
+  .note .card { position: absolute; left: calc(var(--lx) * 100%); top: calc(var(--ly) * 100%); width: 178px; display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; border-radius: 10px; background: color-mix(in srgb, var(--card) 88%, transparent); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border: 1px solid var(--rule); box-shadow: var(--shadow); }
+  .note .tag { color: var(--accent); font-size: 10.5px; }
+  .note .txt { font: 400 1.02rem/1.25 var(--serif); color: var(--ink); }
+  .coords { position: absolute; z-index: 3; right: -60px; top: 12%; writing-mode: vertical-rl; color: var(--muted); font-size: 10.5px; }
+
+  .verify { color: var(--accent); text-decoration: none; }
+  .verify:hover { text-decoration: underline; }
+  .creds { position: relative; z-index: 3; display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--ink); background: linear-gradient(to bottom, var(--paper), color-mix(in srgb, var(--paper) 0%, transparent)); }
+  .creds div { position: relative; display: flex; flex-direction: column-reverse; justify-content: flex-end; padding: 18px 18px 28px 0; border-right: 1px solid var(--rule); }
+  .creds div::before { content: ''; position: absolute; left: 0; top: -1px; width: 0; height: 2px; background: var(--accent); transition: width 0.5s var(--ease-out); }
+  .creds div + div { padding-left: 18px; }
+  .creds div + div::before { left: 18px; }
+  .creds div:hover::before { width: 48px; }
+  .creds div:last-child { border-right: 0; }
+  .creds dd { font: 400 clamp(2.2rem, 4.2vw, 3.3rem)/1 var(--serif); }
+  .creds dt { margin-top: 8px; font-size: 13.5px; color: var(--muted); }
+
+  @media (max-width: 980px) {
+    .hero { padding-top: 92px; }
+    .stage { grid-template-columns: 1fr; min-height: 0; }
+    .copy { padding-bottom: 0; order: 2; }
+    .fig { position: relative; top: 0; right: auto; order: 1; width: min(100%, 320px); height: auto; margin: 26px auto 18px; }
+    .subject { left: auto; right: calc((1 - 686 / 1000) * 100%); top: -22px; }
+    .note, .coords { display: none; }
+    .creds { margin-top: 44px; }
+  }
+  @media (max-width: 860px) {
+    .creds { grid-template-columns: 1fr 1fr; }
+    .creds div { padding: 16px 12px 16px 0 !important; border-right: 0; border-bottom: 1px solid var(--rule); }
+    .creds div:nth-child(odd) { border-right: 1px solid var(--rule); }
+    .creds div:nth-child(even) { padding-left: 14px !important; }
+    .creds div::before { display: none; }
+  }
+</style>
+
+<script>
+  import { animate, createTimeline, createDrawable, onScroll, stagger, splitText, scrambleText, utils } from 'animejs';
+  import { reduced, countUp } from '../scripts/motion';
+
+  const fig = document.getElementById('fig')!;
+  const svg = fig.querySelector<SVGSVGElement>('.marks')!;
+  const notes = [...fig.querySelectorAll<HTMLElement>('.note')];
+
+  // leader lines: from each anchor dot to the nearest edge of its card, in the svg's 1000 x 1309 space
+  function drawLeaders() {
+    const fr = fig.getBoundingClientRect();
+    if (!fr.width) return;
+    notes.forEach((n) => {
+      const dot = n.querySelector<HTMLElement>('.dot')!.getBoundingClientRect();
+      const card = n.querySelector<HTMLElement>('.card')!.getBoundingClientRect();
+      const ax = dot.left + dot.width / 2, ay = dot.top + dot.height / 2;
+      const cx = ax < card.left ? card.left : ax > card.right ? card.right : card.left + card.width / 2;
+      const cy = Math.max(card.top + 14, Math.min(card.bottom - 14, ay));
+      const sx = (v: number) => ((v - fr.left) / fr.width) * 1000, sy = (v: number) => ((v - fr.top) / fr.height) * 1309;
+      const midX = sx(ax) + (sx(cx) - sx(ax)) * 0.55;
+      svg.querySelector(`.leader[data-note="${n.dataset.note}"]`)!.setAttribute('d', `M${sx(ax)} ${sy(ay)} L${midX} ${sy(cy)} L${sx(cx)} ${sy(cy)}`);
+    });
+  }
+  drawLeaders();
+  addEventListener('resize', drawLeaders);
+
+  // ---------- the field: a dot grid that lights up around the cursor, with an occasional sweep ----------
+  const canvas = document.getElementById('field') as HTMLCanvasElement;
+  const ctx = canvas.getContext('2d')!;
+  const hero = canvas.parentElement!;
+  let W = 0, H = 0, dpr = 1, mx = -999, my = -999, sweep = -1, running = false, visible = true, ink = '#000', acc = '#f00';
+  const GAP = 26;
+  function readColors() {
+    const css = getComputedStyle(document.documentElement);
+    ink = css.getPropertyValue('--rule-strong').trim();
+    acc = css.getPropertyValue('--accent').trim();
+  }
+  function size() {
+    dpr = Math.min(devicePixelRatio || 1, 2);
+    W = hero.clientWidth; H = hero.clientHeight;
+    canvas.width = W * dpr; canvas.height = H * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function paint() {
+    ctx.clearRect(0, 0, W, H);
+    for (let y = GAP / 2; y < H; y += GAP) {
+      const sw = sweep >= 0 ? Math.max(0, 1 - Math.abs(y - sweep) / 70) : 0;
+      for (let x = GAP / 2; x < W; x += GAP) {
+        const d = Math.hypot(x - mx, y - my);
+        const near = Math.max(0, 1 - d / 150);
+        const k = Math.max(near, sw * 0.6);
+        // fade the grid out toward the middle-left, so it never sits behind the headline
+        const mask = Math.min(1, Math.max(0.12, (x / W - 0.25) * 1.6));
+        ctx.globalAlpha = (0.32 + k * 0.68) * mask;
+        ctx.fillStyle = k > 0.15 ? acc : ink;
+        ctx.beginPath();
+        ctx.arc(x, y, 0.9 + k * 1.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  function frame() {
+    if (!running) return;
+    if (sweep >= 0) { sweep += 6; if (sweep > H + 80) sweep = -1; }
+    paint();
+    requestAnimationFrame(frame);
+  }
+  const start = () => { if (!running && visible && !document.hidden && !reduced) { running = true; requestAnimationFrame(frame); } };
+  readColors(); size(); paint();
+  addEventListener('resize', () => { size(); paint(); });
+  addEventListener('fh:theme', () => { readColors(); paint(); });
+  new IntersectionObserver(([e]) => { visible = e.isIntersecting; if (visible) start(); else running = false; }).observe(hero);
+  document.addEventListener('visibilitychange', () => (document.hidden ? (running = false) : start()));
+  if (!reduced) {
+    hero.addEventListener('pointermove', (e) => { const r = hero.getBoundingClientRect(); mx = e.clientX - r.left; my = e.clientY - r.top; start(); });
+    hero.addEventListener('pointerleave', () => { mx = my = -999; });
+    // a recon sweep every few seconds
+    setInterval(() => { if (visible && sweep < 0) { sweep = 0; start(); } }, 7000);
+    setTimeout(() => { sweep = 0; start(); }, 1600);
+  }
+
+  // ---------- entrance ----------
+  if (!reduced) {
+    const split = splitText('#hero-name', { chars: { wrap: 'clip' } });
+    document.getElementById('hero-name')!.style.visibility = 'visible';
+    const brackets = createDrawable(svg.querySelectorAll('.brackets path'));
+    const leaders = createDrawable(svg.querySelectorAll('.leader'));
+    utils.set(brackets, { draw: '0 0' });
+    utils.set(leaders, { draw: '0 0' });
+    utils.set(fig.querySelectorAll('.note .dot, .note .card, .subject, .coords'), { opacity: 0 });
+
+    createTimeline({ defaults: { ease: 'outExpo' } })
+      .add(split.chars, { y: ['110%', '0%'], duration: 1200, delay: stagger(32), onComplete: () => split.revert() })
+      .add('.h-in', { opacity: [0, 1], y: [16, 0], duration: 900, delay: stagger(90) }, 280)
+      .add('#kicker', { innerHTML: scrambleText({ chars: 'abcdefghijklmnopqrstuvwxyz·&', duration: 900 }) }, 300)
+      .add('.h-fig', { opacity: [0, 1], duration: 400 }, 150)
+      // the arch grows up from the rule, then the portrait rises into it and fades in
+      .add('.backdrop', { scaleY: [0, 1], opacity: [0, 1], duration: 1100 }, 150)
+      .add(fig.querySelector('img')!, { opacity: [0, 1], y: [90, 0], duration: 1400 }, 350)
+      .add('.glow', { opacity: [0, 1], scale: [0.7, 1], duration: 1600 }, 500)
+      // focus brackets start wide and snap onto the face
+      .add(brackets, { draw: ['0 0', '0 1'], duration: 500, ease: 'outQuad' }, 1100)
+      .add(svg.querySelector('.brackets')!, { scale: [1.35, 1], opacity: [0, 1], duration: 700, ease: 'outBack(1.6)' }, 1100)
+      .add('.subject', { opacity: [0, 1], x: [-8, 0], duration: 500 }, 1600)
+      .add('.coords', { opacity: [0, 1], duration: 900 }, 1500)
+      // then the annotations, one at a time
+      .add(fig.querySelectorAll('.note .dot'), { opacity: [0, 1], scale: [0, 1], duration: 400, delay: stagger(260), ease: 'outBack(2)' }, 1900)
+      .add(leaders, { draw: ['0 0', '0 1'], duration: 600, delay: stagger(260), ease: 'inOutQuad' }, 2050)
+      .add(fig.querySelectorAll('.note .card'), { opacity: [0, 1], y: [8, 0], duration: 600, delay: stagger(260) }, 2350);
+    document.querySelectorAll<HTMLElement>('.creds [data-to]').forEach((n, i) => countUp(n, 900 + i * 120));
+    setTimeout(() => animate('.h-cred', { opacity: [0, 1], y: [18, 0], duration: 900, delay: stagger(90), ease: 'outExpo' }), 650);
+
+    // depth: the notes drift off the photo; the photo itself stays standing on the rule
+    const sc = { target: '.hero', enter: 'start start', leave: 'end start', sync: true } as const;
+    animate(fig.querySelectorAll('.note'), { y: [0, -110], opacity: [1, 0], ease: 'linear', autoplay: onScroll(sc) });
+    animate('#hero-name', { y: [0, 80], ease: 'linear', autoplay: onScroll(sc) });
+    if (matchMedia('(hover: hover) and (pointer: fine)').matches) {
+      let tx = 0, ty = 0, cx = 0, cy = 0, ticking = false;
+      const loop = () => {
+        cx += (tx - cx) * 0.08; cy += (ty - cy) * 0.08;
+        fig.style.translate = `${cx * -14}px ${cy * -8}px`;
+        notes.forEach((n) => (n.style.translate = `${cx * -10}px ${cy * -6}px`));
+        if (Math.abs(tx - cx) > 0.001 || Math.abs(ty - cy) > 0.001) requestAnimationFrame(loop); else ticking = false;
+      };
+      addEventListener('pointermove', (e) => {
+        tx = e.clientX / innerWidth - 0.5; ty = e.clientY / innerHeight - 0.5;
+        if (!ticking) { ticking = true; requestAnimationFrame(loop); }
+      }, { passive: true });
+    }
+
+    // the notes keep talking: every few seconds one of them swaps to its next line, round robin,
+    // only while the hero is on screen and the tab is visible
+    const queue = notes.map((n) => ({ n, lines: JSON.parse(n.dataset.lines || '[]') as string[], i: 0 }));
+    let turn = 0, heroOn = true;
+    new IntersectionObserver(([e]) => (heroOn = e.isIntersecting)).observe(fig);
+    setTimeout(() => setInterval(() => {
+      if (!heroOn || document.hidden) return;
+      const q = queue[turn++ % queue.length];
+      if (q.lines.length < 2) return;
+      q.i = (q.i + 1) % q.lines.length;
+      const txt = q.n.querySelector<HTMLElement>('.txt')!;
+      const card = q.n.querySelector<HTMLElement>('.card')!;
+      txt.textContent = q.lines[q.i];
+      drawLeaders();
+      animate(card, { scale: [0.94, 1], duration: 500, ease: 'outBack(2.2)' });
+      animate(txt, { innerHTML: scrambleText({ chars: 'abcdefghijklmnopqrstuvwxyz', duration: 700 }) });
+    }, 5200), 6000);
+  }
+</script>

@@ -1,0 +1,6 @@
+Contact: mailto:farhan736hussain@gmail.com
+Contact: https://github.com/thecyberfarhan/thecyberfarhan.github.io/security/advisories/new
+Expires: 2027-11-15T00:00:00.000Z
+Preferred-Languages: en, ur
+Canonical: https://thecyberfarhan.github.io/.well-known/security.txt
+Policy: https://thecyberfarhan.github.io/SECURITY.md

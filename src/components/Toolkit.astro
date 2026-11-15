@@ -1,0 +1,188 @@
+---
+import { STACK, TOOL_PHASES, TECHNIQUES } from '../data/site';
+const WHY = [
+  'Find what is exposed before touching anything.',
+  'Where most of my findings live: proxies, fuzzers and the odd scanner.',
+  'Turn a weakness into proof, then follow it as far as it goes.',
+  'Credentials, traffic, and the way from one network to the next.',
+];
+const half = Math.ceil(TECHNIQUES.length / 2);
+const rows = [TECHNIQUES.slice(0, half), TECHNIQUES.slice(half)];
+---
+<section class="block toolkit" id="toolkit" aria-labelledby="toolkit-title">
+  <div class="wrap">
+    <div class="sec-head" data-reveal>
+      <div><p class="label accent">Toolkit</p><h2 id="toolkit-title">What I reach for, phase by phase.</h2></div>
+      <p>The tools matter less than knowing when to use them. Here is what I work with at each stage of a test.</p>
+    </div>
+    <div class="stack" data-reveal>
+      <p class="label">Core stack</p>
+      <ul>{STACK.map((s) => <li>{s}</li>)}</ul>
+    </div>
+  </div>
+
+  <div class="walk" id="tool-walk">
+    <div class="stage wrap">
+      <ol class="rail" data-scout="toolkit" data-scout-side="left">
+        {TOOL_PHASES.map((p, i) => (
+          <li class:list={{ on: i === 0 }} data-i={i}>
+            <span class="n">{String(i + 1).padStart(2, '0')}</span>
+            <span class="txt"><b>{p.phase}</b><small>{WHY[i]}</small></span>
+          </li>
+        ))}
+        <span class="meter" aria-hidden="true"><i></i></span>
+      </ol>
+      <div class="decks">
+        <span class="ghost" aria-hidden="true">01</span>
+        {TOOL_PHASES.map((p, i) => (
+          <section class:list={['deck', { on: i === 0 }]} aria-label={p.phase} data-i={i}>
+            <p class="label deck-label"><span>{String(i + 1).padStart(2, '0')}</span> {p.phase}</p>
+            <ul class="tiles">
+              {p.tools.map(([name, what], k) => (
+                <li><span class="k">{String(k + 1).padStart(2, '0')}</span><b class="nm">{name}</b><small>{what}</small></li>
+              ))}
+            </ul>
+          </section>
+        ))}
+      </div>
+    </div>
+  </div>
+
+  <div class="tech" aria-label="Techniques and frameworks">
+    <p class="label wrap">Techniques and frameworks</p>
+    {rows.map((r, i) => (
+      <div class:list={['ribbon', { rev: i === 1 }]}>
+        <ul>{r.map((t) => <li>{t}</li>)}</ul>
+        <ul aria-hidden="true">{r.map((t) => <li>{t}</li>)}</ul>
+      </div>
+    ))}
+  </div>
+</section>
+
+<style>
+  .stack { display: flex; align-items: center; flex-wrap: wrap; gap: 14px 22px; padding: 20px 0; border-block: 1px solid var(--rule); }
+  .stack ul { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; }
+  .stack li { font: 400 1.15rem var(--serif); }
+  .stack li:not(:last-child)::after { content: '·'; margin-left: 8px; color: var(--rule-strong); }
+
+  /* the walk: on wide screens the stage pins and the four phases play in turn */
+  .walk { position: relative; margin-top: 56px; }
+  .stage { display: grid; grid-template-columns: minmax(250px, 0.8fr) 2fr; gap: 56px; align-items: start; }
+  .rail { position: relative; list-style: none; display: flex; flex-direction: column; gap: 4px; padding-left: 22px; }
+  .rail li { display: flex; gap: 14px; padding: 14px 0; color: var(--muted); transition: color 0.4s; }
+  .rail .n { font: 500 12px var(--mono); padding-top: 5px; color: inherit; }
+  .rail b { display: block; font: 400 1.45rem/1.15 var(--serif); letter-spacing: -0.01em; transition: color 0.4s; }
+  .rail small { display: block; max-height: 0; overflow: hidden; font-size: 14px; color: var(--soft); opacity: 0; transition: max-height 0.5s var(--ease-out), opacity 0.4s, margin 0.4s; }
+  .rail li.on { color: var(--ink); }
+  .rail li.on .n { color: var(--accent); }
+  .rail li.on small { max-height: 80px; opacity: 1; margin-top: 6px; }
+  .meter { position: absolute; left: 0; top: 14px; bottom: 14px; width: 2px; background: var(--rule); border-radius: 2px; }
+  .meter i { position: absolute; inset: 0 0 auto; height: 100%; background: var(--accent); transform-origin: top; transform: scaleY(var(--p, 0.25)); border-radius: 2px; transition: transform 0.15s linear; }
+
+  .decks { position: relative; }
+  .deck-label { display: none; margin-bottom: 14px; }
+  .deck-label span { color: var(--accent); }
+  .tiles { list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; perspective: 900px; }
+  .tiles li { position: relative; display: flex; flex-direction: column; gap: 6px; min-height: 128px; padding: 16px; background: var(--card); border: 1px solid var(--rule); border-radius: 14px; }
+  .tiles .k { font: 500 10.5px var(--mono); color: var(--muted); }
+  .tiles .nm { margin-top: auto; font: 500 1.08rem/1.2 var(--sans); letter-spacing: -0.01em; }
+  .tiles small { font-size: 13px; color: var(--muted); }
+
+  .tech { margin-top: 72px; overflow: hidden; }
+  .tech > .label { margin-bottom: 16px; }
+  .ribbon { display: flex; width: max-content; gap: 8px; margin-bottom: 8px; animation: ribbon 46s linear infinite; }
+  .ribbon.rev { animation-direction: reverse; animation-duration: 52s; }
+  .tech:hover .ribbon { animation-play-state: paused; }
+  .ribbon ul { list-style: none; display: flex; gap: 8px; }
+  .ribbon li { white-space: nowrap; font-size: 14px; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--rule-strong); color: var(--soft); background: var(--card); }
+  @keyframes ribbon { to { transform: translateX(calc(-50% - 4px)); } }
+
+  /* pinned mode, set by the script on wide screens with motion allowed */
+  /* the stage is only as tall as its content and pins in the middle of the screen, so nothing
+     but the next section follows it when the walk lets go */
+  .walk.pinned { height: calc(var(--stage-h, 420px) + 240vh); }
+  .walk.pinned .stage { position: sticky; top: var(--stage-top, 20vh); }
+  .walk.pinned .deck { position: absolute; inset: 0 0 auto; visibility: hidden; }
+  .walk.pinned .deck.on { position: relative; visibility: visible; }
+  .walk.pinned .deck-label { display: none; }
+  .walk.pinned .rail li:not(.on):hover { color: var(--soft); }
+  .walk.pinned .rail li:not(.on):hover b { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
+  .ghost { display: none; }
+  .walk.pinned .ghost { display: block; position: absolute; right: -10px; bottom: calc(100% - 30px); font: 400 clamp(8rem, 16vw, 15rem)/0.8 var(--serif); letter-spacing: -0.05em; color: var(--paper-2); pointer-events: none; user-select: none; z-index: -1; }
+
+  /* stacked mode: every phase in turn, rail hidden */
+  .walk:not(.pinned) .rail { display: none; }
+  .walk:not(.pinned) .stage { grid-template-columns: 1fr; }
+  .walk:not(.pinned) .deck { margin-bottom: 40px; }
+  .walk:not(.pinned) .deck-label { display: block; }
+  @media (max-width: 860px) { .tiles { grid-template-columns: 1fr 1fr; } .tiles li { min-height: 104px; } }
+  @media (prefers-reduced-motion: reduce) { .ribbon { animation: none; flex-wrap: wrap; width: auto; padding-inline: 20px; } .ribbon ul[aria-hidden] { display: none; } .ribbon ul { flex-wrap: wrap; } }
+</style>
+
+<script>
+  import { animate, scrambleText, stagger } from 'animejs';
+  import { initReveals, reduced } from '../scripts/motion';
+
+  const root = document.getElementById('toolkit')!;
+  initReveals(root);
+  const walk = root.querySelector<HTMLElement>('#tool-walk')!;
+  const rail = [...walk.querySelectorAll<HTMLLIElement>('.rail li')];
+  const decks = [...walk.querySelectorAll<HTMLElement>('.deck')];
+  const meter = walk.querySelector<HTMLElement>('.meter')!;
+  const ghost = walk.querySelector<HTMLElement>('.ghost')!;
+  const stage = walk.querySelector<HTMLElement>('.stage')!;
+  const wide = matchMedia('(min-width: 1024px) and (min-height: 640px)');
+  let current = 0;
+
+  function show(i: number) {
+    if (i === current) return;
+    const dir = i > current ? 1 : -1;
+    current = i;
+    rail.forEach((li, k) => li.classList.toggle('on', k === i));
+    decks.forEach((d, k) => d.classList.toggle('on', k === i));
+    ghost.textContent = String(i + 1).padStart(2, '0');
+    animate(ghost, { opacity: [0, 1], y: [40 * dir, 0], duration: 600, ease: 'outExpo' });
+    const tiles = decks[i].querySelectorAll('li');
+    // the tiles flip in and each tool name unscrambles into place
+    animate(tiles, { opacity: [0, 1], y: [18 * dir, 0], rotateX: [-25 * dir, 0], duration: 520, delay: stagger(35), ease: 'outQuart' });
+    tiles.forEach((li, k) => {
+      const nm = li.querySelector('.nm')!;
+      animate(nm, { innerHTML: scrambleText({ chars: 'abcdefghijklmnopqrstuvwxyz-', duration: 520 }), delay: 60 + k * 35 });
+    });
+  }
+
+  function onScroll() {
+    const r = walk.getBoundingClientRect();
+    // 0 when the stage first pins, 1 when it lets go
+    const top = parseFloat(walk.style.getPropertyValue('--stage-top')) || 0;
+    const p = Math.min(1, Math.max(0, (top - r.top) / Math.max(1, r.height - stage.offsetHeight)));
+    meter.style.setProperty('--p', String(0.25 + p * 0.75));
+    show(Math.min(decks.length - 1, Math.floor(p * decks.length * 0.999)));
+  }
+
+  function measure() {
+    const h = stage.offsetHeight;
+    walk.style.setProperty('--stage-h', `${h}px`);
+    walk.style.setProperty('--stage-top', `${Math.max(76, (innerHeight - h) / 2)}px`);
+  }
+  function mode() {
+    const pin = wide.matches && !reduced;
+    walk.classList.toggle('pinned', pin);
+    if (pin) measure();
+    if (pin) { addEventListener('scroll', onScroll, { passive: true }); onScroll(); }
+    else removeEventListener('scroll', onScroll);
+  }
+  mode();
+  wide.addEventListener('change', mode);
+  addEventListener('resize', () => { if (walk.classList.contains('pinned')) measure(); });
+  // clicking a phase on the rail jumps the page to that part of the walk
+  rail.forEach((li, i) => {
+    li.style.cursor = 'pointer';
+    li.addEventListener('click', () => {
+      if (!walk.classList.contains('pinned')) return;
+      const pinTop = parseFloat(walk.style.getPropertyValue('--stage-top')) || 0;
+      const top = walk.getBoundingClientRect().top + scrollY - pinTop + ((walk.offsetHeight - stage.offsetHeight) * (i + 0.5)) / decks.length;
+      (window as unknown as { __lenis?: { scrollTo: (y: number) => void } }).__lenis?.scrollTo(top) ?? scrollTo({ top, behavior: 'smooth' });
+    });
+  });
+</script>

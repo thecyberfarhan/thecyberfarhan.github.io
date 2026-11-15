@@ -1,0 +1,37 @@
+---
+import Base from '../../layouts/Base.astro';
+---
+<Base title="Vault | Farhan Hussain" description="Nothing to see here." path="/vault/" noindex>
+  <section class="vault wrap">
+    <p class="label accent">/vault/ · Disallowed in robots.txt</p>
+    <h1>You read robots.txt.<br /><em>Of course you did.</em></h1>
+    <p class="lead">A "please don't look here" file is the first place anyone looks. That is the whole lesson. Here is your reward:</p>
+    <div class="loot">
+      <p class="label">loot.txt</p>
+      <code id="loot">Rkh7cm9ib3RzX3R4dF9pc19ub3RfYV9sb2NrfQ==</code>
+      <button type="button" class="btn line sm" id="copy-loot">Copy</button>
+    </div>
+    <p class="hint">It is not encrypted. If that looks familiar, you have played Backup Blues. Decode it, then submit it at the bottom of <a class="link-arrow" href="/lab/">the lab</a>.</p>
+  </section>
+</Base>
+
+<style>
+  .vault { min-height: 100svh; display: flex; flex-direction: column; justify-content: center; padding-top: 110px; padding-bottom: 80px; }
+  h1 { font-size: clamp(2.6rem, 6.6vw, 5.2rem); line-height: 1; letter-spacing: -0.035em; margin: 18px 0; }
+  h1 em { color: var(--accent); }
+  .lead { font: 300 clamp(1.15rem, 2vw, 1.4rem)/1.5 var(--serif); color: var(--soft); max-width: 44ch; }
+  .loot { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 34px 0 18px; padding: 20px; background: #1b1d22; border-radius: 14px; max-width: 640px; }
+  .loot .label { color: #8d9099; width: 100%; }
+  .loot code { font: 500 15px var(--mono); color: #e6e3dc; overflow-wrap: anywhere; flex: 1; }
+  .loot .btn { color: #f4f1ea; border-color: #f4f1ea; }
+  .hint { color: var(--muted); max-width: 52ch; }
+</style>
+
+<script>
+  import { say } from '../../scripts/scout';
+  import { line } from '../../scripts/lines';
+  setTimeout(() => say(line('vault'), { state: 'suspicious', ms: 6000 }), 900);
+  document.getElementById('copy-loot')!.addEventListener('click', async (e) => {
+    try { await navigator.clipboard.writeText(document.getElementById('loot')!.textContent!); (e.target as HTMLButtonElement).textContent = 'Copied'; } catch { /* blocked */ }
+  });
+</script>

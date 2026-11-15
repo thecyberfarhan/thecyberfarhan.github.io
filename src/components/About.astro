@@ -1,0 +1,194 @@
+---
+import { ABOUT, SITE } from '../data/site';
+// the sample report's real headline numbers (see /assets/Sample_Pentest_Report.pdf)
+const SEV = [['Critical', 1, '#9e1b2c'], ['High', 2, '#c2410c'], ['Medium', 1, '#a8642a'], ['Low', 1, '#3f6e8c']] as const;
+const FINDINGS = [
+  ['The report export page can be tricked into handing over private data', 'Critical'],
+  ['A staff note with the administrator password sits on the public website', 'High'],
+  ['One staff account has far more power on the server than it needs', 'High'],
+  ['Passwords are stored in a form that is easy to unscramble', 'Medium'],
+  ['The system reveals more about itself than it should', 'Low'],
+];
+const tone = Object.fromEntries(SEV.map(([k, , c]) => [k, c]));
+---
+<section class="block about" id="about" aria-labelledby="about-title">
+  <div class="wrap">
+    <p class="label accent">About</p>
+    <h2 id="about-title" class="sr-only">About</h2>
+    <p class="statement" id="statement">{ABOUT.statement}</p>
+
+    <ul class="cards" id="about-cards" data-enter="kids">
+      {ABOUT.columns.map((c, i) => (
+        <li style={`--r:${[-2.5, 1.2, -1][i]}deg`}>
+          <p class="label"><span>{String(i + 1).padStart(2, '0')}</span> {c.title}</p>
+          <p class="body">{c.body}</p>
+        </li>
+      ))}
+    </ul>
+
+    <div class="sample" id="sample">
+      <div class="copy">
+        <p class="label accent">What you would receive</p>
+        <h3>A report written for the people who decide.</h3>
+        <p>A sample engagement for a fictional company. The summary is in plain language for managers; a separate technical appendix gives the IT team evidence, steps to reproduce and example fixes.</p>
+        <div class="cta">
+          <a class="btn solid" href={SITE.report}>Read the sample report <span class="sr-only">(PDF)</span></a>
+          <a class="btn line" href={SITE.appendix}>Technical appendix <span class="sr-only">(PDF)</span></a>
+        </div>
+      </div>
+
+      <a class="doc" href={SITE.report} aria-label="Open the sample report (PDF)" data-scout="report">
+        <div class="page inside" aria-hidden="true">
+          <p class="kick">1. Summary for leadership</p>
+          <p class="lead">An outsider with basic skills could take full control of the system in under an hour.</p>
+          <ul class="sev">
+            {SEV.map(([k, n, c]) => <li style={`--c:${c}`}><b data-n={n}>{n}</b><span>{k}</span></li>)}
+          </ul>
+          <p class="risk"><span>Overall risk: High.</span> Act this week.</p>
+          <ol class="find">
+            {FINDINGS.map(([t, s]) => <li style={`--c:${tone[s]}`}><span class="t">{t}</span><span class="s">{s}</span></li>)}
+          </ol>
+          <p class="foot">Sample report · Farhan Hussain <span>Page 1 of 3</span></p>
+        </div>
+        <div class="page cover" aria-hidden="true">
+          <div class="face">
+            <p class="kick">Sample report · Fictional company</p>
+            <p class="title">Website Security Review</p>
+            <p class="sub">Customer portal of Acme Corp, a fictional company</p>
+            <dl>
+              <div><dt>Prepared by</dt><dd>Farhan Hussain, Penetration Tester (CPENT)</dd></div>
+              <div><dt>Report date</dt><dd>3 November 2026</dd></div>
+            </dl>
+            <span class="seal">Confidential</span>
+          </div>
+          <div class="back"></div>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<style>
+  .statement { font: 400 clamp(1.8rem, 4vw, 3.2rem)/1.2 var(--serif); letter-spacing: -0.025em; max-width: 24ch; margin: 22px 0 64px; }
+  .statement :global(.word) { transition: none; }
+
+  /* three index cards, dealt onto the page and slightly askew */
+  .cards { list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .cards li { position: relative; padding: 22px 24px 26px; background: var(--card); border: 1px solid var(--rule); border-radius: 6px; box-shadow: 0 1px 0 var(--rule), 0 18px 30px -26px #0006; rotate: var(--r); transition: rotate 0.5s var(--ease-out); background-image: linear-gradient(to bottom, transparent 47px, color-mix(in srgb, var(--accent) 35%, transparent) 47px, color-mix(in srgb, var(--accent) 35%, transparent) 48px, transparent 48px), repeating-linear-gradient(to bottom, transparent 0 27px, var(--rule) 27px 28px); background-position: 0 0, 0 52px; background-size: 100% 100%, 100% calc(100% - 52px); background-repeat: no-repeat; }
+  /* not links, so no lift: the card only straightens, like someone squaring it on the desk */
+  .cards li:hover { rotate: 0deg; }
+  .cards .label { margin-bottom: 26px; color: var(--ink); }
+  .cards .label span { color: var(--accent); margin-right: 6px; }
+  .cards .body { color: var(--soft); font-size: 16px; line-height: 28px; }
+
+  /* the sample report as an object: a cover that swings open onto the summary page */
+  .sample { margin-top: 110px; display: grid; grid-template-columns: 1fr minmax(300px, 440px); gap: clamp(32px, 6vw, 90px); align-items: center; }
+  .copy h3 { font-size: clamp(1.7rem, 3vw, 2.4rem); line-height: 1.12; margin: 12px 0 14px; }
+  .copy > p:not(.label) { color: var(--soft); max-width: 46ch; }
+  .cta { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+
+  .doc { position: relative; display: block; aspect-ratio: 1 / 1.33; perspective: 1800px; text-decoration: none; color: #16181d; }
+  .page { position: absolute; inset: 0; border-radius: 4px; background: #fbfbfc; box-shadow: 0 1px 0 #0000000d, 0 30px 60px -36px #0008; }
+  .inside { padding: 7% 8%; display: flex; flex-direction: column; font-size: clamp(9px, 1.05vw, 12px); }
+  .inside::before { content: ''; position: absolute; inset: 6px -6px -6px 6px; z-index: -1; border-radius: 4px; background: #eef0f3; box-shadow: 0 20px 40px -30px #0006; }
+  .kick { font: 600 0.8em var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: #9e1b2c; }
+  .lead { margin: 0.9em 0 1.3em; font: 400 1.7em/1.2 var(--serif); letter-spacing: -0.01em; }
+  .sev { list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6em; }
+  .sev li { display: flex; flex-direction: column; align-items: center; gap: 0.2em; padding: 0.7em 0 0.6em; border-top: 3px solid var(--c); background: color-mix(in srgb, var(--c) 7%, transparent); }
+  .sev b { font: 400 2.6em/1 var(--serif); color: var(--c); }
+  .sev span { font: 600 0.72em var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: #61656f; }
+  .risk { margin: 1.1em 0; padding: 0.6em 0.8em; border-left: 3px solid #9e1b2c; background: #9e1b2c10; font-size: 1.05em; }
+  .risk span { font-weight: 600; color: #9e1b2c; }
+  .find { list-style: none; counter-reset: f; display: flex; flex-direction: column; }
+  .find li { counter-increment: f; display: grid; grid-template-columns: 1.6em 1fr auto; gap: 0.6em; align-items: baseline; padding: 0.55em 0; border-bottom: 1px solid #e3e6ea; font-size: 0.95em; line-height: 1.35; }
+  .find li::before { content: counter(f); font: 600 0.85em var(--mono); color: #8a8f98; }
+  .find .s { font: 600 0.7em var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--c); }
+  .foot { margin-top: auto; display: flex; justify-content: space-between; font-size: 0.75em; color: #8a8f98; }
+
+  .cover { transform-origin: 0 50%; transform-style: preserve-3d; background: none; box-shadow: none; transform: rotateY(calc(var(--open, 0) * -104deg)); }
+  .face, .back { position: absolute; inset: 0; border-radius: 4px; backface-visibility: hidden; }
+  .face { display: flex; flex-direction: column; padding: 10% 9%; background: #111318; color: #eceef1; box-shadow: 0 30px 60px -30px #000a; font-size: clamp(9px, 1.05vw, 12px); }
+  .face .kick { color: #f0a0a5; }
+  .face .title { margin-top: auto; font: 400 3.7em/1 var(--serif); letter-spacing: -0.03em; }
+  .face .sub { margin-top: 0.8em; font-size: 1.15em; color: #b8bdc6; }
+  .face dl { display: grid; gap: 0.9em; margin-top: 2.6em; padding-top: 1.2em; border-top: 1px solid #ffffff22; }
+  .face dt { font: 600 0.72em var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: #8a8f98; }
+  .face dd { margin-top: 0.2em; font-size: 1.05em; }
+  .seal { position: absolute; top: 9%; right: 9%; padding: 0.35em 0.7em; border: 1.5px solid #f0a0a5; border-radius: 3px; font: 600 0.72em var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: #f0a0a5; rotate: 6deg; }
+  /* past edge-on the cover fades away instead of swinging over the text beside it */
+  .back { transform: rotateY(180deg); background: linear-gradient(to right, #e9ebef, #f7f8fa); opacity: calc((1 - var(--open, 0)) * 4); }
+  .doc:hover .cover { transform: rotateY(calc(var(--open, 0) * -104deg - 6deg)); transition: transform 0.4s var(--ease-out); }
+  .doc:focus-visible { outline: 2px solid var(--accent); outline-offset: 8px; border-radius: 4px; }
+  :global(:root:not(.js-motion)) .cover { --open: 1; }
+
+  @media (max-width: 900px) {
+    .cards { grid-template-columns: 1fr; gap: 14px; }
+    .sample { grid-template-columns: 1fr; }
+    .doc { width: min(100%, 420px); margin: 0 auto; }
+    .inside, .face { font-size: clamp(8px, 2.6vw, 12px); }
+  }
+</style>
+
+<script>
+  import { animate, onScroll, splitText, stagger } from 'animejs';
+  import { reduced } from '../scripts/motion';
+
+  const root = document.getElementById('about')!;
+  if (!reduced) {
+    // each word goes from faint to full ink as the statement scrolls through the view
+    const { words } = splitText('#statement', { words: true });
+    animate(words, {
+      opacity: [0.16, 1],
+      delay: stagger(60),
+      duration: 300,
+      ease: 'linear',
+      autoplay: onScroll({ target: '#statement', enter: 'end start', leave: 'center end', sync: true }),
+    });
+
+    // the index cards are dealt from a pile, one after another
+    const cards = root.querySelectorAll<HTMLElement>('#about-cards li');
+    const io = new IntersectionObserver(([e]) => {
+      if (!e.isIntersecting) return;
+      io.disconnect();
+      animate(cards, {
+        opacity: [0, 1],
+        x: (_: unknown, i: number) => [(1 - i) * 120, 0],
+        y: [60, 0],
+        rotate: (_: unknown, i: number) => [[-14, 9, -6][i], 0],
+        duration: 900,
+        delay: stagger(130),
+        ease: 'outExpo',
+      });
+    }, { threshold: 0.3 });
+    io.observe(root.querySelector('#about-cards')!);
+  }
+
+  // the cover opens as the report scrolls up through the view, then the counts land
+  const doc = root.querySelector<HTMLElement>('.doc')!;
+  const sev = [...doc.querySelectorAll<HTMLElement>('.sev b')];
+  if (reduced) doc.style.setProperty('--open', '1');
+  else {
+    let landed = false, raf = 0, cur = 0, goal = 0;
+    doc.querySelectorAll<HTMLElement>('.sev li, .find li').forEach((li) => (li.style.opacity = '0'));
+    const read = () => {
+      const r = doc.getBoundingClientRect();
+      const mid = r.top + r.height / 2;
+      return Math.min(1, Math.max(0, (innerHeight * 0.85 - mid) / (innerHeight * 0.4)));
+    };
+    const tick = () => {
+      cur += (goal - cur) * 0.14;
+      if (Math.abs(goal - cur) < 0.001) cur = goal;
+      doc.style.setProperty('--open', cur.toFixed(4));
+      if (cur > 0.75 && !landed) {
+        landed = true;
+        animate(doc.querySelectorAll('.sev li'), { opacity: [0, 1], y: [10, 0], duration: 500, delay: stagger(80), ease: 'outQuart' });
+        sev.forEach((b, i) => { const o = { v: 0 }; animate(o, { v: Number(b.dataset.n), duration: 700, delay: 120 + i * 80, ease: 'outQuad', onUpdate: () => { b.textContent = String(Math.round(o.v)); } }); });
+        animate(doc.querySelectorAll('.find li'), { opacity: [0, 1], x: [-10, 0], duration: 500, delay: stagger(70, { start: 350 }), ease: 'outQuart' });
+      }
+      raf = cur === goal ? 0 : requestAnimationFrame(tick);
+    };
+    const onScrollDoc = () => { goal = read(); if (!raf) raf = requestAnimationFrame(tick); };
+    addEventListener('scroll', onScrollDoc, { passive: true });
+    onScrollDoc();
+  }
+</script>

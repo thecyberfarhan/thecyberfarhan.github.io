@@ -1,0 +1,92 @@
+---
+import '@fontsource/instrument-serif/latin-400.css';
+import '@fontsource/instrument-serif/latin-400-italic.css';
+import '@fontsource-variable/inter/index.css';
+import '@fontsource/jetbrains-mono/500.css';
+import '../styles/global.css';
+import Nav from '../components/Nav.astro';
+import { SITE } from '../data/site';
+
+interface Props {
+  title: string;
+  description: string;
+  path?: string;
+  type?: 'website' | 'article';
+  jsonld?: Record<string, unknown>;
+  tone?: string;
+  noindex?: boolean;
+}
+const { title, description, path = '/', type = 'website', jsonld, tone, noindex } = Astro.props;
+const canonical = new URL(path, SITE.url).href;
+const og = `${SITE.url}/assets/og-card.jpg`;
+---
+<!doctype html>
+<html lang="en" style={tone ? `--tone:${tone}` : undefined}>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{title}</title>
+  <meta name="description" content={description} />
+  <link rel="canonical" href={canonical} />
+  <meta name="theme-color" content="#f4f5f7" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#0d1117" media="(prefers-color-scheme: dark)" />
+  <meta name="author" content={SITE.name} />
+  {noindex && <meta name="robots" content="noindex" />}
+  <meta property="og:type" content={type} />
+  <meta property="og:title" content={title} />
+  <meta property="og:description" content={description} />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <meta property="og:url" content={canonical} />
+  <meta property="og:image" content={og} />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Farhan Hussain, penetration tester, in a red jacket with arms crossed" />
+  <meta property="og:site_name" content={SITE.name} />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content={og} />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="sitemap" href="/sitemap-index.xml" />
+  <link rel="alternate" type="text/plain" href="/llms.txt" title="llms.txt" />
+  {jsonld && <script type="application/ld+json" set:html={JSON.stringify(jsonld).replace(/</g, '\\u003c')} />}
+  <script is:inline>
+    // theme before first paint: the visitor's saved choice, else their system setting
+    (function () {
+      var t = null;
+      try { t = localStorage.getItem('fh-theme'); } catch (e) {}
+      if (t !== 'dark' && t !== 'light') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      document.documentElement.dataset.theme = t;
+    })();
+    // decide motion before first paint so revealed content never flashes
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.documentElement.classList.add('js-motion');
+      // if the animation bundle never arrives, show everything rather than leave it hidden
+      setTimeout(() => { if (!window.__motionReady) document.documentElement.classList.remove('js-motion'); }, 3500);
+    }
+    // the old site installed a service worker; retire it for returning visitors
+    if ('serviceWorker' in navigator) navigator.serviceWorker.getRegistrations().then((r) => r.forEach((x) => x.unregister()));
+  </script>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <Nav />
+  <main id="main">
+    <slot />
+  </main>
+  <slot name="after" />
+  <script>
+    import '../scripts/eggs';
+    import '../scripts/smooth';
+    // Scout is not needed for first paint; load it when the browser is idle
+    const loadScout = () => import('../scripts/scout').then((m) => m.boot());
+    if ('requestIdleCallback' in window) requestIdleCallback(loadScout, { timeout: 2500 });
+    else setTimeout(loadScout, 1200);
+  </script>
+</body>
+</html>
+
+<style>
+  .skip { position: absolute; left: 12px; top: -60px; z-index: 100; background: var(--ink); color: var(--paper); padding: 10px 14px; border-radius: 8px; text-decoration: none; }
+  .skip:focus { top: 12px; }
+</style>
