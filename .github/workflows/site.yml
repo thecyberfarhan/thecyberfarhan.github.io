@@ -3,8 +3,9 @@ name: Build and deploy
 # One workflow does everything, because a commit pushed with GITHUB_TOKEN never
 # triggers a second workflow:
 #   1. pull the latest writeups from CTF-Writeups into src/data/writeups.json
-#   2. commit that file back if it changed
-#   3. build the Astro site and publish it to GitHub Pages
+#   2. pull every repo tagged "portfolio-project" into src/data/projects.json
+#   3. commit those files back if they changed
+#   4. build the Astro site and publish it to GitHub Pages
 #
 # Needs Settings > Pages > Source set to "GitHub Actions" (one-time).
 on:
@@ -42,12 +43,19 @@ jobs:
         run: node scripts/sync-writeups.mjs
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Commit synced writeups if they changed
+      - name: Sync projects
+        # same safety net: a failed sync keeps the last known-good project list
+        continue-on-error: true
+        timeout-minutes: 5
+        run: node scripts/sync-projects.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Commit synced data if it changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add src/data/writeups.json
-          git diff --staged --quiet || { git commit -m "Sync writeups from CTF-Writeups [automated]" && git push; }
+          git add src/data/writeups.json src/data/projects.json
+          git diff --staged --quiet || { git commit -m "Sync writeups and projects [automated]" && git push; }
       - run: npm run build
         env:
           ASTRO_TELEMETRY_DISABLED: 1

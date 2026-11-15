@@ -1,0 +1,684 @@
+{
+ "generated": "2026-11-15",
+ "projects": [
+  {
+   "slug": "apicheck",
+   "name": "apicheck",
+   "tagline": "A read-only web and API misconfiguration checker: headers, cookies, CORS, leftover sensitive files, directory listing, verbose errors, and endpoints that answer without authentication.",
+   "kind": "Original",
+   "status": "Active",
+   "language": "Python",
+   "requires": "Python 3.9+, no dependencies",
+   "license": "MIT",
+   "upstream": null,
+   "upstreamStars": null,
+   "scope": "Authorized testing only",
+   "skillArea": "Web and API testing",
+   "stars": 0,
+   "pushedAt": "2026-11-15",
+   "href": "https://github.com/thecyberfarhan/apicheck",
+   "sections": [
+    {
+     "id": "why",
+     "label": "Why",
+     "known": true,
+     "html": "<p>Most of the mistakes that turn into real incidents aren't exotic — they're a missing header, an exposed <code>.env</code>, or an endpoint nobody remembered to lock down. This checks for the common ones quickly, so the interesting manual work can start sooner.</p>"
+    },
+    {
+     "id": "what-this-shows",
+     "label": "What this shows",
+     "known": true,
+     "html": "<ul><li>Web and API testing: the exact class of low-hanging misconfiguration that shows up in almost</li></ul>\n<p>every real assessment, automated into one pass.</p>\n<ul><li>A checker that knows the difference between &quot;indicator&quot; and &quot;proof&quot;: every finding says where to</li></ul>\n<p>look, not that a vulnerability is confirmed, and soft-404 sites are detected and excluded from the exposure check to avoid false positives.</p>\n<ul><li>Tested against both a deliberately misconfigured server and a hardened one, so it's shown to</li></ul>\n<p>flag the first and stay quiet on the second — not just to run without crashing.</p>"
+    },
+    {
+     "id": "requirements",
+     "label": "Requirements",
+     "known": true,
+     "html": "<ul><li>Python 3.9 or newer</li><li>No third-party packages — standard library only</li><li>Tried on: Arch Linux, Kali Linux</li></ul>"
+    },
+    {
+     "id": "install",
+     "label": "Install",
+     "known": true,
+     "html": "<pre><code>git clone https://github.com/thecyberfarhan/apicheck\ncd apicheck\npython3 -m apicheck --help</code></pre>\n<p>No <code>pip install</code> needed.</p>"
+    },
+    {
+     "id": "usage",
+     "label": "Usage",
+     "known": true,
+     "html": "<h3>Basic scan of a lab target</h3>\n<pre><code>python3 -m apicheck http://192.168.1.10:8080</code></pre>\n<h3>Compare an authenticated vs. anonymous response on specific endpoints</h3>\n<pre><code>python3 -m apicheck http://192.168.1.10:8080 --token eyJhbGciOi... --endpoints paths.txt</code></pre>\n<h3>Write a report</h3>\n<pre><code>python3 -m apicheck http://192.168.1.10:8080 -o report.md\npython3 -m apicheck http://192.168.1.10:8080 -o report.json</code></pre>"
+    },
+    {
+     "id": "options",
+     "label": "Options",
+     "known": true,
+     "html": "<div class=\"table-wrap\"><table><thead><tr><th>Flag</th><th>What it does</th><th>Default</th></tr></thead><tbody><tr><td><code>url</code></td><td>Base URL, e.g. <code>http://192.168.1.10:8080</code></td><td>required</td></tr><tr><td><code>--token</code></td><td>Bearer token; compares authenticated vs. anonymous responses</td><td>off</td></tr><tr><td><code>--endpoints</code></td><td>File of one path per line, tested for missing authentication</td><td>off</td></tr><tr><td><code>--timeout</code></td><td>Request timeout, seconds</td><td>tool default</td></tr><tr><td><code>--authorized</code></td><td>Confirm written permission for a public target</td><td>required for public IPs</td></tr><tr><td><code>-o</code>, <code>--out</code></td><td>Write the report to <code>.md</code> or <code>.json</code></td><td>stdout</td></tr></tbody></table></div>"
+    },
+    {
+     "id": "example-output",
+     "label": "Example output",
+     "known": true,
+     "html": "<pre><code>$ python3 -m apicheck http://192.168.1.10:4280\napicheck: only test systems you own or have written permission to test.\n# apicheck report: http://192.168.1.10:4280\n\nRequests sent: 28. Findings: 9.\n\n## [MEDIUM] Content-Security-Policy missing\n...\n## [MEDIUM] Cookie 'PHPSESSID' lacks HttpOnly, SameSite\n...</code></pre>"
+    },
+    {
+     "id": "what-it-checks",
+     "label": "What it checks",
+     "known": true,
+     "html": "<div class=\"table-wrap\"><table><thead><tr><th>Check</th><th>Looks for</th></tr></thead><tbody><tr><td><code>headers</code></td><td>Missing CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy; version strings in <code>Server</code>/<code>X-Powered-By</code></td></tr><tr><td><code>cookies</code></td><td>Session cookies missing <code>HttpOnly</code>, <code>Secure</code> or <code>SameSite</code></td></tr><tr><td><code>cors</code></td><td><code>Access-Control-Allow-Origin</code> reflecting an arbitrary origin, especially combined with credentials</td></tr><tr><td><code>methods</code></td><td><code>TRACE</code> enabled; risky methods (<code>PUT</code>, <code>DELETE</code>, <code>PATCH</code>) advertised via <code>OPTIONS</code></td></tr><tr><td><code>exposure</code></td><td>Leftover <code>.git/HEAD</code>, <code>.env</code>, backup files, <code>phpinfo.php</code>, <code>server-status</code>, published API docs</td></tr><tr><td><code>listing</code></td><td>Directory listing enabled on common paths</td></tr><tr><td><code>errors</code></td><td>Stack traces or SQL error text leaking from a malformed request</td></tr><tr><td><code>auth</code></td><td>Endpoints (from <code>--endpoints</code> or auto-discovered via an OpenAPI/Swagger document) that return the same data with and without a bearer token</td></tr></tbody></table></div>\n<p>Pages that answer 200 to everything (soft-404 sites) are detected and excluded from the <code>exposure</code> check, to avoid false positives.</p>"
+    },
+    {
+     "id": "testing",
+     "label": "Testing",
+     "known": true,
+     "html": "<pre><code>python3 -m unittest discover -s tests -v</code></pre>\n<p>13 tests spin up two local servers — one deliberately misconfigured, one hardened — and assert the checker flags the first and stays quiet on the second. GitHub Actions runs them on Python 3.9, 3.11 and 3.12.</p>"
+    },
+    {
+     "id": "limitations",
+     "label": "Limitations",
+     "known": true,
+     "html": "<ul><li>This is a checker, not an exploit tool: every finding is an indicator to verify by hand, not</li></ul>\n<p>proof that a vulnerability exists.</p>\n<ul><li>Read-only, GET-based checks; it doesn't attempt authentication bypass or injection itself.</li><li>The <code>auth</code> check compares response shape with and without a token; it can miss subtler</li></ul>\n<p>authorization bugs (e.g. one user reading another user's data at the same auth level).</p>"
+    },
+    {
+     "id": "responsible-use",
+     "label": "Responsible use",
+     "known": true,
+     "html": "<p>Only test systems you own or have written permission to test. A public target needs <code>--authorized</code>.</p>"
+    },
+    {
+     "id": "license",
+     "label": "License",
+     "known": true,
+     "html": "<p>MIT. See <a href=\"https://github.com/thecyberfarhan/apicheck/blob/master/LICENSE\" target=\"_blank\" rel=\"noopener noreferrer\">LICENSE</a>.</p>"
+    }
+   ]
+  },
+  {
+   "slug": "reconkit",
+   "name": "reconkit",
+   "tagline": "Threaded port scan, HTTP/security-header probing and optional subdomain brute force, in one Markdown or JSON report. Standard library only.",
+   "kind": "Original",
+   "status": "Active",
+   "language": "Python",
+   "requires": "Python 3.9+, no dependencies",
+   "license": "MIT",
+   "upstream": null,
+   "upstreamStars": null,
+   "scope": "Authorized testing only",
+   "skillArea": "Recon and enumeration",
+   "stars": 0,
+   "pushedAt": "2026-11-15",
+   "href": "https://github.com/thecyberfarhan/reconkit",
+   "sections": [
+    {
+     "id": "why",
+     "label": "Why",
+     "known": true,
+     "html": "<p>Recon is the first phase of almost every test: map what's listening, what's running, and what's misconfigured, before anything else. This started as a handful of one-off scripts I kept rewriting for labs, so I turned it into one small tool with tests.</p>"
+    },
+    {
+     "id": "what-this-shows",
+     "label": "What this shows",
+     "known": true,
+     "html": "<ul><li>Recon and enumeration: the port scan, HTTP probe and subdomain brute force an engagement starts</li></ul>\n<p>with, as one tool instead of three separate scripts.</p>\n<ul><li>Writing tooling that holds up under test, not just under a demo: 8 unit tests, all run against a</li></ul>\n<p>local server so nothing touches the network, with CI on three Python versions.</p>\n<ul><li>A scope guard built into the tool itself, not left to the operator to remember: a public target</li></ul>\n<p>is refused without <code>--authorized</code>.</p>"
+    },
+    {
+     "id": "requirements",
+     "label": "Requirements",
+     "known": true,
+     "html": "<ul><li>Python 3.9 or newer</li><li>No third-party packages — standard library only</li><li>Tried on: Arch Linux, Kali Linux</li></ul>"
+    },
+    {
+     "id": "install",
+     "label": "Install",
+     "known": true,
+     "html": "<pre><code>git clone https://github.com/thecyberfarhan/reconkit\ncd reconkit\npython3 -m reconkit --help</code></pre>\n<p>No <code>pip install</code> needed.</p>"
+    },
+    {
+     "id": "usage",
+     "label": "Usage",
+     "known": true,
+     "html": "<h3>Top common ports and an HTTP probe, against a lab host</h3>\n<pre><code>python3 -m reconkit 192.168.1.10</code></pre>\n<h3>Specific ports, written as a Markdown report</h3>\n<pre><code>python3 -m reconkit 192.168.1.10 -p 22,80,443,8000-8100 -o report.md</code></pre>\n<h3>JSON output, for feeding into another tool</h3>\n<pre><code>python3 -m reconkit 192.168.1.10 -o report.json</code></pre>\n<h3>Subdomain brute force</h3>\n<pre><code>python3 -m reconkit example.com -w wordlists/small.txt --authorized</code></pre>\n<p>One word per line in the wordlist. <code>--authorized</code> is required for any public (non-private) address — reconkit refuses to scan one otherwise.</p>"
+    },
+    {
+     "id": "options",
+     "label": "Options",
+     "known": true,
+     "html": "<div class=\"table-wrap\"><table><thead><tr><th>Flag</th><th>What it does</th><th>Default</th></tr></thead><tbody><tr><td><code>target</code></td><td>Hostname or IP to scan</td><td>required</td></tr><tr><td><code>-p</code>, <code>--ports</code></td><td><code>top</code>, or a list like <code>22,80,8000-8100</code></td><td><code>top</code></td></tr><tr><td><code>-w</code>, <code>--wordlist</code></td><td>Subdomain wordlist; enables brute force</td><td>off</td></tr><tr><td><code>--timeout</code></td><td>Per-port connect timeout, seconds</td><td>tool default</td></tr><tr><td><code>--no-http</code></td><td>Skip the HTTP probe</td><td>off</td></tr><tr><td><code>--authorized</code></td><td>Confirm written permission to test a public target</td><td>required for public IPs</td></tr><tr><td><code>-o</code>, <code>--out</code></td><td>Write the report to this file (<code>.md</code> or <code>.json</code> by extension)</td><td>stdout</td></tr></tbody></table></div>"
+    },
+    {
+     "id": "example-output",
+     "label": "Example output",
+     "known": true,
+     "html": "<pre><code>$ python3 -m reconkit 192.168.1.10 -p 22,80,4280\nreconkit: only scan systems you own or have written permission to test.\n# Recon report: 192.168.1.10\n\nResolved address: `192.168.1.10`\n\n## Open ports\n\n| Port | Service | Banner |\n|---|---|---|\n| 22  | ssh  | SSH-2.0-OpenSSH_9.6 |\n| 4280 | unknown | - |\n\n## Web services\n\n- http://192.168.1.10:4280: HTTP 200, title &quot;Login :: DVWA&quot;, server `Apache/2.4.69`, missing headers: ...</code></pre>"
+    },
+    {
+     "id": "what-it-checks",
+     "label": "What it checks",
+     "known": true,
+     "html": "<div class=\"table-wrap\"><table><thead><tr><th>Check</th><th>What it does</th></tr></thead><tbody><tr><td>Port scan</td><td>Threaded TCP connect scan over a top-ports list or a custom range, with a short banner grab for non-HTTP ports</td></tr><tr><td>HTTP probe</td><td>For every web port found (and silent unknown ports), fetches the page title, <code>Server</code> header, and checks for the six standard security headers (CSP, HSTS, X-Frame-Options, etc.)</td></tr><tr><td>Subdomain brute force</td><td>Resolves <code>word.domain</code> for a wordlist, with wildcard-DNS detection so a catch-all record doesn't produce hundreds of false hits</td></tr><tr><td>Scope check</td><td>Refuses a public IP unless <code>--authorized</code> is passed</td></tr></tbody></table></div>"
+    },
+    {
+     "id": "testing",
+     "label": "Testing",
+     "known": true,
+     "html": "<pre><code>python3 -m unittest discover -s tests -v</code></pre>\n<p>8 tests, all against a local test server — nothing reaches the network. GitHub Actions runs them on Python 3.9, 3.11 and 3.12.</p>"
+    },
+    {
+     "id": "limitations",
+     "label": "Limitations",
+     "known": true,
+     "html": "<ul><li>Port scan is TCP connect only, not SYN; it's slower than a raw-socket scanner but needs no</li></ul>\n<p>elevated privileges.</p>\n<ul><li>Banner grabbing is best-effort and may miss services that don't respond to a bare connection.</li><li>Wildcard-DNS detection catches a catch-all A record; it won't catch every form of subdomain</li></ul>\n<p>takeover or wildcard TLS cert.</p>"
+    },
+    {
+     "id": "responsible-use",
+     "label": "Responsible use",
+     "known": true,
+     "html": "<p>Only scan systems you own or have written permission to test. The scope check enforces this for public targets; it does not replace having actual authorization.</p>"
+    },
+    {
+     "id": "license",
+     "label": "License",
+     "known": true,
+     "html": "<p>MIT. See <a href=\"https://github.com/thecyberfarhan/reconkit/blob/master/LICENSE\" target=\"_blank\" rel=\"noopener noreferrer\">LICENSE</a>.</p>"
+    }
+   ]
+  },
+  {
+   "slug": "corsy",
+   "name": "Corsy",
+   "tagline": "A CORS misconfiguration scanner: sends crafted Origin headers and reports the ones the server trusts.",
+   "kind": "Fork",
+   "status": "Active",
+   "language": "Python",
+   "requires": "Python 3.10+",
+   "license": "GPL-3.0",
+   "upstream": "s0md3v/Corsy",
+   "upstreamStars": null,
+   "scope": "Authorized testing only",
+   "skillArea": "Tooling and automation",
+   "stars": 0,
+   "pushedAt": "2026-11-15",
+   "href": "https://github.com/thecyberfarhan/Corsy",
+   "sections": [
+    {
+     "id": "why",
+     "label": "Why",
+     "known": true,
+     "html": "<p>Cross-origin resource sharing is easy to get wrong: a server that echoes back whatever <code>Origin</code> it is sent, or trusts <code>null</code>, lets any website read responses meant for logged-in users. Corsy tries the known ways a CORS allow-list gets bypassed and tells you which one the target falls for. This fork keeps that, and fixes the parts that gave wrong or missing answers in real use.</p>"
+    },
+    {
+     "id": "what-this-shows",
+     "label": "What this shows",
+     "known": true,
+     "html": "<ul><li>Web and API testing: CORS misconfiguration is a standard part of an API assessment, and this is</li></ul>\n<p>a tool I actually run for it.</p>\n<ul><li>Finding a real concurrency bug by testing under load, not just reading the code: the fix for</li></ul>\n<p>threaded scans corrupting each other's findings was reproduced before it was fixed. See <a href=\"#what-changed\">What changed</a>.</p>\n<ul><li>Noticing when a tool's own output can't be trusted (a failed request looked identical to a clean</li></ul>\n<p>host) and fixing the gap instead of only adding features.</p>"
+    },
+    {
+     "id": "requirements",
+     "label": "Requirements",
+     "known": true,
+     "html": "<ul><li>Python 3.10 or newer (CI runs 3.10, 3.12 and 3.13; also run by hand on 3.14)</li><li><code>requests</code> 2.25+ and <code>urllib3</code> 1.26+ (see <code>requirements.txt</code>)</li><li><code>nano</code>, only if you use <code>--headers</code> with no value (it opens an editor; Unix only)</li><li>Tried on: Arch Linux, Kali Linux</li></ul>"
+    },
+    {
+     "id": "install",
+     "label": "Install",
+     "known": true,
+     "html": "<h3>Arch Linux</h3>\n<pre><code>sudo pacman -S --needed python python-pip git\ngit clone https://github.com/thecyberfarhan/Corsy.git\ncd Corsy\npython -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -r requirements.txt</code></pre>\n<h3>Kali Linux, Parrot OS</h3>\n<pre><code>sudo apt update &amp;&amp; sudo apt install -y python3 python3-pip python3-venv git\ngit clone https://github.com/thecyberfarhan/Corsy.git\ncd Corsy\npython3 -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -r requirements.txt</code></pre>\n<p>Check it worked:</p>\n<pre><code>python3 corsy.py --version</code></pre>\n<p>The virtual environment only needs activating in the shell you use it from. Run <code>deactivate</code>, or open a new terminal, to leave it.</p>"
+    },
+    {
+     "id": "usage",
+     "label": "Usage",
+     "known": true,
+     "html": "<h3>Scan one URL</h3>\n<pre><code>python3 corsy.py -u https://example.com/api/me</code></pre>\n<p>Sends the probes to that URL and prints any misconfiguration found.</p>\n<h3>Scan a list of URLs</h3>\n<pre><code>python3 corsy.py -i urls.txt -o results.json</code></pre>\n<p>One URL or bare hostname per line (<code>example.com</code> is treated as <code>https://example.com</code>). Blank lines and lines starting with <code>#</code> are skipped. <code>-o</code> saves the findings as JSON.</p>\n<h3>Pipe targets in from another tool</h3>\n<pre><code>cat urls.txt | python3 corsy.py\nsubfinder -d example.com | httprobe | python3 corsy.py -t 10</code></pre>\n<p>Piped targets are merged with <code>-u</code> and <code>-i</code>, and duplicates are removed.</p>\n<h3>Send traffic through Burp</h3>\n<pre><code>python3 corsy.py -u https://example.com --proxy http://127.0.0.1:8080</code></pre>\n<h3>Authenticated scans</h3>\n<pre><code>python3 corsy.py -u https://example.com/api/me --headers &quot;Cookie: SESSION=abc123\\nUser-Agent: Mozilla/5.0&quot;</code></pre>\n<p>Headers are separated by a literal <code>\\n</code>.</p>\n<h3>Gate a CI job</h3>\n<pre><code>python3 corsy.py -i staging-urls.txt --fail-on-finding -q</code></pre>\n<p>Exits <code>1</code> if anything is found, <code>0</code> if clean, so a pipeline can fail on it.</p>"
+    },
+    {
+     "id": "options",
+     "label": "Options",
+     "known": true,
+     "html": "<div class=\"table-wrap\"><table><thead><tr><th>Flag</th><th>What it does</th><th>Default</th></tr></thead><tbody><tr><td><code>-u URL</code></td><td>Target URL</td><td>none</td></tr><tr><td><code>-i FILE</code></td><td>File of URLs or hostnames</td><td>none</td></tr><tr><td><code>-o FILE</code></td><td>Write findings as JSON</td><td>off</td></tr><tr><td><code>-t N</code></td><td>Number of threads</td><td><code>2</code></td></tr><tr><td><code>-d SECONDS</code></td><td>Delay between requests</td><td><code>0</code></td></tr><tr><td><code>--timeout SECONDS</code></td><td>Per-request timeout</td><td><code>10</code></td></tr><tr><td><code>--proxy URL</code></td><td>Route requests through a proxy</td><td>off</td></tr><tr><td><code>--headers [HEADERS]</code></td><td>Extra request headers; no value opens an editor</td><td>built-in browser headers</td></tr><tr><td><code>-q</code></td><td>Hide description, severity and exploitation text</td><td>off</td></tr><tr><td><code>--fail-on-finding</code></td><td>Exit <code>1</code> when a misconfiguration is found</td><td>off</td></tr><tr><td><code>-V</code>, <code>--version</code></td><td>Print the version</td><td></td></tr></tbody></table></div>"
+    },
+    {
+     "id": "example-output",
+     "label": "Example output",
+     "known": true,
+     "html": "<p>Against a local test server that reflects every Origin:</p>\n<pre><code> + http://127.0.0.1:8911/reflect\n   - Class: origin reflected\n   - Description: This host allows any origin to make requests to it.\n   - Severity: high\n   - Exploitation: Make requests from any domain you control.\n   - ACAO Header: http://example.com\n   - ACAC Header: true</code></pre>\n<p><code>ACAO</code> is <code>Access-Control-Allow-Origin</code> and <code>ACAC</code> is <code>Access-Control-Allow-Credentials</code>. A reflected origin with <code>ACAC: true</code> means another site can read authenticated responses.</p>"
+    },
+    {
+     "id": "what-it-checks",
+     "label": "What it checks",
+     "known": true,
+     "html": "<div class=\"table-wrap\"><table><thead><tr><th>Check</th><th>Severity</th><th>What it means</th></tr></thead><tbody><tr><td><code>origin reflected</code></td><td>high</td><td>Any Origin is echoed back</td></tr><tr><td><code>pre-domain wildcard</code></td><td>high</td><td>A host that ends with the target's name is accepted</td></tr><tr><td><code>post-domain wildcard</code></td><td>high</td><td>A host that starts with the target's name is accepted</td></tr><tr><td><code>null origin allowed</code></td><td>high</td><td>The <code>null</code> Origin is trusted</td></tr><tr><td><code>unescaped regex</code></td><td>high</td><td>The allow-list regex has an unescaped dot</td></tr><tr><td><code>unrecognized underscore</code></td><td>high</td><td>An underscore in the Origin bypasses validation</td></tr><tr><td><code>broken parser</code></td><td>high</td><td>A backtick in the Origin bypasses validation</td></tr><tr><td><code>third party allowed</code></td><td>medium</td><td>A different host is trusted</td></tr><tr><td><code>wildcard value</code></td><td>low</td><td><code>*</code> is returned (browsers won't send credentials with it)</td></tr><tr><td><code>http origin allowed</code></td><td>low</td><td>An unencrypted <code>http://</code> Origin is trusted</td></tr></tbody></table></div>"
+    },
+    {
+     "id": "how-it-works",
+     "label": "How it works",
+     "known": true,
+     "html": "<p>For each URL, Corsy sends GET requests with a different <code>Origin</code> header each time: the site's own origin first, then a third-party origin, then variations of the site's name (prefixed, suffixed, with an underscore, a backtick, an altered dot) and <code>null</code>. If the response's <code>Access-Control-Allow-Origin</code> echoes back an origin it shouldn't trust, that's a finding. If the first probe shows the server sends no CORS headers at all, it stops there.</p>"
+    },
+    {
+     "id": "comparison",
+     "label": "Comparison",
+     "known": true,
+     "html": "<div class=\"table-wrap\"><table><thead><tr><th></th><th>Upstream <code>s0md3v/Corsy</code></th><th>This fork</th></tr></thead><tbody><tr><td>Two findings of the same kind scanned together</td><td>Share one record, so their <code>ACAO</code>/<code>ACAC</code> values overwrite each other</td><td>Each finding has its own copy</td></tr><tr><td><code>-i</code> and <code>-u</code> when stdin isn't a terminal (CI, cron, a subprocess)</td><td>Ignored; only stdin is read</td><td>Merged with piped targets</td></tr><tr><td>Request timeout</td><td>None; one dead host can hang a thread forever</td><td><code>--timeout</code>, default 10 s</td></tr><tr><td>A request that fails</td><td>Only a refused connection printed anything; every other failure was silent, so the host looked clean</td><td>Every failure is reported</td></tr><tr><td>Where it finds its checks database</td><td>Built from <code>sys.path[0]</code>, which breaks when Corsy is imported rather than run as a script</td><td>Relative to the package</td></tr><tr><td>Proxy (Burp)</td><td>None</td><td><code>--proxy</code></td></tr><tr><td>Use in CI</td><td>Always exits <code>0</code></td><td><code>--fail-on-finding</code> exits <code>1</code> on a finding</td></tr><tr><td>Hostnames without a scheme</td><td>Skipped</td><td>Treated as <code>https://</code></td></tr><tr><td>Automated tests</td><td>None</td><td>9 tests, run in CI</td></tr></tbody></table></div>\n<p>Use something else when you need preflight (<code>OPTIONS</code>) coverage or session-aware testing: Corsy only sends GET requests.</p>"
+    },
+    {
+     "id": "what-changed",
+     "label": "What changed",
+     "known": true,
+     "html": "<h3>Fixed: findings overwrote each other when scanned in parallel</h3>\n<p>Every result of the same kind was built from one shared record loaded from <code>db/details.json</code>, and the scanner wrote the headers into that record. With more than one thread, two endpoints of the same class ended up reporting identical <code>ACAO</code> and <code>ACAC</code> values. Reproduced with two wildcard endpoints, one sending <code>Access-Control-Allow-Credentials: true</code> and one not: every run reported them as the same. A credentialed wildcard could be reported as not credentialed, or the reverse. Each finding now gets its own copy. A regression test runs both endpoints concurrently five times.</p>\n<h3>Fixed: <code>-i</code> and <code>-u</code> were ignored when stdin wasn't a terminal</h3>\n<p>When stdin was not a TTY, Corsy read targets from stdin only. In CI, cron or any subprocess, <code>-i urls.txt</code> printed &quot;No valid URLs to test&quot; even with a valid file. It now merges <code>-u</code>, <code>-i</code> and piped targets, and removes duplicates.</p>\n<h3>Fixed: failed requests looked like clean hosts</h3>\n<p>The request wrapper printed a message only for a refused connection and returned nothing for any other failure, including a redirect loop (it compared against a string that never appears in the error). A host that failed to answer was therefore indistinguishable from a host with no misconfiguration. Failures are now caught by type and reported. There was also no timeout, so a host that accepted a connection and never answered blocked its thread indefinitely. <code>--timeout</code> adds one.</p>\n<h3>Fixed: the checks database path</h3>\n<p>It was built from <code>sys.path[0]</code>, which is empty when Corsy is imported rather than run as a script, so importing it failed with <code>FileNotFoundError: /db/details.json</code>. The path is now resolved from the package's own location.</p>\n<h3>Added: <code>--proxy</code>, <code>--fail-on-finding</code>, <code>--version</code>, bare hostnames</h3>\n<p>Proxying through Burp, a non-zero exit for CI, a version flag, and acceptance of <code>example.com</code> style input with <code>#</code> comments and blank lines skipped.</p>\n<h3>Housekeeping</h3>\n<p><code>core/requester.py</code> mixed tabs and spaces in one block. It parsed fine, so this isn't a bug fix; it was just tidied while the file was being rewritten.</p>"
+    },
+    {
+     "id": "testing",
+     "label": "Testing",
+     "known": true,
+     "html": "<pre><code>pip install pytest\npytest -q</code></pre>\n<p>Nine tests start a small local HTTP server that models each misconfiguration and assert that the scanner finds it, that a clean host returns nothing, that two findings never share state, that a hung host times out, and that input parsing behaves. GitHub Actions runs them on Python 3.10, 3.12 and 3.13. Nothing leaves your machine.</p>"
+    },
+    {
+     "id": "limitations",
+     "label": "Limitations",
+     "known": true,
+     "html": "<ul><li>GET requests only. It does not send preflight <code>OPTIONS</code> requests.</li><li>It reports the first misconfiguration it finds on a URL and stops, so a URL with two problems</li></ul>\n<p>shows one.</p>\n<ul><li><code>invalid value</code> appears in the checks database and in upstream's list of tests, but no code</li></ul>\n<p>ever emits it, so Corsy effectively runs 10 checks, not 11.</p>\n<ul><li>It sends no cookies or tokens unless you pass <code>--headers</code>, so it tests the anonymous view of an</li></ul>\n<p>endpoint unless you give it a session.</p>\n<ul><li>TLS certificates are not verified, so scans work against lab hosts with self-signed certs.</li></ul>"
+    },
+    {
+     "id": "responsible-use",
+     "label": "Responsible use",
+     "known": true,
+     "html": "<p>Only scan systems you own or have written permission to test. Each scan sends up to nine requests per URL.</p>"
+    },
+    {
+     "id": "credits",
+     "label": "Credits",
+     "known": true,
+     "html": "<p>Built on <a href=\"https://github.com/s0md3v/Corsy\" target=\"_blank\" rel=\"noopener noreferrer\">s0md3v/Corsy</a> by Somdev Sangwan and contributors. Upstream's detection logic and checks database are theirs. The fixes and additions above are in this fork.</p>"
+    },
+    {
+     "id": "license",
+     "label": "License",
+     "known": true,
+     "html": "<p>GPL-3.0, the same as upstream. See <a href=\"https://github.com/thecyberfarhan/Corsy/blob/master/LICENSE\" target=\"_blank\" rel=\"noopener noreferrer\">LICENSE</a>.</p>"
+    }
+   ]
+  },
+  {
+   "slug": "jwt-tool",
+   "name": "jwt_tool",
+   "tagline": "Decodes, tampers with, signs and attacks JSON Web Tokens: the toolkit for testing whether a JWT implementation actually checks what it claims to.",
+   "kind": "Fork",
+   "status": "Active",
+   "language": "Python",
+   "requires": "Python 3.11+",
+   "license": "GPL-3.0 (upstream's own licence file; see License)",
+   "upstream": "ticarpi/jwt_tool",
+   "upstreamStars": null,
+   "scope": "Authorized testing only",
+   "skillArea": "Web and API testing",
+   "stars": 0,
+   "pushedAt": "2026-11-15",
+   "href": "https://github.com/thecyberfarhan/jwt_tool",
+   "sections": [
+    {
+     "id": "why",
+     "label": "Why",
+     "known": true,
+     "html": "<p>JWTs carry authentication and authorization state, and a surprising number of implementations accept a token they shouldn't: no signature, the wrong algorithm, a key swapped for a public one. jwt_tool automates the standard checks for that class of bug, scans a live endpoint's behaviour with different tampered tokens, and helps forge a new one once a weakness is found.</p>"
+    },
+    {
+     "id": "what-this-shows",
+     "label": "What this shows",
+     "known": true,
+     "html": "<ul><li>Web and API testing: this is the tool I reach for whenever an engagement touches</li></ul>\n<p>authentication tokens, and this fork is what I use.</p>\n<ul><li>Reading and fixing someone else's code under real constraints: four independent crashes</li></ul>\n<p>diagnosed from a 2,200-line single file, each reproduced with a crafted token before being fixed, not patched blind. See <a href=\"#what-changed\">What changed</a>.</p>\n<ul><li>Writing tests that prove a fix instead of just exercising the code: the suite below drives the</li></ul>\n<p>real CLI against each crash case and asserts it no longer happens.</p>"
+    },
+    {
+     "id": "requirements",
+     "label": "Requirements",
+     "known": true,
+     "html": "<ul><li>Python 3.11 or newer (CI runs 3.11, 3.12, 3.13; 3.14 verified by hand, see below)</li><li><code>pycryptodomex</code>, <code>requests</code>, <code>termcolor</code>, <code>ratelimit</code> (see <code>requirements.txt</code>)</li><li>Tried on: Arch Linux, Kali Linux</li></ul>"
+    },
+    {
+     "id": "install",
+     "label": "Install",
+     "known": true,
+     "html": "<h3>Arch Linux</h3>\n<pre><code>sudo pacman -S --needed python python-pip git\ngit clone https://github.com/thecyberfarhan/jwt_tool.git\ncd jwt_tool\npython -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -r requirements.txt</code></pre>\n<h3>Kali Linux, Parrot OS</h3>\n<pre><code>sudo apt update &amp;&amp; sudo apt install -y python3 python3-pip python3-venv git\ngit clone https://github.com/thecyberfarhan/jwt_tool.git\ncd jwt_tool\npython3 -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -r requirements.txt</code></pre>\n<p>Check it worked. The first run also creates <code>~/.jwt_tool/jwtconf.ini</code> and a set of test keys:</p>\n<pre><code>python3 jwt_tool.py -h</code></pre>\n<h3>Docker</h3>\n<p>Upstream also publishes a Docker image; this fork's fixes aren't built into it (yet), so for now use the source install above if you want this fork's behaviour.</p>"
+    },
+    {
+     "id": "usage",
+     "label": "Usage",
+     "known": true,
+     "html": "<h3>Read a token's claims</h3>\n<pre><code>python3 jwt_tool.py eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0IiwibmFtZSI6ImFsaWNlIiwicm9sZSI6InVzZXIiLCJpYXQiOjE3MDAwMDAwMDB9.R11xpZc8uimaZMTBmvRCRII-HPbxcVI8QDSKR-DF7EU</code></pre>\n<p>Decodes the header and payload and flags any timestamp claim.</p>\n<h3>Run a playbook scan against a live endpoint</h3>\n<pre><code>python3 jwt_tool.py -t https://example.com/api/me -rc &quot;session=&lt;token&gt;&quot; -M pb</code></pre>\n<p>Replays the request with a battery of tampered tokens (<code>alg:none</code>, blank signature, key confusion, and more) and reports which ones the server still accepts.</p>\n<h3>Tamper a claim and re-sign</h3>\n<pre><code>python3 jwt_tool.py &lt;token&gt; -I -pc role -pv admin -S hs256 -p secret</code></pre>\n<p>Injects <code>role: admin</code> into the payload and signs the result with a known HMAC secret.</p>\n<h3>Crack a weak HMAC secret</h3>\n<pre><code>python3 jwt_tool.py &lt;token&gt; -C -d jwt-common.txt</code></pre>\n<p>Tries every line of the bundled wordlist as the signing secret.</p>\n<h3>Route a live check through Burp</h3>\n<pre><code>python3 jwt_tool.py &lt;token&gt; -t https://example.com/api/me -M pb -P 127.0.0.1:8080</code></pre>"
+    },
+    {
+     "id": "options",
+     "label": "Options",
+     "known": true,
+     "html": "<p>The tool has a large flag set (tampering, signing, exploits, cracking); the most-used ones:</p>\n<div class=\"table-wrap\"><table><thead><tr><th>Flag</th><th>What it does</th><th>Default</th></tr></thead><tbody><tr><td><code>jwt</code></td><td>The token to work with (or read it from <code>-r</code>/cookies/headers)</td><td>none</td></tr><tr><td><code>-t</code>, <code>--targeturl URL</code></td><td>Send the forged token to this URL</td><td>none</td></tr><tr><td><code>-rc</code>, <code>--cookies</code></td><td>Cookies to send with the request</td><td>none</td></tr><tr><td><code>-M</code>, <code>--mode</code></td><td>Scan mode: <code>pb</code> playbook, <code>er</code> fuzz claims for errors, <code>cc</code> fuzz common claims, <code>at</code> all tests</td><td>none</td></tr><tr><td><code>-X</code>, <code>--exploit</code></td><td>A known attack: <code>a</code> alg:none, <code>n</code> null signature, <code>b</code> blank password, <code>k</code> key confusion, <code>i</code> inject JWKS, <code>s</code> spoof JWKS</td><td>none</td></tr><tr><td><code>-I</code>, <code>--injectclaims</code></td><td>Add or change claims (combine with <code>-pc</code>/<code>-pv</code>/<code>-hc</code>/<code>-hv</code>)</td><td>off</td></tr><tr><td><code>-S</code>, <code>--sign</code></td><td>Sign the result: <code>hs256</code>/<code>rs256</code>/<code>es256</code>/<code>ps256</code> and <code>384</code>/<code>512</code> variants</td><td>none</td></tr><tr><td><code>-C</code>, <code>--crack</code></td><td>Brute-force an HMAC secret (combine with <code>-d</code>/<code>-p</code>/<code>-kf</code>)</td><td>off</td></tr><tr><td><code>-np</code>, <code>--noproxy</code></td><td>Disable the proxy for this run</td><td>off</td></tr><tr><td><code>-P</code>, <code>--proxy HOST:PORT</code></td><td>*(this fork)* Set the proxy for this run</td><td>config's <code>proxy</code> value</td></tr><tr><td><code>-v</code>, <code>--verbose</code></td><td>Slightly more detail while parsing</td><td>off</td></tr></tbody></table></div>\n<p>Run <code>python3 jwt_tool.py -h</code> for the complete list; the exploit and sign options in particular have several sub-modes worth reading in full before using them live.</p>"
+    },
+    {
+     "id": "example-output",
+     "label": "Example output",
+     "known": true,
+     "html": "<p>Dissecting a sample HS256 token (<code>sub</code>, <code>name</code>, <code>role</code>, <code>iat</code>):</p>\n<pre><code>Token header values:\n[+] alg = &quot;HS256&quot;\n[+] typ = &quot;JWT&quot;\n\nToken payload values:\n[+] sub = &quot;1234&quot;\n[+] name = &quot;alice&quot;\n[+] role = &quot;user&quot;\n[+] iat = 1700000000    ==&gt; TIMESTAMP = 2023-11-15 03:13:20 (UTC)</code></pre>"
+    },
+    {
+     "id": "how-it-works",
+     "label": "How it works",
+     "known": true,
+     "html": "<p>jwt_tool decodes the token locally (no network needed for that), then either tampers with the decoded claims and re-encodes/re-signs it, or sends a battery of tampered variants to a live URL and compares responses to tell which tampering the server accepted. The scan modes in <code>-M</code> run a fixed set of known JWT weaknesses; <code>-X</code> runs one specific exploit by name; <code>-I</code>/<code>-T</code> give manual control over which claim changes and how the result is signed.</p>"
+    },
+    {
+     "id": "comparison",
+     "label": "Comparison",
+     "known": true,
+     "html": "<div class=\"table-wrap\"><table><thead><tr><th></th><th>Upstream <code>ticarpi/jwt_tool</code></th><th>This fork</th></tr></thead><tbody><tr><td>Python 3.14</td><td>Crashes on first run: can't write its own config file</td><td>Fixed</td></tr><tr><td>A token with a nested object or array claim (e.g. Firebase's <code>firebase.identities</code>)</td><td>Crashes with <code>TypeError</code></td><td>Fixed</td></tr><tr><td><code>iat</code>/<code>exp</code> as a date string, or a huge out-of-range value</td><td>Crashes with <code>ValueError</code>/<code>OverflowError</code></td><td>Shown as-is, no crash</td></tr><tr><td>Setting the proxy for one run</td><td>Edit <code>jwtconf.ini</code> first</td><td><code>-P</code>/<code>--proxy</code></td></tr><tr><td>Automated tests</td><td>None</td><td>7 tests, run in CI</td></tr></tbody></table></div>"
+    },
+    {
+     "id": "what-changed",
+     "label": "What changed",
+     "known": true,
+     "html": "<h3>Fixed: the tool couldn't create its config file on Python 3.14 (upstream #142)</h3>\n<p>Config generation stored its inline help text as INI keys, several of which contain a <code>:</code> (<code>&quot;# To disable the proxy option set this value to: False...&quot;</code>). Python 3.14 tightened <code>configparser</code> to reject writing a key that contains its own delimiter character, so the very first run crashed with <code>InvalidWriteError</code> before a usable config existed. Reproduced by running the tool fresh under Python 3.14. Fixed by writing that guidance as a real comment block above the config instead of smuggling it into key names; nothing in the text was lost.</p>\n<h3>Fixed: crashes on nested or list-shaped claims (upstream #115, #135)</h3>\n<p>A payload with a nested object — Firebase tokens are the common real example, with <code>firebase.identities.email</code> as a list inside a dict inside a claim — crashed with <code>TypeError: the JSON object must be str, bytes or bytearray, not OrderedDict</code>. The renderer that walks a claim's sub-values called a string-casting helper on values that were already parsed Python objects, and that helper always tried <code>json.loads()</code> on its input regardless of type. Reproduced with a crafted token carrying a nested dict-of-list claim. Fixed in two places: the helper now returns non-string input unchanged, and the nested-claim renderer prints any depth of object or array with <code>json.dumps(..., indent=4)</code> instead of a one-level-only loop.</p>\n<h3>Fixed: crashes on timestamp claims that aren't a plain number (upstream #95, #113)</h3>\n<p><code>iat</code>, <code>nbf</code> and <code>exp</code> were assumed to always be a clean Unix integer. A date string (seen in the wild, e.g. <code>&quot;07/05/2023 14:17:40&quot;</code>) raised <code>ValueError</code>; a value far outside the range Python's <code>datetime</code> can represent raised <code>OverflowError</code> or <code>OSError</code>, depending on platform. Either crash ends the whole run on an otherwise-decodable token. Reproduced with both shapes of bad input. Fixed with a <code>try</code>/<code>except</code> around the parse: a claim that can't be read as a timestamp is now printed as its raw value instead of stopping the tool, and a claim that parses fine still gets the timestamp and expiry check exactly as before.</p>\n<h3>Added: <code>-P</code>/<code>--proxy</code> to set the proxy for one run (upstream #104)</h3>\n<p>The proxy was config-file only; changing it for a single run meant editing <code>jwtconf.ini</code> by hand. <code>-P host:port</code> overrides it for just that invocation, the same way <code>-np</code> already disabled it for one run. Verified against a local HTTP listener standing in for Burp: requests sent with <code>-P</code> arrived at the listener in absolute-URI form; the same command without it did not.</p>"
+    },
+    {
+     "id": "testing",
+     "label": "Testing",
+     "known": true,
+     "html": "<pre><code>pip install pytest\npytest -q</code></pre>\n<p>Seven tests run the real <code>jwt_tool.py</code> as a subprocess (an isolated <code>$HOME</code> so the real config is never touched) against crafted tokens: nested/Firebase-style claims, a string-date timestamp, an out-of-range timestamp, a list claim, a normal token with valid expiry, and the <code>-P</code> flag. Each asserts the process produces no traceback. GitHub Actions runs them on Python 3.11, 3.12 and 3.13. Python 3.14 support (the #142 fix) was additionally verified by hand, since no CI runner currently ships it.</p>"
+    },
+    {
+     "id": "limitations",
+     "label": "Limitations",
+     "known": true,
+     "html": "<ul><li>The test suite checks that the four fixed crashes no longer happen and that ordinary tokens</li></ul>\n<p>still decode correctly. It doesn't cover the rest of this file's 2,200 lines (the sign, exploit and crack paths), which are upstream's long-standing, separately-tested logic.</p>\n<ul><li><code>-C</code>/crack speed depends entirely on the wordlist; it does not brute-force arbitrary secrets.</li><li>Live scanning (<code>-t</code>/<code>-M</code>) sends real HTTP requests to whatever URL you give it.</li></ul>"
+    },
+    {
+     "id": "responsible-use",
+     "label": "Responsible use",
+     "known": true,
+     "html": "<p>Only point <code>-t</code>/<code>-M</code>/live scanning at systems you own or have written permission to test. Cracking, tampering and exploit modes are for testing tokens you're authorized to attack.</p>"
+    },
+    {
+     "id": "credits",
+     "label": "Credits",
+     "known": true,
+     "html": "<p>Built on <a href=\"https://github.com/ticarpi/jwt_tool\" target=\"_blank\" rel=\"noopener noreferrer\">ticarpi/jwt_tool</a> by Ted Rowland (<code>ticarpi</code>) and contributors. The scan modes, exploit catalogue, signing and cracking logic are upstream's work; the fixes and the proxy flag above are this fork's.</p>"
+    },
+    {
+     "id": "license",
+     "label": "License",
+     "known": true,
+     "html": "<p>GPL-3.0, the same as upstream. See <a href=\"https://github.com/thecyberfarhan/jwt_tool/blob/master/LICENSE\" target=\"_blank\" rel=\"noopener noreferrer\">LICENSE</a>.</p>"
+    }
+   ]
+  },
+  {
+   "slug": "king-phisher",
+   "name": "King Phisher",
+   "tagline": "A phishing-campaign toolkit for security-awareness testing, kept running on a current Python after upstream stopped maintaining it.",
+   "kind": "Fork",
+   "status": "Active",
+   "language": "Python",
+   "requires": "Python 3.12+ (server side)",
+   "license": "BSD-3-Clause",
+   "upstream": "CrimsonForge-io/king-phisher",
+   "upstreamStars": null,
+   "scope": "Authorized testing only",
+   "skillArea": "Social engineering",
+   "stars": 0,
+   "pushedAt": "2026-11-15",
+   "href": "https://github.com/thecyberfarhan/king-phisher",
+   "sections": [
+    {
+     "id": "why",
+     "label": "Why",
+     "known": true,
+     "html": "<p>King Phisher runs phishing-simulation campaigns to measure and improve an organisation's real-world susceptibility, with a GUI client, a server, and template-driven emails and landing pages. Upstream has said outright it's no longer maintained, and the maintainer confirmed on an open issue that King Phisher 2.0 is a from-scratch rewrite carrying none of this codebase over — so nothing broken here was going to get fixed. This fork fixes what's actually broken on a current Python, without touching the campaign logic or the GTK client UI.</p>"
+    },
+    {
+     "id": "what-this-shows",
+     "label": "What this shows",
+     "known": true,
+     "html": "<ul><li>Social engineering: this is the toolkit I use for authorized phishing-simulation campaigns, and</li></ul>\n<p>this fork is why it still runs.</p>\n<ul><li>Diagnosing a dead import chain down to the exact removed stdlib module, then rebuilding the</li></ul>\n<p>affected code on its modern replacement instead of patching around it.</p>\n<ul><li>Verifying a fix actually works end-to-end (a real SMTP client, not just &quot;it imports now&quot;) — see</li></ul>\n<p><a href=\"#what-changed\">What changed</a>.</p>"
+    },
+    {
+     "id": "requirements",
+     "label": "Requirements",
+     "known": true,
+     "html": "<ul><li>Python 3.12 or newer for the server/dev side this fork touches</li><li>System packages for the full client+server install: GTK, PostgreSQL (handled by</li></ul>\n<p><code>tools/install.sh</code>)</p>\n<ul><li>Tried on: Arch Linux, Kali Linux, Parrot OS</li></ul>"
+    },
+    {
+     "id": "install",
+     "label": "Install",
+     "known": true,
+     "html": "<p>Two paths: the full install (GTK client + server, needs system packages), or just the Python/dev side this fork's fixes live in, which needs nothing beyond Python.</p>\n<h3>Full install (client + server) — same command on Arch, Kali and Parrot</h3>\n<p><code>tools/install.sh</code> detects your distro and installs whatever system packages it needs (GTK, PostgreSQL, etc.). Unchanged from upstream — see <code>INSTALL.md</code> for the distro-specific detail:</p>\n<pre><code>git clone https://github.com/thecyberfarhan/king-phisher.git\ncd king-phisher\nsudo bash tools/install.sh</code></pre>\n<h3>Just the dev/Python side (this fork's fixes, no GTK needed)</h3>\n<p>Only touches <code>king_phisher.server</code> and the shared code this fork fixed and tested — the GTK client itself still needs the full install above. Same command on Arch, Kali and Parrot once <code>python3</code>, <code>pip</code> and <code>git</code> are installed:</p>\n<pre><code>git clone https://github.com/thecyberfarhan/king-phisher.git\ncd king-phisher\ntools/devshell.sh</code></pre>\n<p>That creates <code>.venv/</code>, installs <code>requirements.txt</code> into it, and drops you into a shell with it active.</p>"
+    },
+    {
+     "id": "usage",
+     "label": "Usage",
+     "known": true,
+     "html": "<h3>Open a dev shell with the fork's dependencies installed</h3>\n<pre><code>tools/devshell.sh</code></pre>\n<h3>Run one command inside that environment without staying in it</h3>\n<pre><code>tools/devshell.sh python3 -c &quot;import king_phisher.server.database.models&quot;</code></pre>\n<h3>Start the server (full install only)</h3>\n<pre><code>king-phisher-server -c server_config.yml</code></pre>\n<p>See upstream's <a href=\"https://github.com/securestate/king-phisher/wiki\" target=\"_blank\" rel=\"noopener noreferrer\">wiki</a> for configuring a campaign, the client, and template files — unchanged in this fork.</p>"
+    },
+    {
+     "id": "options",
+     "label": "Options",
+     "known": true,
+     "html": "<p><code>tools/devshell.sh</code> itself takes no flags: run it alone for an interactive shell, or <code>tools/devshell.sh &lt;command&gt;</code> to run one command inside the environment and return. Everything else — the server config file, the GTK client, campaign and template options — is upstream's, unchanged; see <code>INSTALL.md</code> and the wiki linked above.</p>"
+    },
+    {
+     "id": "whats-inside",
+     "label": "What's inside",
+     "known": true,
+     "html": "<div class=\"table-wrap\"><table><thead><tr><th>Part</th><th>What it is</th><th>Touched by this fork</th></tr></thead><tbody><tr><td><code>king_phisher/server/</code></td><td>Server: SMTP sending, database, web server for landing pages</td><td>Yes — the two fixes below</td></tr><tr><td><code>king_phisher/client/</code></td><td>GTK campaign-editor and dashboard UI</td><td>No</td></tr><tr><td><code>tools/install.sh</code></td><td>Upstream's full system installer</td><td>No</td></tr><tr><td><code>tools/devshell.sh</code></td><td>Venv lifecycle for the dev/Python side</td><td>Added by this fork</td></tr><tr><td><code>requirements.txt</code></td><td>Dependency floors for the server/dev side</td><td>Added by this fork</td></tr></tbody></table></div>"
+    },
+    {
+     "id": "comparison",
+     "label": "Comparison",
+     "known": true,
+     "html": "<div class=\"table-wrap\"><table><thead><tr><th></th><th>Upstream <code>CrimsonForge-io/king-phisher</code></th><th>This fork</th></tr></thead><tbody><tr><td><code>smtp_server.py</code> on Python 3.12+</td><td>Crashes on import (<code>asyncore</code>/<code>smtpd</code> removed by PEP 594)</td><td>Rebuilt on <code>asyncio</code> via <code>aiosmtpd</code>, same public API</td></tr><tr><td><code>server.database.models</code> import</td><td>Crashes (<code>sqlalchemy.Binary</code> removed in SQLAlchemy 1.4+)</td><td>Fixed: swapped for <code>sqlalchemy.LargeBinary</code></td></tr><tr><td>Dependency versions</td><td><code>Pipfile</code> hard-pins ~40 packages to exact 2019 releases, no stated Python floor</td><td><code>requirements.txt</code> with <code>&gt;=</code> floors; verified installing and importing cleanly on Python 3.14</td></tr><tr><td>Dev environment</td><td><code>install.sh</code> is a single <code>sudo bash</code> system installer, no venv story</td><td><code>tools/devshell.sh</code>: creates/updates a <code>.venv</code>, only ever active inside a subshell</td></tr></tbody></table></div>"
+    },
+    {
+     "id": "what-changed",
+     "label": "What changed",
+     "known": true,
+     "html": "<h3>Fixed: <code>smtp_server.py</code> failed to import at all on Python 3.12+</h3>\n<p>It used the stdlib <code>asyncore</code>/<code>smtpd</code> modules, both removed by PEP 594 — <a href=\"https://github.com/CrimsonForge-io/king-phisher/issues/522\" target=\"_blank\" rel=\"noopener noreferrer\">upstream issue #522</a>, where the maintainer confirmed the codebase is unmaintained and a from-scratch 2.0 is planned instead. Rebuilt on <code>asyncio</code> via <code>aiosmtpd</code>, keeping the same public API, and verified end-to-end against a real SMTP client on Python 3.14.</p>\n<h3>Fixed: <code>sqlalchemy.Binary</code> (removed in SQLAlchemy 1.4+)</h3>\n<p>Broke importing the whole <code>king_phisher.server.database.models</code> module and a historical Alembic migration. Swapped for <code>sqlalchemy.LargeBinary</code> — an identical column type, just renamed upstream — in both places.</p>\n<h3>Modernized: dependency floors</h3>\n<p>Added <code>requirements.txt</code> with the same roughly 40 packages upstream's <code>Pipfile</code> pins to exact 2019 releases, switched to <code>&gt;=</code> floors so pip resolves current wheels. Verified on Python 3.14: every package installs cleanly and all 29 <code>king_phisher.server</code> submodules, plus the rest of the shared non-client code, import without error. One necessary cap: <code>setuptools&lt;81</code>, because a transitive dependency (<code>smoke-zephyr</code>) still imports the now-optional <code>pkg_resources</code> API — documented inline in <code>requirements.txt</code>.</p>\n<h3>Added <code>tools/devshell.sh</code>: automated venv lifecycle</h3>\n<p>Upstream has no venv story (<code>install.sh</code> is a single <code>sudo bash</code> system installer). This script creates <code>.venv/</code> on first run, installs or updates <code>requirements.txt</code> into it, and only ever activates the venv inside a subshell, so there's nothing to remember to deactivate — closing that shell, the command it ran, or the terminal all end it automatically.</p>"
+    },
+    {
+     "id": "testing",
+     "label": "Testing",
+     "known": true,
+     "html": "<p>This fork has no automated test suite of its own; the two fixes were verified directly: <code>smtp_server.py</code> against a real SMTP client end-to-end, and <code>database.models</code> by confirming all 29 server submodules import cleanly on Python 3.14 after the dependency changes.</p>"
+    },
+    {
+     "id": "limitations",
+     "label": "Limitations",
+     "known": true,
+     "html": "<ul><li>The GTK client needs system GObject-introspection libraries that are outside pip's scope and</li></ul>\n<p>weren't available to verify in the environment this fork was built in; that part of <code>INSTALL.md</code>/<code>tools/install.sh</code> is unchanged from upstream and untested by this fork.</p>\n<ul><li>Campaign logic, templates, the web server for landing pages, and the rest of the server beyond</li></ul>\n<p>the two fixes above are unchanged from upstream — including whatever else may not work on a Python this new, since upstream stopped testing against one.</p>"
+    },
+    {
+     "id": "responsible-use",
+     "label": "Responsible use",
+     "known": true,
+     "html": "<p>King Phisher sends real emails and serves real landing pages. Only run a campaign against an organisation that has authorized the test, with scope agreed in advance.</p>"
+    },
+    {
+     "id": "credits",
+     "label": "Credits",
+     "known": true,
+     "html": "<p>Built on <a href=\"https://github.com/CrimsonForge-io/king-phisher\" target=\"_blank\" rel=\"noopener noreferrer\">king-phisher</a> (formerly <code>rsmusllp/king-phisher</code>), by SecureState and its contributors. The server, client, campaign logic and templates are upstream's; the fixes above are this fork's.</p>"
+    },
+    {
+     "id": "license",
+     "label": "License",
+     "known": true,
+     "html": "<p>BSD-3-Clause, the same as upstream. See <a href=\"https://github.com/thecyberfarhan/king-phisher/blob/master/LICENSE\" target=\"_blank\" rel=\"noopener noreferrer\">LICENSE</a>.</p>"
+    }
+   ]
+  },
+  {
+   "slug": "sherlock",
+   "name": "Sherlock",
+   "tagline": "Finds a username across hundreds of sites, with a way to tell a confident hit from a false positive — upstream had no way to do that at all.",
+   "kind": "Fork",
+   "status": "Active",
+   "language": "Python",
+   "requires": "Python 3.10+",
+   "license": "MIT",
+   "upstream": "sherlock-project/sherlock",
+   "upstreamStars": null,
+   "scope": "Authorized testing only",
+   "skillArea": "OSINT",
+   "stars": 0,
+   "pushedAt": "2026-11-15",
+   "href": "https://github.com/thecyberfarhan/sherlock",
+   "sections": [
+    {
+     "id": "why",
+     "label": "Why",
+     "known": true,
+     "html": "<p>A username-checker tool is only as useful as its false-positive rate. Sherlock's own detection can be fooled by a soft-404 page, a generic sign-in redirect, or a WAF challenge that still returns 200 — and it gave no way to tell a confident hit apart from one of those. This fork is built around fixing exactly that, plus the export bugs that lost data silently.</p>"
+    },
+    {
+     "id": "what-this-shows",
+     "label": "What this shows",
+     "known": true,
+     "html": "<ul><li>OSINT: judging whether a tool's detection logic is actually trustworthy, not just whether it</li></ul>\n<p>runs. <code>--verify</code> below is a method for catching a detector's own false positives, demonstrated against a real site.</p>\n<ul><li>Finding and fixing real data-loss bugs (the <code>{?}</code> wildcard and the <code>--csv</code>/<code>--xlsx</code> cases</li></ul>\n<p>below), both reproduced before being fixed.</p>\n<ul><li>Contributing upstream: the export fixes are filed as <a href=\"https://github.com/sherlock-project/sherlock/pull/3172\" target=\"_blank\" rel=\"noopener noreferrer\">sherlock-project/sherlock#3172</a>,</li></ul>\n<p>open at the time of writing.</p>"
+    },
+    {
+     "id": "requirements",
+     "label": "Requirements",
+     "known": true,
+     "html": "<ul><li>Python 3.10 or newer (upstream's CI covers 3.10 through 3.14)</li><li>Installed as an editable package via <code>pyproject.toml</code> (<code>poetry-core</code> build backend)</li><li>Tried on: Arch Linux, Kali Linux</li></ul>"
+    },
+    {
+     "id": "install",
+     "label": "Install",
+     "known": true,
+     "html": "<p>This fork isn't on PyPI — that package name points to upstream — so install it from source.</p>\n<h3>Arch Linux</h3>\n<pre><code>sudo pacman -S --needed python python-pip git\ngit clone https://github.com/thecyberfarhan/sherlock.git\ncd sherlock\npython -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -e .</code></pre>\n<h3>Kali Linux, Parrot OS</h3>\n<pre><code>sudo apt update &amp;&amp; sudo apt install -y python3 python3-pip python3-venv git\ngit clone https://github.com/thecyberfarhan/sherlock.git\ncd sherlock\npython3 -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -e .</code></pre>\n<p>Check it worked:</p>\n<pre><code>sherlock --help</code></pre>\n<p>The virtual environment only needs activating in the shell you use it from. Run <code>deactivate</code>, or open a new terminal, to leave it.</p>"
+    },
+    {
+     "id": "usage",
+     "label": "Usage",
+     "known": true,
+     "html": "<h3>Check a username, with confidence flagged</h3>\n<pre><code>sherlock --verify someusername</code></pre>\n<p>Re-checks every hit against a canary username; flags the ones that look like false positives.</p>\n<h3>Recover from a slow or rate-limited run</h3>\n<pre><code>sherlock --retry 2 someusername</code></pre>\n<p>Re-checks only the sites that came back <code>Unknown</code>, up to 2 more times.</p>\n<h3>Export a structured report</h3>\n<pre><code>sherlock --verify --export-json results.json someusername\nsherlock --verify --markdown -o results.md someusername</code></pre>\n<h3>Check one or two specific sites</h3>\n<pre><code>sherlock --site GitHub --site Reddit --verify someusername</code></pre>\n<p>For the full site list and the rest of the base tool's flags, see upstream's own README (<code>docs/pyproject/README.md</code>) or the <a href=\"https://sherlock-project.github.io/\" target=\"_blank\" rel=\"noopener noreferrer\">project site</a>.</p>"
+    },
+    {
+     "id": "options",
+     "label": "Options",
+     "known": true,
+     "html": "<p>The fork-added flags (everything else is unchanged from upstream — run <code>sherlock --help</code> for the full list):</p>\n<div class=\"table-wrap\"><table><thead><tr><th>Flag</th><th>What it does</th><th>Default</th></tr></thead><tbody><tr><td><code>--verify</code></td><td>Re-check every claimed hit against a canary username; mark low-confidence results</td><td>off</td></tr><tr><td><code>--retry N</code></td><td>Re-check only <code>Unknown</code> sites, up to N more times</td><td><code>0</code></td></tr><tr><td><code>--export-json FILENAME</code></td><td>Write a structured JSON report</td><td>off</td></tr><tr><td><code>--markdown</code></td><td>Write a <code>.md</code> table report, confidence flagged inline</td><td>off</td></tr></tbody></table></div>"
+    },
+    {
+     "id": "example-output",
+     "label": "Example output",
+     "known": true,
+     "html": "<p>Checking a real username against two sites, with <code>--verify</code>:</p>\n<pre><code>$ sherlock --site GitHub --site Reddit --verify torvalds\n\n[+] GitHub: https://www.github.com/torvalds\n[+] Reddit: https://www.reddit.com/user/torvalds\n[*] Verifying 2 claimed result(s) against a canary username...\n[!] Reddit: likely false positive (a random, unregistered username also came back &quot;claimed&quot; here)\n\n[*] Search completed with 2 results</code></pre>\n<p>GitHub's detection held up. Reddit's didn't: a random, near-certainly-unregistered username also came back <code>CLAIMED</code> there, so the real result is flagged instead of presented as confident.</p>\n<p>A <code>--retry</code> run recovering from a dead proxy:</p>\n<pre><code>$ sherlock --site GitHub --proxy http://dead-proxy:1 --retry 2 torvalds\n\n[*] Checking username torvalds on:\n\n[*] Retrying 1 site(s) that returned Unknown (attempt 1/2)...\n[*] Checking username torvalds on:\n\n[*] Retrying 1 site(s) that returned Unknown (attempt 2/2)...</code></pre>\n<p>A <code>--markdown</code> report, low confidence flagged inline:</p>\n<pre><code>| Site | Status | URL |\n| --- | --- | --- |\n| GitHub | Claimed | [https://www.github.com/torvalds](https://www.github.com/torvalds) |\n| Reddit | Claimed ⚠️ low confidence | [https://www.reddit.com/user/torvalds](https://www.reddit.com/user/torvalds) |</code></pre>"
+    },
+    {
+     "id": "how-it-works",
+     "label": "How it works",
+     "known": true,
+     "html": "<p>Sherlock requests a profile URL per site and decides &quot;claimed&quot; from the status code, a redirect target, or matching error text. <code>--verify</code> repeats that same check a second time against a randomly generated username that is near-certainly unregistered; if the site reports *that* username as claimed too, its detection can't actually distinguish a real account from a miss, so the original result is downgraded to low confidence instead of presented as a confirmed hit. This costs one extra request per site that claimed a hit, and none for sites that didn't, so the cost scales with how many hits came back.</p>"
+    },
+    {
+     "id": "comparison",
+     "label": "Comparison",
+     "known": true,
+     "html": "<div class=\"table-wrap\"><table><thead><tr><th></th><th>Upstream <code>sherlock-project/sherlock</code></th><th>This fork</th></tr></thead><tbody><tr><td>Confidence on a hit</td><td>None — every claimed result is reported the same way, soft-404s included</td><td><code>--verify</code> flags low-confidence results</td></tr><tr><td>A transient error (timeout, rate limit)</td><td>Reported <code>Unknown</code> and left there</td><td><code>--retry N</code> re-checks only the <code>Unknown</code> sites</td></tr><tr><td>A run where every request fails</td><td>Prints &quot;0 results&quot;, exit <code>0</code> — identical to a clean empty search</td><td>Explicit warning, exit <code>2</code></td></tr><tr><td><code>--output</code> + a <code>{?}</code> wildcard</td><td>Silently overwrites itself; only the last variant survives</td><td>Rejected up front with a clear error*</td></tr><tr><td><code>--csv</code>/<code>--xlsx</code> + <code>--output</code>/<code>--folderoutput</code></td><td>Ignored — always writes to the current directory</td><td>Honoured, same as every other export format*</td></tr><tr><td>Structured export</td><td>None</td><td><code>--export-json</code></td></tr><tr><td>Report format</td><td><code>.txt</code>, <code>.csv</code>, <code>.xlsx</code></td><td>Adds <code>--markdown</code></td></tr></tbody></table></div>\n<p>\\* Also submitted upstream as <a href=\"https://github.com/sherlock-project/sherlock/pull/3172\" target=\"_blank\" rel=\"noopener noreferrer\">sherlock-project/sherlock#3172</a>; if that's merged, those two rows stop being a difference.</p>"
+    },
+    {
+     "id": "what-changed",
+     "label": "What changed",
+     "known": true,
+     "html": "<h3>Fixed: <code>--output</code> silently lost results to a <code>{?}</code> wildcard</h3>\n<p><code>--output path</code> is meant for a single username, but a <code>{?}</code> wildcard (<code>name{?}</code>) expands into several usernames before the write loop runs. Upstream checked the argument count *before* expansion, so <code>name{?}</code> looked like one username and was let through; each variant's result then overwrote the last one's output file. The check now runs against the expanded list and refuses up front with a clear error instead of silently losing data.</p>\n<h3>Fixed: <code>--csv</code>/<code>--xlsx</code> ignored <code>--output</code> and <code>--folderoutput</code></h3>\n<p>Both writers always wrote to the current directory regardless of what was asked for; the Excel writer also ignored <code>--folderoutput</code>. Both now resolve through the same path logic as every other export format, so requesting several formats together doesn't make them overwrite each other.</p>\n<h3>Added: <code>--verify</code>, <code>--retry</code>, <code>--export-json</code>, <code>--markdown</code></h3>\n<p>Described above. <code>--verify</code> runs once, after any retries, so a site that only succeeds on a retry still gets verified.</p>\n<h3>Changed: a total failure no longer looks like a clean empty search</h3>\n<p>If every request errors out (dead proxy, no network, aggressive rate limiting), Sherlock used to print &quot;Search completed with 0 results&quot; and exit <code>0</code> — identical to a genuine clean search. A run where every checked site comes back <code>Unknown</code> now prints an explicit warning and exits <code>2</code>, so a script calling Sherlock can tell the two apart.</p>"
+    },
+    {
+     "id": "testing",
+     "label": "Testing",
+     "known": true,
+     "html": "<p>Upstream's own test suite (<code>test_probes.py</code>, <code>test_manifest.py</code>, <code>test_unicode.py</code> and the rest in <code>tests/</code>) runs unchanged; this fork doesn't touch detection logic, the site list, or proxy/Tor support, so it doesn't add to that suite. The flags above were verified by hand against real sites, shown in <a href=\"#example-output\">Example output</a>.</p>"
+    },
+    {
+     "id": "limitations",
+     "label": "Limitations",
+     "known": true,
+     "html": "<ul><li><code>--verify</code> roughly doubles the requests sent to sites that claimed a hit (none for sites that</li></ul>\n<p>didn't), so a run with many hits takes longer.</p>\n<ul><li>Verification only catches a detector that can't distinguish a real account from a random one on</li></ul>\n<p>the *same* site; it says nothing about sites not checked.</p>\n<ul><li>This fork doesn't touch detection logic, the site list, or proxy/Tor support — those are</li></ul>\n<p>upstream's, unchanged.</p>"
+    },
+    {
+     "id": "responsible-use",
+     "label": "Responsible use",
+     "known": true,
+     "html": "<p>A username search is passive and touches only public profile URLs, but running it against someone without reason to is still a privacy intrusion. Use it for your own accounts, consented research, or an authorized engagement.</p>"
+    },
+    {
+     "id": "credits",
+     "label": "Credits",
+     "known": true,
+     "html": "<p>Built on <a href=\"https://github.com/sherlock-project/sherlock\" target=\"_blank\" rel=\"noopener noreferrer\">sherlock-project/sherlock</a>. The detection logic, site list, and base CLI are upstream's; the confidence check, retry logic, and export formats above are this fork's.</p>"
+    },
+    {
+     "id": "license",
+     "label": "License",
+     "known": true,
+     "html": "<p>MIT. See <a href=\"https://github.com/thecyberfarhan/sherlock/blob/master/LICENSE\" target=\"_blank\" rel=\"noopener noreferrer\">LICENSE</a>.</p>"
+    }
+   ]
+  },
+  {
+   "slug": "lab-reports",
+   "name": "Lab reports",
+   "tagline": "Pentest-style reports written against intentionally vulnerable training apps, in my own isolated lab.",
+   "kind": "Field note",
+   "status": "Active",
+   "language": null,
+   "requires": null,
+   "license": "MIT",
+   "upstream": null,
+   "upstreamStars": null,
+   "scope": "Own lab only",
+   "skillArea": "Reporting",
+   "stars": 0,
+   "pushedAt": "2026-11-15",
+   "href": "https://github.com/thecyberfarhan/lab-reports",
+   "sections": [
+    {
+     "id": "why",
+     "label": "Why",
+     "known": true,
+     "html": "<p>A finding is only half the job. The other half is writing it up the way a client actually reads it: what was tested, what was found, how bad it is, and how to fix it. These reports follow a real engagement's structure against apps built to be broken, so the structure can be shown without touching anyone else's system.</p>"
+    },
+    {
+     "id": "what-this-shows",
+     "label": "What this shows",
+     "known": true,
+     "html": "<ul><li>Reporting: scope and rules of engagement, a summary a non-technical reader can act on, findings</li></ul>\n<p>with evidence and risk ratings, and fixes in priority order — not just &quot;I found a bug.&quot;</p>\n<ul><li>Using my own tools as part of a real engagement, not just running them standalone: the DVWA</li></ul>\n<p>report's appendix is the actual <a href=\"https://github.com/thecyberfarhan/lab-reports/blob/master/../reconkit\" target=\"_blank\" rel=\"noopener noreferrer\">reconkit</a> and <a href=\"https://github.com/thecyberfarhan/lab-reports/blob/master/../apicheck\" target=\"_blank\" rel=\"noopener noreferrer\">apicheck</a> output from that test.</p>\n<ul><li>Confirming findings by hand, not trusting a scanner's output: the report says explicitly that</li></ul>\n<p>the vulnerabilities were confirmed with minimal, safe proof-of-concept requests.</p>"
+    },
+    {
+     "id": "whats-inside",
+     "label": "What's inside",
+     "known": true,
+     "html": "<div class=\"table-wrap\"><table><thead><tr><th>Target</th><th>App</th><th>Status</th></tr></thead><tbody><tr><td><a href=\"https://github.com/thecyberfarhan/lab-reports/blob/master/dvwa-low/report.md\" target=\"_blank\" rel=\"noopener noreferrer\">DVWA (low security)</a></td><td><a href=\"https://github.com/digininja/DVWA\" target=\"_blank\" rel=\"noopener noreferrer\">Damn Vulnerable Web Application</a></td><td>Done</td></tr><tr><td>WebGoat</td><td><a href=\"https://owasp.org/www-project-webgoat/\" target=\"_blank\" rel=\"noopener noreferrer\">OWASP WebGoat</a></td><td>Planned</td></tr></tbody></table></div>\n<p>Each report follows the same shape: scope and rules of engagement, a summary, findings with evidence and a risk rating, overall risk, and recommendations in priority order. The DVWA report additionally appendices the raw output of <a href=\"https://github.com/thecyberfarhan/lab-reports/blob/master/../reconkit\" target=\"_blank\" rel=\"noopener noreferrer\">reconkit</a> and <a href=\"https://github.com/thecyberfarhan/lab-reports/blob/master/../apicheck\" target=\"_blank\" rel=\"noopener noreferrer\">apicheck</a> run against the same target, as evidence of the recon phase that led to the findings.</p>"
+    },
+    {
+     "id": "method",
+     "label": "Method",
+     "known": true,
+     "html": "<p>Black-box recon first (unauthenticated), then authenticated testing with the app's default low-privilege demo account. No automated exploitation tools were used against the live app beyond the two tools in this portfolio; every vulnerability below was confirmed by hand with minimal, safe proof-of-concept requests.</p>"
+    },
+    {
+     "id": "limitations",
+     "label": "Limitations",
+     "known": true,
+     "html": "<ul><li>Every target here is a training app built to be broken; findings and fixes reflect that, not a</li></ul>\n<p>production system's full threat model.</p>\n<ul><li>Only one report (DVWA, low security setting) is complete; WebGoat is planned but not started.</li></ul>"
+    },
+    {
+     "id": "responsible-use",
+     "label": "Responsible use",
+     "known": true,
+     "html": "<p>All testing here is against instances run by me, on a network only I can reach. Nothing in this repo targets a system I don't own or don't have permission to test.</p>"
+    },
+    {
+     "id": "license",
+     "label": "License",
+     "known": true,
+     "html": "<p>MIT. See <a href=\"https://github.com/thecyberfarhan/lab-reports/blob/master/LICENSE\" target=\"_blank\" rel=\"noopener noreferrer\">LICENSE</a>.</p>"
+    }
+   ]
+  }
+ ]
+}

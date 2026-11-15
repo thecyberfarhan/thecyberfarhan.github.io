@@ -52,3 +52,24 @@ Without this, the 3-hour scheduled run still covers it -- this step is purely fo
 ## Template assumptions
 
 The parser handles both templates used so far: the older one (`**Difficulty:**` line, bullet list under "Tools Used", headings like "Shell / Access") and the newer one (difficulty in the ASCII banner, a `| Tool | Purpose |` table, "Shell / Initial Access", "Escalation Path", dates in the Changelog table). Section headings are matched by aliases in `SECTION_ORDER`; a writeup with a heading it does not know simply leaves that section out rather than failing the build.
+
+## sync-projects.mjs
+
+Finds every public repo under `github.com/thecyberfarhan` tagged with the GitHub topic
+`portfolio-project`, reads its README (which follows
+[docs/tool-readme-standard.md](../docs/tool-readme-standard.md)) and writes
+`src/data/projects.json`. Astro builds every project page, the home page's cards, the sitemap
+and `llms.txt` from that one file.
+
+To add a project to the site: write its README to the standard, then add the `portfolio-project`
+topic to the repo. To take one off the site: remove the topic. A private project is never
+synced — list it by hand in `src/data/site.ts` instead, where it shows as a card with no page.
+
+Run: `npm run sync:projects` (`GITHUB_TOKEN` optional locally, used in CI for rate limits).
+
+## lint-readmes.mjs
+
+Checks every `portfolio-project` repo's README against the standard: an H1 and tagline, an
+"At a glance" table with a `Kind`, and every section that kind requires. Read-only.
+
+Run: `npm run lint:readmes` (every repo), or `npm run lint:readmes -- corsy` (one repo).

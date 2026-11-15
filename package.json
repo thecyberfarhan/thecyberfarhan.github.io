@@ -6,7 +6,9 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "sync": "node scripts/sync-writeups.mjs"
+    "sync": "node scripts/sync-writeups.mjs",
+    "sync:projects": "node scripts/sync-projects.mjs",
+    "lint:readmes": "node scripts/lint-readmes.mjs"
   },
   "dependencies": {
     "@astrojs/sitemap": "3.7.4",

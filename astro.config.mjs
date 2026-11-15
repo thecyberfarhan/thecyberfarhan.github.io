@@ -12,6 +12,12 @@ if (!scout.ok) throw new Error(`scout.avatar.json is invalid: ${JSON.stringify(s
 const writeupDates = Object.fromEntries(JSON.parse(readFileSync(new URL('./src/data/writeups.json', import.meta.url), 'utf8')).writeups.map((w) => [w.slug, w.date]));
 const newestWriteup = Object.values(writeupDates).filter(Boolean).sort().pop();
 
+// project dates for the same reason, keyed by slug; the home page and the projects hub both
+// change whenever a project is added or its README is updated
+const projectDates = Object.fromEntries(JSON.parse(readFileSync(new URL('./src/data/projects.json', import.meta.url), 'utf8')).projects.map((p) => [p.slug, p.pushedAt]));
+const newestProject = Object.values(projectDates).filter(Boolean).sort().pop();
+const newestOverall = [newestWriteup, newestProject].filter(Boolean).sort().pop();
+
 export default defineConfig({
   site: 'https://thecyberfarhan.github.io',
   trailingSlash: 'ignore',
@@ -54,8 +60,14 @@ export default defineConfig({
         }
         item.url = url.href;
         // a writeup changed when it was written; the home page and the hub change whenever a writeup is added
-        const slug = url.pathname.match(/^\/writeups\/([^/]+)\.html$/)?.[1];
-        const date = slug ? writeupDates[slug] : ['/', '/writeups/'].includes(url.pathname) ? newestWriteup : undefined;
+        const writeupSlug = url.pathname.match(/^\/writeups\/([^/]+)\.html$/)?.[1];
+        const projectSlug = url.pathname.match(/^\/projects\/([^/]+)\.html$/)?.[1];
+        const date = writeupSlug ? writeupDates[writeupSlug]
+          : projectSlug ? projectDates[projectSlug]
+          : url.pathname === '/' ? newestOverall
+          : url.pathname === '/writeups/' ? newestWriteup
+          : url.pathname === '/projects/' ? newestProject
+          : undefined;
         if (date) item.lastmod = new Date(date + 'T12:00:00Z').toISOString();
         return item;
       },
