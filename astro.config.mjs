@@ -8,6 +8,10 @@ import { validateCharacter } from '@bible-strong/avatar-core';
 const scout = validateCharacter(JSON.parse(readFileSync(new URL('./src/data/scout.avatar.json', import.meta.url), 'utf8')));
 if (!scout.ok) throw new Error(`scout.avatar.json is invalid: ${JSON.stringify(scout.errors[0])}`);
 
+// writeup dates for the sitemap's lastmod, so search engines see which pages actually changed
+const writeupDates = Object.fromEntries(JSON.parse(readFileSync(new URL('./src/data/writeups.json', import.meta.url), 'utf8')).writeups.map((w) => [w.slug, w.date]));
+const newestWriteup = Object.values(writeupDates).filter(Boolean).sort().pop();
+
 export default defineConfig({
   site: 'https://thecyberfarhan.github.io',
   trailingSlash: 'ignore',
@@ -49,6 +53,10 @@ export default defineConfig({
           url.pathname = ['/lab', '/writeups'].includes(p) ? p + '/' : p + '.html';
         }
         item.url = url.href;
+        // a writeup changed when it was written; the home page and the hub change whenever a writeup is added
+        const slug = url.pathname.match(/^\/writeups\/([^/]+)\.html$/)?.[1];
+        const date = slug ? writeupDates[slug] : ['/', '/writeups/'].includes(url.pathname) ? newestWriteup : undefined;
+        if (date) item.lastmod = new Date(date + 'T12:00:00Z').toISOString();
         return item;
       },
     }),

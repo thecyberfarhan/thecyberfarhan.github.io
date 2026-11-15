@@ -27,4 +27,5 @@ Allow: /
 User-agent: Google-Extended
 Allow: /
 
+Sitemap: https://thecyberfarhan.github.io/sitemap.xml
 Sitemap: https://thecyberfarhan.github.io/sitemap-index.xml
