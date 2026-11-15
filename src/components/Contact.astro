@@ -27,7 +27,7 @@ const year = new Date().getFullYear();
         ))}
       </ul>
     </div>
-    <div class="fine"><span>© {year} {SITE.name} · Penetration tester</span><span>Built by hand with Astro and anime.js · <a href="/old/">See the old design</a></span></div>
+    <div class="fine"><span>© {year} {SITE.name} · Penetration tester</span><span>Built by hand with Astro and anime.js</span></div>
   </div>
 </footer>
 
@@ -52,8 +52,6 @@ const year = new Date().getFullYear();
   .links .a { transition: transform 0.3s var(--ease-out); color: var(--on-dark-muted); }
   .links a:hover .n { color: var(--hi); }
   .links a:hover .a { transform: translateX(4px); color: var(--on-dark); }
-  .fine a { color: inherit; text-underline-offset: 3px; }
-  .fine a:hover { color: var(--on-dark); }
   .fine { margin-top: 90px; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; font-size: 13px; color: var(--on-dark-muted); }
   @media (max-width: 860px) { .grid { grid-template-columns: 1fr; gap: 30px; } .links .h { display: none; } }
 </style>

@@ -35,6 +35,7 @@ function drawAvatar(state = 'idle') {
     character: dressed(wearing), state, size: '100%', followPointer: finePointer, paused: reduced, ariaLabel: 'Scout', settleAfterMs: 0,
   });
 }
+let oldTold = false;
 let hideT = 0, typeT = 0, lastSaid = 0, pinned = false, roaming = false, hidden = false, mounted = false;
 
 const store = {
@@ -161,6 +162,8 @@ function mount() {
     pokeReset = window.setTimeout(() => { pokes = 0; }, 20000);
     if (pokes >= 8) { say(line('pokeTooMuch'), { state: 'sleeping', ms: 4000, priority: true }); return; }
     avatar.poke(pokes >= 5 ? 'spin' : 'bounce');
+    // the third poke in a row, once per visit, buys a secret: where the old design lives
+    if (pokes === 3 && !oldTold) { oldTold = true; import('./eggs').then((m) => m.oldSecret()); return; }
     say(pokes >= 5 ? line('pokeTooMuch') : line('poke'), { state: pokes >= 5 ? 'angry' : 'playful', ms: 3500, priority: true });
   });
 
