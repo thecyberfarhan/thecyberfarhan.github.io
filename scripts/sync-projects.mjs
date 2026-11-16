@@ -77,11 +77,13 @@ function tableToHtml(rows, repo, branch) {
 function mdToHtml(md, repo, branch) {
   if (!md) return '';
   const out = [];
-  const fenceRe = /```[a-z]*\n([\s\S]*?)```/g;
+  // the fence's language is kept as a class so the page can colour the block with Shiki
+  const fenceRe = /```([\w+-]*)\n([\s\S]*?)```/g;
   let last = 0, m;
   while ((m = fenceRe.exec(md))) {
     out.push(textBlockToHtml(md.slice(last, m.index), repo, branch));
-    out.push(`<pre><code>${esc(m[1].replace(/\n$/, ''))}</code></pre>`);
+    const lang = m[1] ? ` class="language-${m[1].toLowerCase()}"` : '';
+    out.push(`<pre><code${lang}>${esc(m[2].replace(/\n$/, ''))}</code></pre>`);
     last = fenceRe.lastIndex;
   }
   out.push(textBlockToHtml(md.slice(last), repo, branch));
@@ -248,7 +250,41 @@ function parseReadme(md, repo, branch, repoMeta) {
 // which skill the project shows an employer, for filtering; falls back to a sane default
 const SKILL_FALLBACK = { Fork: 'Tooling and automation', Original: 'Web and API testing', 'Field note': 'Reporting' };
 
-function toRecord(repo, md, branch) {
+// numbers the page shows in its facts strip, read from the README itself so they can't drift:
+// how many "### Fixed: ..." / "### Added: ..." entries "What changed" has, and the test count the
+// "Testing" section states ("14 tests", "Nine tests"). Anything not stated stays null.
+const WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
+  thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20 };
+function readmeStats(md) {
+  const sections = splitSections(md);
+  const body = (name) => (sections.find((s) => s.heading.toLowerCase() === name)?.body || '').replace(/```[\s\S]*?```/g, '');
+  const changes = body('what changed').split('\n').filter((l) => /^###\s+/.test(l));
+  const count = (re) => changes.filter((l) => re.test(l.replace(/^###\s+/, ''))).length;
+  const t = /\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty)\s+tests?\b/i.exec(body('testing'));
+  const tests = t ? (/^\d+$/.test(t[1]) ? Number(t[1]) : WORDS[t[1].toLowerCase()]) : null;
+  return { fixes: count(/^fixed\b/i), additions: count(/^added\b/i), tests };
+}
+
+// the latest finished run on the default branch; only a pass is shown on the page
+async function ciStatus(repo, branch) {
+  try {
+    const res = await gh(`https://api.github.com/repos/${OWNER}/${repo}/actions/runs?branch=${encodeURIComponent(branch)}&status=completed&per_page=1&exclude_pull_requests=true`);
+    if (!res.ok) return null;
+    const run = (await res.json()).workflow_runs?.[0];
+    return run ? { conclusion: run.conclusion, url: run.html_url } : null;
+  } catch { return null; }
+}
+
+// /users/:user/repos doesn't include a fork's parent, so the upstream's stars need their own call
+async function upstreamStars(fullName) {
+  if (!fullName || !/^[\w.-]+\/[\w.-]+$/.test(fullName)) return null;
+  try {
+    const res = await gh(`https://api.github.com/repos/${fullName}`);
+    return res.ok ? (await res.json()).stargazers_count ?? null : null;
+  } catch { return null; }
+}
+
+function toRecord(repo, md, branch, extra = {}) {
   const parsed = parseReadme(md, repo.name, branch, repo);
   const glance = parsed.glance;
   const kind = /^original$/i.test(glance['Kind'] || '') ? 'Original'
@@ -264,12 +300,14 @@ function toRecord(repo, md, branch) {
     requires: glance['Requires'] || null,
     license: glance['License'] || repo.license?.spdx_id || null,
     upstream: glance['Upstream'] || repo.parent?.full_name || null,
-    upstreamStars: repo.parent?.stargazers_count ?? null,
+    upstreamStars: extra.upstreamStars ?? repo.parent?.stargazers_count ?? null,
     scope: glance['Scope'] || null,
     skillArea: glance['Skill area'] || SKILL_FALLBACK[kind],
     stars: repo.stargazers_count,
     pushedAt: repo.pushed_at ? repo.pushed_at.slice(0, 10) : null,
     href: repo.html_url,
+    stats: readmeStats(md),
+    ci: extra.ci ?? null,
     sections: parsed.sections,
   };
 }
@@ -286,7 +324,9 @@ async function main() {
     const slug = slugify(repo.name);
     try {
       const md = await rawReadme(repo.name, repo.default_branch);
-      records.push(toRecord(repo, md, repo.default_branch));
+      const glanceUpstream = /\|\s*\*{0,2}Upstream\*{0,2}\s*\|\s*([^|]+?)\s*\|/i.exec(md)?.[1].replace(/\[([^\]]+)\]\([^)]*\)/, '$1');
+      const [stars, ci] = await Promise.all([upstreamStars(glanceUpstream || repo.parent?.full_name), ciStatus(repo.name, repo.default_branch)]);
+      records.push(toRecord(repo, md, repo.default_branch, { upstreamStars: stars, ci }));
     } catch (err) {
       console.warn(`! ${repo.name}: ${err.message}`);
       if (prevBySlug.has(slug)) { records.push(prevBySlug.get(slug)); kept.push(slug); }

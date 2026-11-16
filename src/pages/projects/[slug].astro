@@ -1,5 +1,7 @@
 ---
 import { keepCodeTogether } from '../../lib/inline-code';
+import { highlightBlocks } from '../../lib/highlight';
+import { changeCards, terminalFrames } from '../../lib/project-html';
 import Base from '../../layouts/Base.astro';
 import Contact from '../../components/Contact.astro';
 import { syncedProjects, SITE, type SyncedProject } from '../../data/site';
@@ -17,8 +19,23 @@ const TONE: Record<string, string> = { Original: '#3f6e8c', Fork: '#a8642a', 'Fi
 const tone = TONE[p.kind] ?? TONE.Original;
 const path = `/projects/${p.slug}.html`;
 const description = p.tagline;
-const words = p.sections.map((s) => s.html).join(' ').replace(/<[^>]+>/g, ' ').split(/\s+/).length;
-const minutes = Math.max(2, Math.round(words / 220));
+// each README section, coloured and reshaped for the page (fix cards, terminal frames)
+const sections = await Promise.all(p.sections.map(async (s) => {
+  let html = await highlightBlocks(keepCodeTogether(s.html));
+  if (s.id === 'what-changed') html = changeCards(html);
+  if (s.id === 'example-output') html = terminalFrames(html, p.name);
+  return { ...s, html };
+}));
+// the numbers strip under the title, all read from the README or GitHub by the sync
+const compact = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1).replace(/\.0$/, '')}k` : String(n));
+const st = p.stats ?? { fixes: 0, additions: 0, tests: null };
+const stats: { n: string; count?: number; label: string; href?: string; tone?: string }[] = [
+  ...(st.fixes ? [{ n: String(st.fixes), count: st.fixes, label: st.fixes === 1 ? 'bug fixed' : 'bugs fixed' }] : []),
+  ...(st.additions ? [{ n: String(st.additions), count: st.additions, label: st.additions === 1 ? 'addition' : 'additions' }] : []),
+  ...(st.tests ? [{ n: String(st.tests), count: st.tests, label: 'automated tests' }] : []),
+  ...(p.ci?.conclusion === 'success' ? [{ n: 'Passing', label: 'CI on GitHub', href: p.ci.url, tone: 'ok' }] : []),
+  ...(p.upstreamStars ? [{ n: `${compact(p.upstreamStars)}★`, label: 'upstream stars' }] : []),
+];
 const jsonld = {
   '@context': 'https://schema.org',
   '@type': 'TechArticle',
@@ -47,13 +64,27 @@ const repoPath = p.href.replace('https://github.com/', '');
     <header class="head" data-enter="kids">
       <a class="back label" href="/projects/">← All projects</a>
       <p class="label kicker">{p.kind}{p.stars ? ` · ${p.stars.toLocaleString()}★` : ''}</p>
-      <h1>{p.name}</h1>
+      <h1 style={`view-transition-name: p-${p.slug}`}>{p.name}</h1>
       <p class="tagline">{p.tagline}</p>
       <ul class="meta">
         <li class="lvl">{p.status}</li>
         {p.pushedAt && <li>Updated <time datetime={p.pushedAt}>{p.pushedAt}</time></li>}
-        <li>{minutes} min read</li>
       </ul>
+      {stats.length > 0 && (
+        <ul class="stats" aria-label="In numbers">
+          {stats.map((x) => {
+            const Tag = x.href ? 'a' : 'div';
+            return (
+              <li>
+                <Tag class:list={['stat', x.tone]} {...(x.href ? { href: x.href, target: '_blank', rel: 'noopener' } : {})}>
+                  <b data-count={x.count}>{x.tone === 'ok' && <i class="pulse" aria-hidden="true"></i>}{x.n}</b>
+                  <span>{x.label}{x.href && ' ↗'}</span>
+                </Tag>
+              </li>
+            );
+          })}
+        </ul>
+      )}
     </header>
 
     <div class="layout">
@@ -70,10 +101,10 @@ const repoPath = p.href.replace('https://github.com/', '');
       </aside>
 
       <div class="prose" id="prose">
-        {p.sections.map((s) => (
+        {sections.map((s) => (
           <section id={s.id}>
             <h2>{s.label}</h2>
-            <Fragment set:html={keepCodeTogether(s.html)} />
+            <Fragment set:html={s.html} />
           </section>
         ))}
 
@@ -100,7 +131,8 @@ const repoPath = p.href.replace('https://github.com/', '');
   .kicker { color: var(--tone-ink); }
   .head h1 { font-size: clamp(2.8rem, 7vw, 5.6rem); line-height: 0.98; letter-spacing: -0.035em; margin: 14px 0 16px; overflow-wrap: anywhere; }
   .tagline { color: var(--soft); font-size: clamp(1.05rem, 1.6vw, 1.25rem); max-width: 60ch; margin-bottom: 24px; }
-  .meta { list-style: none; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; font-size: 14px; color: var(--muted); padding-bottom: 30px; border-bottom: 1px solid var(--ink); }
+  .head { padding-bottom: 30px; border-bottom: 1px solid var(--ink); }
+  .meta { list-style: none; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; font-size: 14px; color: var(--muted); }
   .meta .lvl { font: 500 12.5px var(--mono); color: var(--tone-ink); border: 1px solid color-mix(in srgb, var(--tone) 50%, transparent); padding: 4px 11px; border-radius: 999px; }
   .layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: clamp(30px, 5vw, 70px); margin-top: 44px; }
   .side { position: sticky; top: 96px; align-self: start; display: flex; flex-direction: column; gap: 28px; max-height: calc(100vh - 120px); overflow: hidden auto; overscroll-behavior: contain; scrollbar-width: none; padding-left: 2px; }
@@ -155,6 +187,61 @@ const repoPath = p.href.replace('https://github.com/', '');
   .pn a:hover { border-color: var(--ink); }
   .pn .nx { text-align: right; }
   .pt { font: 400 1.2rem var(--serif); color: var(--ink); }
+
+  /* numbers strip under the title */
+  .stats { list-style: none; display: flex; flex-wrap: wrap; gap: 10px; margin-top: 26px; }
+  .stat { display: flex; flex-direction: column; gap: 2px; min-width: 118px; padding: 12px 16px 13px; border: 1px solid var(--rule); border-radius: 12px; background: var(--card); text-decoration: none; transition: border-color 0.2s, transform 0.3s var(--ease-out); }
+  a.stat:hover { border-color: var(--ok); transform: translateY(-2px); }
+  .stat b { display: flex; align-items: center; gap: 8px; font: 400 1.75rem/1.1 var(--serif); color: var(--ink); font-variant-numeric: tabular-nums; }
+  .stat span { font: 500 10.5px var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .stat.ok b { color: var(--ok); }
+  .pulse { position: relative; width: 9px; height: 9px; border-radius: 50%; background: var(--ok); flex: none; }
+  .pulse::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: var(--ok); animation: pulse 2s ease-out infinite; }
+  @keyframes pulse { from { transform: scale(1); opacity: 0.6; } to { transform: scale(2.8); opacity: 0; } }
+
+  /* "What changed" as numbered cards */
+  .prose :global(.fixes) { display: grid; gap: 14px; counter-reset: fix; }
+  .prose :global(.fix) { --k: var(--tone); position: relative; padding: 18px 20px 6px 22px; border: 1px solid var(--rule); border-radius: 14px; background: var(--card); overflow: hidden; }
+  .prose :global(.fix::before) { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--k); }
+  .prose :global(.fix[data-kind='fixed']) { --k: var(--accent); }
+  .prose :global(.fix[data-kind='added']) { --k: var(--ok); }
+  .prose :global(.fix[data-kind='housekeeping']), .prose :global(.fix[data-kind='modernised']) { --k: var(--rule-strong); }
+  .prose :global(.fix-h) { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .prose :global(.fix-n) { font: 500 12px var(--mono); color: var(--muted); }
+  .prose :global(.fix-tag) { font: 500 10.5px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--k); border: 1px solid color-mix(in srgb, var(--k) 45%, transparent); padding: 2px 8px; border-radius: 999px; }
+  .prose :global(.fix h3) { margin: 0 0 8px; font-size: 1.08rem; line-height: 1.4; }
+  .prose :global(.fix-b) { font-size: 15.5px; line-height: 1.7; }
+
+  /* "Example output" as a terminal window that replays the run */
+  .prose :global(.term) { margin: 0 0 22px; border-radius: 12px; overflow: hidden; background: var(--code-bg); box-shadow: 0 0 0 1px #ffffff10, var(--shadow); }
+  .prose :global(.term-bar) { display: flex; align-items: center; gap: 12px; padding: 9px 12px; background: #1d2027; border-bottom: 1px solid #ffffff12; font: 500 11.5px var(--mono); color: #9aa0a9; }
+  .prose :global(.dots) { display: flex; gap: 6px; }
+  .prose :global(.dots i) { width: 10px; height: 10px; border-radius: 50%; background: #3a3f48; }
+  .prose :global(.dots i:nth-child(1)) { background: #ff5f57; }
+  .prose :global(.dots i:nth-child(2)) { background: #febc2e; }
+  .prose :global(.dots i:nth-child(3)) { background: #28c840; }
+  .prose :global(.term-t) { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prose :global(.term-copy), .prose :global(.term-replay) { font: 500 11px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 10px; border-radius: 6px; background: #2c2f36; color: #c9c6bf; transition: background 0.2s; }
+  .prose :global(.term-copy:hover), .prose :global(.term-replay:hover) { background: #3a3e47; }
+  .prose :global(.term-copy.done) { background: var(--ok); color: #fff; }
+  .prose :global(.term pre) { margin: 0; border-radius: 0; }
+  .prose :global(.term .line) { display: inline-block; }
+  .prose :global(.term .line.wait) { visibility: hidden; }
+  .prose :global(.caret) { display: inline-block; width: 0.6em; height: 1.1em; margin-left: 2px; vertical-align: -0.2em; background: var(--code-fg); animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* upstream vs this fork switch above the comparison table */
+  .prose :global(.cmp-switch) { display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 12px; border: 1px solid var(--rule); border-radius: 999px; background: var(--card); }
+  .prose :global(.cmp-switch button) { padding: 6px 14px; border-radius: 999px; font: 500 12.5px var(--sans); color: var(--muted); transition: background 0.25s, color 0.25s; }
+  .prose :global(.cmp-switch button[aria-pressed='true']) { background: var(--ink); color: var(--paper); }
+  .prose :global(.cmp td), .prose :global(.cmp th) { transition: opacity 0.3s, background-color 0.3s; }
+  .prose :global(.cmp[data-show='fork'] tr > :nth-child(2)), .prose :global(.cmp[data-show='upstream'] tr > :nth-child(3)) { opacity: 0.45; }
+  .prose :global(.cmp[data-show='fork'] td:nth-child(3)), .prose :global(.cmp[data-show='upstream'] td:nth-child(2)) { background: color-mix(in srgb, var(--tone) 9%, var(--card)); color: var(--ink); }
+  @media (max-width: 640px) {
+    .prose :global(.cmp[data-show='fork'] tr > :nth-child(2)), .prose :global(.cmp[data-show='upstream'] tr > :nth-child(3)) { display: none; }
+  }
+  @media (max-width: 640px) { .stats { display: grid; grid-template-columns: 1fr 1fr; } .stat { min-width: 0; } }
+  @media (prefers-reduced-motion: reduce) { .pulse::after, .prose :global(.caret) { animation: none; } }
   @media (max-width: 900px) {
     .layout { grid-template-columns: minmax(0, 1fr); }
     .side { position: static; max-height: none; flex-direction: column-reverse; gap: 22px; padding: 18px; border: 1px solid var(--rule); border-radius: 14px; background: var(--card); }
@@ -173,14 +260,105 @@ const repoPath = p.href.replace('https://github.com/', '');
   const prose = document.getElementById('prose')!;
   animate(bar, { scaleX: [0, 1], ease: 'linear', autoplay: onScroll({ target: prose, enter: 'start start', leave: 'end end', sync: true }) });
 
+  // arriving from another page of the site, the title morphs into place through the view
+  // transition; animating it here as well would fight that, so only the rest of the header moves
+  const morphed = 'onpagereveal' in window && document.referrer.startsWith(location.origin);
+  if (morphed) document.querySelector<HTMLElement>('.head h1')!.style.opacity = '1';
   if (!reduced) {
-    animate('.head > *', { opacity: [0, 1], y: [18, 0], duration: 800, delay: stagger(80), ease: 'outQuart' });
+    animate(morphed ? '.head > :not(h1)' : '.head > *', { opacity: [0, 1], y: [18, 0], duration: 800, delay: stagger(80), ease: 'outQuart' });
+    // the numbers count up from zero
+    document.querySelectorAll<HTMLElement>('.stat b[data-count]').forEach((b, i) => {
+      const n = Number(b.dataset.count);
+      const o = { v: 0 };
+      b.lastChild!.textContent = '0';
+      animate(o, { v: n, duration: 1100, delay: 450 + i * 90, ease: 'outExpo', modifier: Math.round, onUpdate: () => { b.lastChild!.textContent = String(o.v); } });
+    });
   }
 
-  prose.querySelectorAll('pre').forEach((pre) => {
+  const once = (els: Element[], fn: (el: Element) => void, rootMargin = '0px 0px -12% 0px') => {
+    const io = new IntersectionObserver((entries) => entries.forEach((e) => { if (e.isIntersecting) { io.unobserve(e.target); fn(e.target); } }), { rootMargin });
+    els.forEach((el) => io.observe(el));
+  };
+
+  // "What changed" cards rise in one after another as they come into view
+  const cards = [...prose.querySelectorAll('.fix')];
+  if (!reduced && cards.length) {
+    cards.forEach((c) => ((c as HTMLElement).style.opacity = '0'));
+    once(cards, (c) => animate(c, { opacity: [0, 1], y: [26, 0], duration: 700, delay: (cards.indexOf(c) % 3) * 90, ease: 'outQuart' }));
+  }
+
+  // "Example output" replays like a live terminal the first time it scrolls into view: a "$ "
+  // line types itself out, every other line prints in turn, and a caret blinks at the end
+  function replay(term: HTMLElement) {
+    const lines = [...term.querySelectorAll<HTMLElement>('.line')];
+    term.querySelector('.caret')?.remove();
+    lines.forEach((l) => l.classList.add('wait'));
+    const gap = Math.max(25, Math.min(110, 2400 / Math.max(lines.length, 1)));
+    let t = 0;
+    lines.forEach((l) => {
+      const typed = /^\$\s/.test(l.textContent ?? '');
+      const at = t;
+      setTimeout(() => {
+        l.classList.remove('wait');
+        if (typed) animate(l, { clipPath: ['inset(0 100% 0 0)', 'inset(0 0% 0 0)'], duration: Math.min(1400, (l.textContent?.length ?? 10) * 38), ease: 'linear' });
+      }, at);
+      t += typed ? Math.min(1400, (l.textContent?.length ?? 10) * 38) + 260 : gap;
+    });
+    setTimeout(() => {
+      const caret = document.createElement('span');
+      caret.className = 'caret';
+      caret.setAttribute('aria-hidden', 'true');
+      (lines.at(-1) ?? term.querySelector('code'))?.after(caret);
+      const btn = term.querySelector<HTMLButtonElement>('.term-replay');
+      if (btn) btn.hidden = false;
+    }, t);
+  }
+  const terms = [...prose.querySelectorAll<HTMLElement>('.term')];
+  if (!reduced) {
+    terms.forEach((term) => {
+      term.querySelectorAll('.line').forEach((l) => l.classList.add('wait'));
+      term.querySelector('.term-replay')?.addEventListener('click', () => replay(term));
+    });
+    once(terms, (term) => replay(term as HTMLElement), '0px 0px -25% 0px');
+  }
+
+  // Comparison on a fork: a switch picks which column to look at. The other column dims on a
+  // wide screen and hides on a phone, where a three-column table doesn't fit
+  const table = prose.querySelector<HTMLTableElement>('#comparison table');
+  const heads = table ? [...table.querySelectorAll('thead th')] : [];
+  if (table && heads.length === 3 && /upstream/i.test(heads[1].textContent ?? '')) {
+    table.classList.add('cmp');
+    table.dataset.show = 'fork';
+    const sw = document.createElement('div');
+    sw.className = 'cmp-switch';
+    sw.setAttribute('role', 'group');
+    sw.setAttribute('aria-label', 'Compare');
+    const opts: [string, string][] = [['upstream', 'Upstream'], ['fork', 'This fork']];
+    const buttons = opts.map(([v, label]) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = label;
+      b.setAttribute('aria-pressed', String(v === 'fork'));
+      b.addEventListener('click', () => {
+        if (table.dataset.show === v) return;
+        table.dataset.show = v;
+        buttons.forEach((x, i) => x.setAttribute('aria-pressed', String(opts[i][0] === v)));
+        if (!reduced) animate(table.querySelectorAll(`td:nth-child(${v === 'fork' ? 3 : 2})`), { opacity: [0.2, 1], x: [v === 'fork' ? 12 : -12, 0], duration: 450, delay: stagger(40), ease: 'outQuart' });
+      });
+      return b;
+    });
+    sw.append(...buttons);
+    table.closest('.table-wrap')?.before(sw);
+  }
+
+  prose.querySelectorAll<HTMLElement>('pre').forEach((pre) => {
+    if (pre.closest('.term')) { pre.closest('.term')!.querySelector('.term-bar')!.append(copyButton(pre, 'term-copy')); return; }
+    pre.appendChild(copyButton(pre, 'copy'));
+  });
+  function copyButton(pre: HTMLElement, cls: string) {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'copy';
+    b.className = cls;
     b.textContent = 'Copy';
     b.setAttribute('aria-label', 'Copy code');
     b.addEventListener('click', async () => {
@@ -191,8 +369,8 @@ const repoPath = p.href.replace('https://github.com/', '');
         setTimeout(() => { b.textContent = 'Copy'; b.classList.remove('done'); }, 1500);
       } catch { /* clipboard blocked */ }
     });
-    pre.appendChild(b);
-  });
+    return b;
+  }
 
   const follow = initSidePanel(document.querySelector<HTMLElement>('.side')!);
   const links = new Map([...document.querySelectorAll<HTMLAnchorElement>('.toc a')].map((a) => [a.hash.slice(1), a]));

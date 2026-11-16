@@ -82,6 +82,14 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 
 /* every scroll area on the site (page, code blocks, tables, lab terminal) gets a thin bar in the
    theme's own colours instead of the browser's grey default */
+/* moving between pages of the site: an element that carries the same view-transition-name on
+   both pages (a project's title on its card and in its page header) glides from one to the other.
+   Chrome, Edge and Safari do this natively; other browsers just load the page as before. */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition { navigation: auto; }
+}
+::view-transition-group(*) { animation-duration: 0.5s; animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1); }
+
 html, * { scrollbar-width: thin; scrollbar-color: var(--rule-strong) transparent; }
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -129,6 +137,8 @@ section.block { padding: clamp(84px, 11vw, 140px) 0; }
 /* elements that animate in on load start hidden, so they never paint at rest and then jump */
 .js-motion [data-enter], .js-motion [data-enter='kids'] > * { opacity: 0; }
 .js-motion [data-enter='kids'] { opacity: 1; }
+/* during a page-to-page transition the title that morphs in has to be visible in the snapshot */
+html:active-view-transition [data-enter='kids'] > [style*='view-transition-name'] { opacity: 1; }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

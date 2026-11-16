@@ -139,11 +139,13 @@ function inline(s) {
 function mdToHtml(md) {
   if (!md) return '';
   const out = [];
-  const fenceRe = /```[a-z]*\n([\s\S]*?)```/g;
+  // the fence's language is kept as a class so the page can colour the block with Shiki
+  const fenceRe = /```([\w+-]*)\n([\s\S]*?)```/g;
   let last = 0, m;
   while ((m = fenceRe.exec(md))) {
     out.push(textBlockToHtml(md.slice(last, m.index)));
-    out.push(`<pre><code>${esc(m[1].replace(/\n$/, ''))}</code></pre>`);
+    const lang = m[1] ? ` class="language-${m[1].toLowerCase()}"` : '';
+    out.push(`<pre><code${lang}>${esc(m[2].replace(/\n$/, ''))}</code></pre>`);
     last = fenceRe.lastIndex;
   }
   out.push(textBlockToHtml(md.slice(last)));

@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-15",
+ "generated": "2026-11-16",
  "projects": [
   {
    "slug": "apicheck",
@@ -8,15 +8,24 @@
    "kind": "Original",
    "status": "Active",
    "language": "Python",
-   "requires": "Python 3.9+, no dependencies",
+   "requires": "Python 3.10+, no dependencies",
    "license": "MIT",
    "upstream": null,
    "upstreamStars": null,
    "scope": "Authorized testing only",
    "skillArea": "Web and API testing",
    "stars": 0,
-   "pushedAt": "2026-11-15",
+   "pushedAt": "2026-11-16",
    "href": "https://github.com/thecyberfarhan/apicheck",
+   "stats": {
+    "fixes": 0,
+    "additions": 0,
+    "tests": 13
+   },
+   "ci": {
+    "conclusion": "success",
+    "url": "https://github.com/thecyberfarhan/apicheck/actions/runs/43858763872"
+   },
    "sections": [
     {
      "id": "why",
@@ -34,19 +43,19 @@
      "id": "requirements",
      "label": "Requirements",
      "known": true,
-     "html": "<ul><li>Python 3.9 or newer</li><li>No third-party packages — standard library only</li><li>Tried on: Arch Linux, Kali Linux</li></ul>"
+     "html": "<ul><li>Python 3.10 or newer</li><li>No third-party packages — standard library only</li><li>Tried on: Arch Linux, Kali Linux</li></ul>"
     },
     {
      "id": "install",
      "label": "Install",
      "known": true,
-     "html": "<pre><code>git clone https://github.com/thecyberfarhan/apicheck\ncd apicheck\npython3 -m apicheck --help</code></pre>\n<p>No <code>pip install</code> needed.</p>"
+     "html": "<pre><code class=\"language-bash\">git clone https://github.com/thecyberfarhan/apicheck\ncd apicheck\npython3 -m apicheck --help</code></pre>\n<p>No <code>pip install</code> needed.</p>"
     },
     {
      "id": "usage",
      "label": "Usage",
      "known": true,
-     "html": "<h3>Basic scan of a lab target</h3>\n<pre><code>python3 -m apicheck http://192.168.1.10:8080</code></pre>\n<h3>Compare an authenticated vs. anonymous response on specific endpoints</h3>\n<pre><code>python3 -m apicheck http://192.168.1.10:8080 --token eyJhbGciOi... --endpoints paths.txt</code></pre>\n<h3>Write a report</h3>\n<pre><code>python3 -m apicheck http://192.168.1.10:8080 -o report.md\npython3 -m apicheck http://192.168.1.10:8080 -o report.json</code></pre>"
+     "html": "<h3>Basic scan of a lab target</h3>\n<pre><code class=\"language-bash\">python3 -m apicheck http://192.168.1.10:8080</code></pre>\n<h3>Compare an authenticated vs. anonymous response on specific endpoints</h3>\n<pre><code class=\"language-bash\">python3 -m apicheck http://192.168.1.10:8080 --token eyJhbGciOi... --endpoints paths.txt</code></pre>\n<h3>Write a report</h3>\n<pre><code class=\"language-bash\">python3 -m apicheck http://192.168.1.10:8080 -o report.md\npython3 -m apicheck http://192.168.1.10:8080 -o report.json</code></pre>"
     },
     {
      "id": "options",
@@ -58,7 +67,7 @@
      "id": "example-output",
      "label": "Example output",
      "known": true,
-     "html": "<pre><code>$ python3 -m apicheck http://192.168.1.10:4280\napicheck: only test systems you own or have written permission to test.\n# apicheck report: http://192.168.1.10:4280\n\nRequests sent: 28. Findings: 9.\n\n## [MEDIUM] Content-Security-Policy missing\n...\n## [MEDIUM] Cookie 'PHPSESSID' lacks HttpOnly, SameSite\n...</code></pre>"
+     "html": "<pre><code class=\"language-text\">$ python3 -m apicheck http://192.168.1.10:4280\napicheck: only test systems you own or have written permission to test.\n# apicheck report: http://192.168.1.10:4280\n\nRequests sent: 28. Findings: 9.\n\n## [MEDIUM] Content-Security-Policy missing\n...\n## [MEDIUM] Cookie 'PHPSESSID' lacks HttpOnly, SameSite\n...</code></pre>"
     },
     {
      "id": "what-it-checks",
@@ -70,7 +79,7 @@
      "id": "testing",
      "label": "Testing",
      "known": true,
-     "html": "<pre><code>python3 -m unittest discover -s tests -v</code></pre>\n<p>13 tests spin up two local servers — one deliberately misconfigured, one hardened — and assert the checker flags the first and stays quiet on the second. GitHub Actions runs them on Python 3.9, 3.11 and 3.12.</p>"
+     "html": "<pre><code class=\"language-bash\">python3 -m unittest discover -s tests -v</code></pre>\n<p>13 tests spin up two local servers — one deliberately misconfigured, one hardened — and assert the checker flags the first and stays quiet on the second. GitHub Actions runs them on Python 3.10, 3.12 and 3.13.</p>"
     },
     {
      "id": "limitations",
@@ -99,15 +108,24 @@
    "kind": "Original",
    "status": "Active",
    "language": "Python",
-   "requires": "Python 3.9+, no dependencies",
+   "requires": "Python 3.10+, no dependencies",
    "license": "MIT",
    "upstream": null,
    "upstreamStars": null,
    "scope": "Authorized testing only",
    "skillArea": "Recon and enumeration",
    "stars": 0,
-   "pushedAt": "2026-11-15",
+   "pushedAt": "2026-11-16",
    "href": "https://github.com/thecyberfarhan/reconkit",
+   "stats": {
+    "fixes": 0,
+    "additions": 0,
+    "tests": 8
+   },
+   "ci": {
+    "conclusion": "success",
+    "url": "https://github.com/thecyberfarhan/reconkit/actions/runs/43858775178"
+   },
    "sections": [
     {
      "id": "why",
@@ -125,19 +143,19 @@
      "id": "requirements",
      "label": "Requirements",
      "known": true,
-     "html": "<ul><li>Python 3.9 or newer</li><li>No third-party packages — standard library only</li><li>Tried on: Arch Linux, Kali Linux</li></ul>"
+     "html": "<ul><li>Python 3.10 or newer</li><li>No third-party packages — standard library only</li><li>Tried on: Arch Linux, Kali Linux</li></ul>"
     },
     {
      "id": "install",
      "label": "Install",
      "known": true,
-     "html": "<pre><code>git clone https://github.com/thecyberfarhan/reconkit\ncd reconkit\npython3 -m reconkit --help</code></pre>\n<p>No <code>pip install</code> needed.</p>"
+     "html": "<pre><code class=\"language-bash\">git clone https://github.com/thecyberfarhan/reconkit\ncd reconkit\npython3 -m reconkit --help</code></pre>\n<p>No <code>pip install</code> needed.</p>"
     },
     {
      "id": "usage",
      "label": "Usage",
      "known": true,
-     "html": "<h3>Top common ports and an HTTP probe, against a lab host</h3>\n<pre><code>python3 -m reconkit 192.168.1.10</code></pre>\n<h3>Specific ports, written as a Markdown report</h3>\n<pre><code>python3 -m reconkit 192.168.1.10 -p 22,80,443,8000-8100 -o report.md</code></pre>\n<h3>JSON output, for feeding into another tool</h3>\n<pre><code>python3 -m reconkit 192.168.1.10 -o report.json</code></pre>\n<h3>Subdomain brute force</h3>\n<pre><code>python3 -m reconkit example.com -w wordlists/small.txt --authorized</code></pre>\n<p>One word per line in the wordlist. <code>--authorized</code> is required for any public (non-private) address — reconkit refuses to scan one otherwise.</p>"
+     "html": "<h3>Top common ports and an HTTP probe, against a lab host</h3>\n<pre><code class=\"language-bash\">python3 -m reconkit 192.168.1.10</code></pre>\n<h3>Specific ports, written as a Markdown report</h3>\n<pre><code class=\"language-bash\">python3 -m reconkit 192.168.1.10 -p 22,80,443,8000-8100 -o report.md</code></pre>\n<h3>JSON output, for feeding into another tool</h3>\n<pre><code class=\"language-bash\">python3 -m reconkit 192.168.1.10 -o report.json</code></pre>\n<h3>Subdomain brute force</h3>\n<pre><code class=\"language-bash\">python3 -m reconkit example.com -w wordlists/small.txt --authorized</code></pre>\n<p>One word per line in the wordlist. <code>--authorized</code> is required for any public (non-private) address — reconkit refuses to scan one otherwise.</p>"
     },
     {
      "id": "options",
@@ -149,7 +167,7 @@
      "id": "example-output",
      "label": "Example output",
      "known": true,
-     "html": "<pre><code>$ python3 -m reconkit 192.168.1.10 -p 22,80,4280\nreconkit: only scan systems you own or have written permission to test.\n# Recon report: 192.168.1.10\n\nResolved address: `192.168.1.10`\n\n## Open ports\n\n| Port | Service | Banner |\n|---|---|---|\n| 22  | ssh  | SSH-2.0-OpenSSH_9.6 |\n| 4280 | unknown | - |\n\n## Web services\n\n- http://192.168.1.10:4280: HTTP 200, title &quot;Login :: DVWA&quot;, server `Apache/2.4.69`, missing headers: ...</code></pre>"
+     "html": "<pre><code class=\"language-text\">$ python3 -m reconkit 192.168.1.10 -p 22,80,4280\nreconkit: only scan systems you own or have written permission to test.\n# Recon report: 192.168.1.10\n\nResolved address: `192.168.1.10`\n\n## Open ports\n\n| Port | Service | Banner |\n|---|---|---|\n| 22  | ssh  | SSH-2.0-OpenSSH_9.6 |\n| 4280 | unknown | - |\n\n## Web services\n\n- http://192.168.1.10:4280: HTTP 200, title &quot;Login :: DVWA&quot;, server `Apache/2.4.69`, missing headers: ...</code></pre>"
     },
     {
      "id": "what-it-checks",
@@ -161,7 +179,7 @@
      "id": "testing",
      "label": "Testing",
      "known": true,
-     "html": "<pre><code>python3 -m unittest discover -s tests -v</code></pre>\n<p>8 tests, all against a local test server — nothing reaches the network. GitHub Actions runs them on Python 3.9, 3.11 and 3.12.</p>"
+     "html": "<pre><code class=\"language-bash\">python3 -m unittest discover -s tests -v</code></pre>\n<p>8 tests, all against a local test server — nothing reaches the network. GitHub Actions runs them on Python 3.10, 3.12 and 3.13.</p>"
     },
     {
      "id": "limitations",
@@ -193,12 +211,21 @@
    "requires": "Python 3.10+",
    "license": "AGPL-3.0",
    "upstream": "s0md3v/Arjun",
-   "upstreamStars": null,
+   "upstreamStars": 6445,
    "scope": "Authorized testing only",
    "skillArea": "Tooling and automation",
    "stars": 0,
    "pushedAt": "2026-11-15",
    "href": "https://github.com/thecyberfarhan/Arjun",
+   "stats": {
+    "fixes": 6,
+    "additions": 0,
+    "tests": 14
+   },
+   "ci": {
+    "conclusion": "success",
+    "url": "https://github.com/thecyberfarhan/Arjun/actions/runs/43766215729"
+   },
    "sections": [
     {
      "id": "why",
@@ -222,13 +249,13 @@
      "id": "install",
      "label": "Install",
      "known": true,
-     "html": "<h3>Arch Linux</h3>\n<pre><code>sudo pacman -S --needed python python-pip git\ngit clone https://github.com/thecyberfarhan/Arjun.git\ncd Arjun\npython -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -r requirements.txt\npip install -e .</code></pre>\n<h3>Kali Linux, Parrot OS</h3>\n<pre><code>sudo apt update &amp;&amp; sudo apt install -y python3 python3-pip python3-venv git\ngit clone https://github.com/thecyberfarhan/Arjun.git\ncd Arjun\npython3 -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -r requirements.txt\npip install -e .</code></pre>\n<p>Check it worked:</p>\n<pre><code>arjun -h</code></pre>\n<p>The virtual environment only needs activating in the shell you use it from. Run <code>deactivate</code>, or open a new terminal, to leave it.</p>"
+     "html": "<h3>Arch Linux</h3>\n<pre><code class=\"language-bash\">sudo pacman -S --needed python python-pip git\ngit clone https://github.com/thecyberfarhan/Arjun.git\ncd Arjun\npython -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -r requirements.txt\npip install -e .</code></pre>\n<h3>Kali Linux, Parrot OS</h3>\n<pre><code class=\"language-bash\">sudo apt update &amp;&amp; sudo apt install -y python3 python3-pip python3-venv git\ngit clone https://github.com/thecyberfarhan/Arjun.git\ncd Arjun\npython3 -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -r requirements.txt\npip install -e .</code></pre>\n<p>Check it worked:</p>\n<pre><code class=\"language-bash\">arjun -h</code></pre>\n<p>The virtual environment only needs activating in the shell you use it from. Run <code>deactivate</code>, or open a new terminal, to leave it.</p>"
     },
     {
      "id": "usage",
      "label": "Usage",
      "known": true,
-     "html": "<h3>Scan one URL</h3>\n<pre><code>arjun -u https://example.com/api/userinfo</code></pre>\n<p>Sends the default wordlist (25,890 names) against the URL and prints any parameter that changes the response.</p>\n<h3>Scan a list of URLs</h3>\n<pre><code>arjun -i urls.txt -oT found.txt</code></pre>\n<p>One URL per line. <code>-oT</code> writes <code>url?param=value</code> for every parameter found, one per line.</p>\n<h3>Replay captured requests from Burp</h3>\n<pre><code>arjun -i export.xml -oJ found.json</code></pre>\n<p>Imports every request Burp exported as XML, including its captured body, and tests each one.</p>\n<h3>Send data in every request</h3>\n<pre><code>arjun -u https://example.com/api/search -m JSON --include '{&quot;q&quot;: &quot;test&quot;}'</code></pre>\n<p>Keeps <code>q</code> present on every probe, for an endpoint that 400s without it.</p>\n<h3>Through Burp or another proxy</h3>\n<pre><code>arjun -u https://example.com --headers &quot;Cookie: SESSION=abc123&quot;</code></pre>\n<h3>Use a smaller, faster wordlist</h3>\n<pre><code>arjun -u https://example.com -w my_params.txt -t 10</code></pre>"
+     "html": "<h3>Scan one URL</h3>\n<pre><code class=\"language-bash\">arjun -u https://example.com/api/userinfo</code></pre>\n<p>Sends the default wordlist (25,890 names) against the URL and prints any parameter that changes the response.</p>\n<h3>Scan a list of URLs</h3>\n<pre><code class=\"language-bash\">arjun -i urls.txt -oT found.txt</code></pre>\n<p>One URL per line. <code>-oT</code> writes <code>url?param=value</code> for every parameter found, one per line.</p>\n<h3>Replay captured requests from Burp</h3>\n<pre><code class=\"language-bash\">arjun -i export.xml -oJ found.json</code></pre>\n<p>Imports every request Burp exported as XML, including its captured body, and tests each one.</p>\n<h3>Send data in every request</h3>\n<pre><code class=\"language-bash\">arjun -u https://example.com/api/search -m JSON --include '{&quot;q&quot;: &quot;test&quot;}'</code></pre>\n<p>Keeps <code>q</code> present on every probe, for an endpoint that 400s without it.</p>\n<h3>Through Burp or another proxy</h3>\n<pre><code class=\"language-bash\">arjun -u https://example.com --headers &quot;Cookie: SESSION=abc123&quot;</code></pre>\n<h3>Use a smaller, faster wordlist</h3>\n<pre><code class=\"language-bash\">arjun -u https://example.com -w my_params.txt -t 10</code></pre>"
     },
     {
      "id": "options",
@@ -240,7 +267,7 @@
      "id": "example-output",
      "label": "Example output",
      "known": true,
-     "html": "<p>Against a local test server with a hidden <code>secret_admin_flag</code> parameter:</p>\n<pre><code>[*] Scanning 0/1: http://127.0.0.1:33225/\n[*] Probing the target for stability\n[*] Analysing HTTP response for anomalies\n[*] Logicforcing the URL endpoint\n[✓] parameter detected: secret_admin_flag, based on: body length\n[+] Parameters found: secret_admin_flag</code></pre>\n<p><code>-oJ</code> for the same run:</p>\n<pre><code>{\n    &quot;http://127.0.0.1:33225/&quot;: {\n        &quot;headers&quot;: { &quot;...&quot;: &quot;...&quot; },\n        &quot;method&quot;: &quot;GET&quot;,\n        &quot;params&quot;: [&quot;secret_admin_flag&quot;]\n    }\n}</code></pre>"
+     "html": "<p>Against a local test server with a hidden <code>secret_admin_flag</code> parameter:</p>\n<pre><code class=\"language-text\">[*] Scanning 0/1: http://127.0.0.1:33225/\n[*] Probing the target for stability\n[*] Analysing HTTP response for anomalies\n[*] Logicforcing the URL endpoint\n[✓] parameter detected: secret_admin_flag, based on: body length\n[+] Parameters found: secret_admin_flag</code></pre>\n<p><code>-oJ</code> for the same run:</p>\n<pre><code class=\"language-json\">{\n    &quot;http://127.0.0.1:33225/&quot;: {\n        &quot;headers&quot;: { &quot;...&quot;: &quot;...&quot; },\n        &quot;method&quot;: &quot;GET&quot;,\n        &quot;params&quot;: [&quot;secret_admin_flag&quot;]\n    }\n}</code></pre>"
     },
     {
      "id": "how-it-works",
@@ -264,7 +291,7 @@
      "id": "testing",
      "label": "Testing",
      "known": true,
-     "html": "<pre><code>pip install -r requirements.txt pytest\npytest -q</code></pre>\n<p>14 tests. A local HTTP server backs the <code>requester()</code>/<code>stable_request()</code> tests; the importer and parsing tests use real file fixtures (including a Burp-XML-shaped one) with no network access. GitHub Actions runs them on Python 3.10, 3.12 and 3.13.</p>"
+     "html": "<pre><code class=\"language-bash\">pip install -r requirements.txt pytest\npytest -q</code></pre>\n<p>14 tests. A local HTTP server backs the <code>requester()</code>/<code>stable_request()</code> tests; the importer and parsing tests use real file fixtures (including a Burp-XML-shaped one) with no network access. GitHub Actions runs them on Python 3.10, 3.12 and 3.13.</p>"
     },
     {
      "id": "limitations",
@@ -302,12 +329,21 @@
    "requires": "Python 3.10+",
    "license": "GPL-3.0",
    "upstream": "s0md3v/Corsy",
-   "upstreamStars": null,
+   "upstreamStars": 1545,
    "scope": "Authorized testing only",
    "skillArea": "Tooling and automation",
    "stars": 0,
    "pushedAt": "2026-11-15",
    "href": "https://github.com/thecyberfarhan/Corsy",
+   "stats": {
+    "fixes": 4,
+    "additions": 1,
+    "tests": 9
+   },
+   "ci": {
+    "conclusion": "success",
+    "url": "https://github.com/thecyberfarhan/Corsy/actions/runs/43763613200"
+   },
    "sections": [
     {
      "id": "why",
@@ -331,13 +367,13 @@
      "id": "install",
      "label": "Install",
      "known": true,
-     "html": "<h3>Arch Linux</h3>\n<pre><code>sudo pacman -S --needed python python-pip git\ngit clone https://github.com/thecyberfarhan/Corsy.git\ncd Corsy\npython -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -r requirements.txt</code></pre>\n<h3>Kali Linux, Parrot OS</h3>\n<pre><code>sudo apt update &amp;&amp; sudo apt install -y python3 python3-pip python3-venv git\ngit clone https://github.com/thecyberfarhan/Corsy.git\ncd Corsy\npython3 -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -r requirements.txt</code></pre>\n<p>Check it worked:</p>\n<pre><code>python3 corsy.py --version</code></pre>\n<p>The virtual environment only needs activating in the shell you use it from. Run <code>deactivate</code>, or open a new terminal, to leave it.</p>"
+     "html": "<h3>Arch Linux</h3>\n<pre><code class=\"language-bash\">sudo pacman -S --needed python python-pip git\ngit clone https://github.com/thecyberfarhan/Corsy.git\ncd Corsy\npython -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -r requirements.txt</code></pre>\n<h3>Kali Linux, Parrot OS</h3>\n<pre><code class=\"language-bash\">sudo apt update &amp;&amp; sudo apt install -y python3 python3-pip python3-venv git\ngit clone https://github.com/thecyberfarhan/Corsy.git\ncd Corsy\npython3 -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -r requirements.txt</code></pre>\n<p>Check it worked:</p>\n<pre><code class=\"language-bash\">python3 corsy.py --version</code></pre>\n<p>The virtual environment only needs activating in the shell you use it from. Run <code>deactivate</code>, or open a new terminal, to leave it.</p>"
     },
     {
      "id": "usage",
      "label": "Usage",
      "known": true,
-     "html": "<h3>Scan one URL</h3>\n<pre><code>python3 corsy.py -u https://example.com/api/me</code></pre>\n<p>Sends the probes to that URL and prints any misconfiguration found.</p>\n<h3>Scan a list of URLs</h3>\n<pre><code>python3 corsy.py -i urls.txt -o results.json</code></pre>\n<p>One URL or bare hostname per line (<code>example.com</code> is treated as <code>https://example.com</code>). Blank lines and lines starting with <code>#</code> are skipped. <code>-o</code> saves the findings as JSON.</p>\n<h3>Pipe targets in from another tool</h3>\n<pre><code>cat urls.txt | python3 corsy.py\nsubfinder -d example.com | httprobe | python3 corsy.py -t 10</code></pre>\n<p>Piped targets are merged with <code>-u</code> and <code>-i</code>, and duplicates are removed.</p>\n<h3>Send traffic through Burp</h3>\n<pre><code>python3 corsy.py -u https://example.com --proxy http://127.0.0.1:8080</code></pre>\n<h3>Authenticated scans</h3>\n<pre><code>python3 corsy.py -u https://example.com/api/me --headers &quot;Cookie: SESSION=abc123\\nUser-Agent: Mozilla/5.0&quot;</code></pre>\n<p>Headers are separated by a literal <code>\\n</code>.</p>\n<h3>Gate a CI job</h3>\n<pre><code>python3 corsy.py -i staging-urls.txt --fail-on-finding -q</code></pre>\n<p>Exits <code>1</code> if anything is found, <code>0</code> if clean, so a pipeline can fail on it.</p>"
+     "html": "<h3>Scan one URL</h3>\n<pre><code class=\"language-bash\">python3 corsy.py -u https://example.com/api/me</code></pre>\n<p>Sends the probes to that URL and prints any misconfiguration found.</p>\n<h3>Scan a list of URLs</h3>\n<pre><code class=\"language-bash\">python3 corsy.py -i urls.txt -o results.json</code></pre>\n<p>One URL or bare hostname per line (<code>example.com</code> is treated as <code>https://example.com</code>). Blank lines and lines starting with <code>#</code> are skipped. <code>-o</code> saves the findings as JSON.</p>\n<h3>Pipe targets in from another tool</h3>\n<pre><code class=\"language-bash\">cat urls.txt | python3 corsy.py\nsubfinder -d example.com | httprobe | python3 corsy.py -t 10</code></pre>\n<p>Piped targets are merged with <code>-u</code> and <code>-i</code>, and duplicates are removed.</p>\n<h3>Send traffic through Burp</h3>\n<pre><code class=\"language-bash\">python3 corsy.py -u https://example.com --proxy http://127.0.0.1:8080</code></pre>\n<h3>Authenticated scans</h3>\n<pre><code class=\"language-bash\">python3 corsy.py -u https://example.com/api/me --headers &quot;Cookie: SESSION=abc123\\nUser-Agent: Mozilla/5.0&quot;</code></pre>\n<p>Headers are separated by a literal <code>\\n</code>.</p>\n<h3>Gate a CI job</h3>\n<pre><code class=\"language-bash\">python3 corsy.py -i staging-urls.txt --fail-on-finding -q</code></pre>\n<p>Exits <code>1</code> if anything is found, <code>0</code> if clean, so a pipeline can fail on it.</p>"
     },
     {
      "id": "options",
@@ -349,7 +385,7 @@
      "id": "example-output",
      "label": "Example output",
      "known": true,
-     "html": "<p>Against a local test server that reflects every Origin:</p>\n<pre><code> + http://127.0.0.1:8911/reflect\n   - Class: origin reflected\n   - Description: This host allows any origin to make requests to it.\n   - Severity: high\n   - Exploitation: Make requests from any domain you control.\n   - ACAO Header: http://example.com\n   - ACAC Header: true</code></pre>\n<p><code>ACAO</code> is <code>Access-Control-Allow-Origin</code> and <code>ACAC</code> is <code>Access-Control-Allow-Credentials</code>. A reflected origin with <code>ACAC: true</code> means another site can read authenticated responses.</p>"
+     "html": "<p>Against a local test server that reflects every Origin:</p>\n<pre><code class=\"language-text\"> + http://127.0.0.1:8911/reflect\n   - Class: origin reflected\n   - Description: This host allows any origin to make requests to it.\n   - Severity: high\n   - Exploitation: Make requests from any domain you control.\n   - ACAO Header: http://example.com\n   - ACAC Header: true</code></pre>\n<p><code>ACAO</code> is <code>Access-Control-Allow-Origin</code> and <code>ACAC</code> is <code>Access-Control-Allow-Credentials</code>. A reflected origin with <code>ACAC: true</code> means another site can read authenticated responses.</p>"
     },
     {
      "id": "what-it-checks",
@@ -379,7 +415,7 @@
      "id": "testing",
      "label": "Testing",
      "known": true,
-     "html": "<pre><code>pip install pytest\npytest -q</code></pre>\n<p>Nine tests start a small local HTTP server that models each misconfiguration and assert that the scanner finds it, that a clean host returns nothing, that two findings never share state, that a hung host times out, and that input parsing behaves. GitHub Actions runs them on Python 3.10, 3.12 and 3.13. Nothing leaves your machine.</p>"
+     "html": "<pre><code class=\"language-bash\">pip install pytest\npytest -q</code></pre>\n<p>Nine tests start a small local HTTP server that models each misconfiguration and assert that the scanner finds it, that a clean host returns nothing, that two findings never share state, that a hung host times out, and that input parsing behaves. GitHub Actions runs them on Python 3.10, 3.12 and 3.13. Nothing leaves your machine.</p>"
     },
     {
      "id": "limitations",
@@ -417,12 +453,21 @@
    "requires": "Python 3.11+",
    "license": "GPL-3.0 (upstream's own licence file; see License)",
    "upstream": "ticarpi/jwt_tool",
-   "upstreamStars": null,
+   "upstreamStars": 6820,
    "scope": "Authorized testing only",
    "skillArea": "Web and API testing",
    "stars": 0,
    "pushedAt": "2026-11-15",
    "href": "https://github.com/thecyberfarhan/jwt_tool",
+   "stats": {
+    "fixes": 3,
+    "additions": 1,
+    "tests": 7
+   },
+   "ci": {
+    "conclusion": "success",
+    "url": "https://github.com/thecyberfarhan/jwt_tool/actions/runs/43763247146"
+   },
    "sections": [
     {
      "id": "why",
@@ -446,13 +491,13 @@
      "id": "install",
      "label": "Install",
      "known": true,
-     "html": "<h3>Arch Linux</h3>\n<pre><code>sudo pacman -S --needed python python-pip git\ngit clone https://github.com/thecyberfarhan/jwt_tool.git\ncd jwt_tool\npython -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -r requirements.txt</code></pre>\n<h3>Kali Linux, Parrot OS</h3>\n<pre><code>sudo apt update &amp;&amp; sudo apt install -y python3 python3-pip python3-venv git\ngit clone https://github.com/thecyberfarhan/jwt_tool.git\ncd jwt_tool\npython3 -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -r requirements.txt</code></pre>\n<p>Check it worked. The first run also creates <code>~/.jwt_tool/jwtconf.ini</code> and a set of test keys:</p>\n<pre><code>python3 jwt_tool.py -h</code></pre>\n<h3>Docker</h3>\n<p>Upstream also publishes a Docker image; this fork's fixes aren't built into it (yet), so for now use the source install above if you want this fork's behaviour.</p>"
+     "html": "<h3>Arch Linux</h3>\n<pre><code class=\"language-bash\">sudo pacman -S --needed python python-pip git\ngit clone https://github.com/thecyberfarhan/jwt_tool.git\ncd jwt_tool\npython -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -r requirements.txt</code></pre>\n<h3>Kali Linux, Parrot OS</h3>\n<pre><code class=\"language-bash\">sudo apt update &amp;&amp; sudo apt install -y python3 python3-pip python3-venv git\ngit clone https://github.com/thecyberfarhan/jwt_tool.git\ncd jwt_tool\npython3 -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -r requirements.txt</code></pre>\n<p>Check it worked. The first run also creates <code>~/.jwt_tool/jwtconf.ini</code> and a set of test keys:</p>\n<pre><code class=\"language-bash\">python3 jwt_tool.py -h</code></pre>\n<h3>Docker</h3>\n<p>Upstream also publishes a Docker image; this fork's fixes aren't built into it (yet), so for now use the source install above if you want this fork's behaviour.</p>"
     },
     {
      "id": "usage",
      "label": "Usage",
      "known": true,
-     "html": "<h3>Read a token's claims</h3>\n<pre><code>python3 jwt_tool.py eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0IiwibmFtZSI6ImFsaWNlIiwicm9sZSI6InVzZXIiLCJpYXQiOjE3MDAwMDAwMDB9.R11xpZc8uimaZMTBmvRCRII-HPbxcVI8QDSKR-DF7EU</code></pre>\n<p>Decodes the header and payload and flags any timestamp claim.</p>\n<h3>Run a playbook scan against a live endpoint</h3>\n<pre><code>python3 jwt_tool.py -t https://example.com/api/me -rc &quot;session=&lt;token&gt;&quot; -M pb</code></pre>\n<p>Replays the request with a battery of tampered tokens (<code>alg:none</code>, blank signature, key confusion, and more) and reports which ones the server still accepts.</p>\n<h3>Tamper a claim and re-sign</h3>\n<pre><code>python3 jwt_tool.py &lt;token&gt; -I -pc role -pv admin -S hs256 -p secret</code></pre>\n<p>Injects <code>role: admin</code> into the payload and signs the result with a known HMAC secret.</p>\n<h3>Crack a weak HMAC secret</h3>\n<pre><code>python3 jwt_tool.py &lt;token&gt; -C -d jwt-common.txt</code></pre>\n<p>Tries every line of the bundled wordlist as the signing secret.</p>\n<h3>Route a live check through Burp</h3>\n<pre><code>python3 jwt_tool.py &lt;token&gt; -t https://example.com/api/me -M pb -P 127.0.0.1:8080</code></pre>"
+     "html": "<h3>Read a token's claims</h3>\n<pre><code class=\"language-bash\">python3 jwt_tool.py eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0IiwibmFtZSI6ImFsaWNlIiwicm9sZSI6InVzZXIiLCJpYXQiOjE3MDAwMDAwMDB9.R11xpZc8uimaZMTBmvRCRII-HPbxcVI8QDSKR-DF7EU</code></pre>\n<p>Decodes the header and payload and flags any timestamp claim.</p>\n<h3>Run a playbook scan against a live endpoint</h3>\n<pre><code class=\"language-bash\">python3 jwt_tool.py -t https://example.com/api/me -rc &quot;session=&lt;token&gt;&quot; -M pb</code></pre>\n<p>Replays the request with a battery of tampered tokens (<code>alg:none</code>, blank signature, key confusion, and more) and reports which ones the server still accepts.</p>\n<h3>Tamper a claim and re-sign</h3>\n<pre><code class=\"language-bash\">python3 jwt_tool.py &lt;token&gt; -I -pc role -pv admin -S hs256 -p secret</code></pre>\n<p>Injects <code>role: admin</code> into the payload and signs the result with a known HMAC secret.</p>\n<h3>Crack a weak HMAC secret</h3>\n<pre><code class=\"language-bash\">python3 jwt_tool.py &lt;token&gt; -C -d jwt-common.txt</code></pre>\n<p>Tries every line of the bundled wordlist as the signing secret.</p>\n<h3>Route a live check through Burp</h3>\n<pre><code class=\"language-bash\">python3 jwt_tool.py &lt;token&gt; -t https://example.com/api/me -M pb -P 127.0.0.1:8080</code></pre>"
     },
     {
      "id": "options",
@@ -464,7 +509,7 @@
      "id": "example-output",
      "label": "Example output",
      "known": true,
-     "html": "<p>Dissecting a sample HS256 token (<code>sub</code>, <code>name</code>, <code>role</code>, <code>iat</code>):</p>\n<pre><code>Token header values:\n[+] alg = &quot;HS256&quot;\n[+] typ = &quot;JWT&quot;\n\nToken payload values:\n[+] sub = &quot;1234&quot;\n[+] name = &quot;alice&quot;\n[+] role = &quot;user&quot;\n[+] iat = 1700000000    ==&gt; TIMESTAMP = 2023-11-15 03:13:20 (UTC)</code></pre>"
+     "html": "<p>Dissecting a sample HS256 token (<code>sub</code>, <code>name</code>, <code>role</code>, <code>iat</code>):</p>\n<pre><code class=\"language-text\">Token header values:\n[+] alg = &quot;HS256&quot;\n[+] typ = &quot;JWT&quot;\n\nToken payload values:\n[+] sub = &quot;1234&quot;\n[+] name = &quot;alice&quot;\n[+] role = &quot;user&quot;\n[+] iat = 1700000000    ==&gt; TIMESTAMP = 2023-11-15 03:13:20 (UTC)</code></pre>"
     },
     {
      "id": "how-it-works",
@@ -488,7 +533,7 @@
      "id": "testing",
      "label": "Testing",
      "known": true,
-     "html": "<pre><code>pip install pytest\npytest -q</code></pre>\n<p>Seven tests run the real <code>jwt_tool.py</code> as a subprocess (an isolated <code>$HOME</code> so the real config is never touched) against crafted tokens: nested/Firebase-style claims, a string-date timestamp, an out-of-range timestamp, a list claim, a normal token with valid expiry, and the <code>-P</code> flag. Each asserts the process produces no traceback. GitHub Actions runs them on Python 3.11, 3.12 and 3.13. Python 3.14 support (the #142 fix) was additionally verified by hand, since no CI runner currently ships it.</p>"
+     "html": "<pre><code class=\"language-bash\">pip install pytest\npytest -q</code></pre>\n<p>Seven tests run the real <code>jwt_tool.py</code> as a subprocess (an isolated <code>$HOME</code> so the real config is never touched) against crafted tokens: nested/Firebase-style claims, a string-date timestamp, an out-of-range timestamp, a list claim, a normal token with valid expiry, and the <code>-P</code> flag. Each asserts the process produces no traceback. GitHub Actions runs them on Python 3.11, 3.12 and 3.13. Python 3.14 support (the #142 fix) was additionally verified by hand, since no CI runner currently ships it.</p>"
     },
     {
      "id": "limitations",
@@ -526,12 +571,18 @@
    "requires": "Python 3.12+ (server side)",
    "license": "BSD-3-Clause",
    "upstream": "CrimsonForge-io/king-phisher",
-   "upstreamStars": null,
+   "upstreamStars": 2614,
    "scope": "Authorized testing only",
    "skillArea": "Social engineering",
    "stars": 0,
    "pushedAt": "2026-11-15",
    "href": "https://github.com/thecyberfarhan/king-phisher",
+   "stats": {
+    "fixes": 2,
+    "additions": 1,
+    "tests": null
+   },
+   "ci": null,
    "sections": [
     {
      "id": "why",
@@ -555,13 +606,13 @@
      "id": "install",
      "label": "Install",
      "known": true,
-     "html": "<p>Two paths: the full install (GTK client + server, needs system packages), or just the Python/dev side this fork's fixes live in, which needs nothing beyond Python.</p>\n<h3>Full install (client + server) — same command on Arch, Kali and Parrot</h3>\n<p><code>tools/install.sh</code> detects your distro and installs whatever system packages it needs (GTK, PostgreSQL, etc.). Unchanged from upstream — see <code>INSTALL.md</code> for the distro-specific detail:</p>\n<pre><code>git clone https://github.com/thecyberfarhan/king-phisher.git\ncd king-phisher\nsudo bash tools/install.sh</code></pre>\n<h3>Just the dev/Python side (this fork's fixes, no GTK needed)</h3>\n<p>Only touches <code>king_phisher.server</code> and the shared code this fork fixed and tested — the GTK client itself still needs the full install above. Same command on Arch, Kali and Parrot once <code>python3</code>, <code>pip</code> and <code>git</code> are installed:</p>\n<pre><code>git clone https://github.com/thecyberfarhan/king-phisher.git\ncd king-phisher\ntools/devshell.sh</code></pre>\n<p>That creates <code>.venv/</code>, installs <code>requirements.txt</code> into it, and drops you into a shell with it active.</p>"
+     "html": "<p>Two paths: the full install (GTK client + server, needs system packages), or just the Python/dev side this fork's fixes live in, which needs nothing beyond Python.</p>\n<h3>Full install (client + server) — same command on Arch, Kali and Parrot</h3>\n<p><code>tools/install.sh</code> detects your distro and installs whatever system packages it needs (GTK, PostgreSQL, etc.). Unchanged from upstream — see <code>INSTALL.md</code> for the distro-specific detail:</p>\n<pre><code class=\"language-bash\">git clone https://github.com/thecyberfarhan/king-phisher.git\ncd king-phisher\nsudo bash tools/install.sh</code></pre>\n<h3>Just the dev/Python side (this fork's fixes, no GTK needed)</h3>\n<p>Only touches <code>king_phisher.server</code> and the shared code this fork fixed and tested — the GTK client itself still needs the full install above. Same command on Arch, Kali and Parrot once <code>python3</code>, <code>pip</code> and <code>git</code> are installed:</p>\n<pre><code class=\"language-bash\">git clone https://github.com/thecyberfarhan/king-phisher.git\ncd king-phisher\ntools/devshell.sh</code></pre>\n<p>That creates <code>.venv/</code>, installs <code>requirements.txt</code> into it, and drops you into a shell with it active.</p>"
     },
     {
      "id": "usage",
      "label": "Usage",
      "known": true,
-     "html": "<h3>Open a dev shell with the fork's dependencies installed</h3>\n<pre><code>tools/devshell.sh</code></pre>\n<h3>Run one command inside that environment without staying in it</h3>\n<pre><code>tools/devshell.sh python3 -c &quot;import king_phisher.server.database.models&quot;</code></pre>\n<h3>Start the server (full install only)</h3>\n<pre><code>king-phisher-server -c server_config.yml</code></pre>\n<p>See upstream's <a href=\"https://github.com/securestate/king-phisher/wiki\" target=\"_blank\" rel=\"noopener noreferrer\">wiki</a> for configuring a campaign, the client, and template files — unchanged in this fork.</p>"
+     "html": "<h3>Open a dev shell with the fork's dependencies installed</h3>\n<pre><code class=\"language-bash\">tools/devshell.sh</code></pre>\n<h3>Run one command inside that environment without staying in it</h3>\n<pre><code class=\"language-bash\">tools/devshell.sh python3 -c &quot;import king_phisher.server.database.models&quot;</code></pre>\n<h3>Start the server (full install only)</h3>\n<pre><code class=\"language-bash\">king-phisher-server -c server_config.yml</code></pre>\n<p>See upstream's <a href=\"https://github.com/securestate/king-phisher/wiki\" target=\"_blank\" rel=\"noopener noreferrer\">wiki</a> for configuring a campaign, the client, and template files — unchanged in this fork.</p>"
     },
     {
      "id": "options",
@@ -629,12 +680,21 @@
    "requires": "Python 3.10+",
    "license": "MIT",
    "upstream": "devanshbatham/ParamSpider",
-   "upstreamStars": null,
+   "upstreamStars": 3210,
    "scope": "Authorized testing only",
    "skillArea": "Tooling and automation",
    "stars": 0,
    "pushedAt": "2026-11-15",
    "href": "https://github.com/thecyberfarhan/ParamSpider",
+   "stats": {
+    "fixes": 4,
+    "additions": 0,
+    "tests": 9
+   },
+   "ci": {
+    "conclusion": "success",
+    "url": "https://github.com/thecyberfarhan/ParamSpider/actions/runs/43767934178"
+   },
    "sections": [
     {
      "id": "why",
@@ -658,13 +718,13 @@
      "id": "install",
      "label": "Install",
      "known": true,
-     "html": "<h3>Arch Linux</h3>\n<pre><code>sudo pacman -S --needed python python-pip git\ngit clone https://github.com/thecyberfarhan/ParamSpider.git\ncd ParamSpider\npython -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -r requirements.txt\npip install -e .</code></pre>\n<h3>Kali Linux, Parrot OS</h3>\n<pre><code>sudo apt update &amp;&amp; sudo apt install -y python3 python3-pip python3-venv git\ngit clone https://github.com/thecyberfarhan/ParamSpider.git\ncd ParamSpider\npython3 -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -r requirements.txt\npip install -e .</code></pre>\n<p>Check it worked:</p>\n<pre><code>paramspider -h</code></pre>\n<p>The virtual environment only needs activating in the shell you use it from. Run <code>deactivate</code>, or open a new terminal, to leave it.</p>"
+     "html": "<h3>Arch Linux</h3>\n<pre><code class=\"language-bash\">sudo pacman -S --needed python python-pip git\ngit clone https://github.com/thecyberfarhan/ParamSpider.git\ncd ParamSpider\npython -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -r requirements.txt\npip install -e .</code></pre>\n<h3>Kali Linux, Parrot OS</h3>\n<pre><code class=\"language-bash\">sudo apt update &amp;&amp; sudo apt install -y python3 python3-pip python3-venv git\ngit clone https://github.com/thecyberfarhan/ParamSpider.git\ncd ParamSpider\npython3 -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -r requirements.txt\npip install -e .</code></pre>\n<p>Check it worked:</p>\n<pre><code class=\"language-bash\">paramspider -h</code></pre>\n<p>The virtual environment only needs activating in the shell you use it from. Run <code>deactivate</code>, or open a new terminal, to leave it.</p>"
     },
     {
      "id": "usage",
      "label": "Usage",
      "known": true,
-     "html": "<h3>Mine one domain</h3>\n<pre><code>paramspider -d example.com</code></pre>\n<p>Writes every parameterised URL found for the domain to <code>results/example.com.txt</code>.</p>\n<h3>Mine a list of domains</h3>\n<pre><code>paramspider -l domains.txt</code></pre>\n<p>One domain per line. A domain the archive never answers is now skipped, not fatal to the rest of the list.</p>\n<h3>Watch the URLs as they're found</h3>\n<pre><code>paramspider -d example.com -s</code></pre>\n<h3>Route through a proxy</h3>\n<pre><code>paramspider -d example.com --proxy '127.0.0.1:8080'</code></pre>\n<h3>Use a reflection marker instead of FUZZ</h3>\n<pre><code>paramspider -d example.com -p '&quot;&gt;&lt;h1&gt;reflection&lt;/h1&gt;'</code></pre>\n<p>Useful for a quick manual XSS sweep over the output file.</p>\n<h3>Give the archive more time to answer</h3>\n<pre><code>paramspider -d example.com -T 60</code></pre>"
+     "html": "<h3>Mine one domain</h3>\n<pre><code class=\"language-bash\">paramspider -d example.com</code></pre>\n<p>Writes every parameterised URL found for the domain to <code>results/example.com.txt</code>.</p>\n<h3>Mine a list of domains</h3>\n<pre><code class=\"language-bash\">paramspider -l domains.txt</code></pre>\n<p>One domain per line. A domain the archive never answers is now skipped, not fatal to the rest of the list.</p>\n<h3>Watch the URLs as they're found</h3>\n<pre><code class=\"language-bash\">paramspider -d example.com -s</code></pre>\n<h3>Route through a proxy</h3>\n<pre><code class=\"language-bash\">paramspider -d example.com --proxy '127.0.0.1:8080'</code></pre>\n<h3>Use a reflection marker instead of FUZZ</h3>\n<pre><code class=\"language-bash\">paramspider -d example.com -p '&quot;&gt;&lt;h1&gt;reflection&lt;/h1&gt;'</code></pre>\n<p>Useful for a quick manual XSS sweep over the output file.</p>\n<h3>Give the archive more time to answer</h3>\n<pre><code class=\"language-bash\">paramspider -d example.com -T 60</code></pre>"
     },
     {
      "id": "options",
@@ -676,7 +736,7 @@
      "id": "example-output",
      "label": "Example output",
      "known": true,
-     "html": "<p>Against a domain with three archived URLs (one an image, one with two empty-value parameters):</p>\n<pre><code>[INFO] Fetching URLs for example.com\n[INFO] Found 3 URLs for example.com\n[INFO] Cleaning URLs for example.com\n[INFO] Found 2 URLs after cleaning\n[INFO] Extracting URLs with parameters\nhttps://example.com/profile?id=FUZZ&amp;debug=FUZZ\nhttps://example.com/search?q=FUZZ&amp;token=FUZZ\n[INFO] Saved cleaned URLs to results/example.com.txt</code></pre>\n<p><code>logo.png?v=2</code> was dropped as a static asset; <code>debug</code> and <code>token</code>, both archived with empty values, are kept.</p>"
+     "html": "<p>Against a domain with three archived URLs (one an image, one with two empty-value parameters):</p>\n<pre><code class=\"language-text\">[INFO] Fetching URLs for example.com\n[INFO] Found 3 URLs for example.com\n[INFO] Cleaning URLs for example.com\n[INFO] Found 2 URLs after cleaning\n[INFO] Extracting URLs with parameters\nhttps://example.com/profile?id=FUZZ&amp;debug=FUZZ\nhttps://example.com/search?q=FUZZ&amp;token=FUZZ\n[INFO] Saved cleaned URLs to results/example.com.txt</code></pre>\n<p><code>logo.png?v=2</code> was dropped as a static asset; <code>debug</code> and <code>token</code>, both archived with empty values, are kept.</p>"
     },
     {
      "id": "what-it-checks",
@@ -706,7 +766,7 @@
      "id": "testing",
      "label": "Testing",
      "known": true,
-     "html": "<pre><code>pip install -r requirements.txt pytest\npytest -q</code></pre>\n<p>9 tests. A local HTTP server backs the timeout/retry tests (one endpoint that never responds, one that always 500s); the URL-cleaning tests run with no network access. GitHub Actions runs them on Python 3.10, 3.12 and 3.13.</p>"
+     "html": "<pre><code class=\"language-bash\">pip install -r requirements.txt pytest\npytest -q</code></pre>\n<p>9 tests. A local HTTP server backs the timeout/retry tests (one endpoint that never responds, one that always 500s); the URL-cleaning tests run with no network access. GitHub Actions runs them on Python 3.10, 3.12 and 3.13.</p>"
     },
     {
      "id": "limitations",
@@ -744,12 +804,18 @@
    "requires": "Python 3.10+",
    "license": "MIT",
    "upstream": "sherlock-project/sherlock",
-   "upstreamStars": null,
+   "upstreamStars": 112856,
    "scope": "Authorized testing only",
    "skillArea": "OSINT",
    "stars": 0,
    "pushedAt": "2026-11-15",
    "href": "https://github.com/thecyberfarhan/sherlock",
+   "stats": {
+    "fixes": 2,
+    "additions": 1,
+    "tests": null
+   },
+   "ci": null,
    "sections": [
     {
      "id": "why",
@@ -773,13 +839,13 @@
      "id": "install",
      "label": "Install",
      "known": true,
-     "html": "<p>This fork isn't on PyPI — that package name points to upstream — so install it from source.</p>\n<h3>Arch Linux</h3>\n<pre><code>sudo pacman -S --needed python python-pip git\ngit clone https://github.com/thecyberfarhan/sherlock.git\ncd sherlock\npython -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -e .</code></pre>\n<h3>Kali Linux, Parrot OS</h3>\n<pre><code>sudo apt update &amp;&amp; sudo apt install -y python3 python3-pip python3-venv git\ngit clone https://github.com/thecyberfarhan/sherlock.git\ncd sherlock\npython3 -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -e .</code></pre>\n<p>Check it worked:</p>\n<pre><code>sherlock --help</code></pre>\n<p>The virtual environment only needs activating in the shell you use it from. Run <code>deactivate</code>, or open a new terminal, to leave it.</p>"
+     "html": "<p>This fork isn't on PyPI — that package name points to upstream — so install it from source.</p>\n<h3>Arch Linux</h3>\n<pre><code class=\"language-bash\">sudo pacman -S --needed python python-pip git\ngit clone https://github.com/thecyberfarhan/sherlock.git\ncd sherlock\npython -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -e .</code></pre>\n<h3>Kali Linux, Parrot OS</h3>\n<pre><code class=\"language-bash\">sudo apt update &amp;&amp; sudo apt install -y python3 python3-pip python3-venv git\ngit clone https://github.com/thecyberfarhan/sherlock.git\ncd sherlock\npython3 -m venv .venv &amp;&amp; source .venv/bin/activate\npip install -e .</code></pre>\n<p>Check it worked:</p>\n<pre><code class=\"language-bash\">sherlock --help</code></pre>\n<p>The virtual environment only needs activating in the shell you use it from. Run <code>deactivate</code>, or open a new terminal, to leave it.</p>"
     },
     {
      "id": "usage",
      "label": "Usage",
      "known": true,
-     "html": "<h3>Check a username, with confidence flagged</h3>\n<pre><code>sherlock --verify someusername</code></pre>\n<p>Re-checks every hit against a canary username; flags the ones that look like false positives.</p>\n<h3>Recover from a slow or rate-limited run</h3>\n<pre><code>sherlock --retry 2 someusername</code></pre>\n<p>Re-checks only the sites that came back <code>Unknown</code>, up to 2 more times.</p>\n<h3>Export a structured report</h3>\n<pre><code>sherlock --verify --export-json results.json someusername\nsherlock --verify --markdown -o results.md someusername</code></pre>\n<h3>Check one or two specific sites</h3>\n<pre><code>sherlock --site GitHub --site Reddit --verify someusername</code></pre>\n<p>For the full site list and the rest of the base tool's flags, see upstream's own README (<code>docs/pyproject/README.md</code>) or the <a href=\"https://sherlock-project.github.io/\" target=\"_blank\" rel=\"noopener noreferrer\">project site</a>.</p>"
+     "html": "<h3>Check a username, with confidence flagged</h3>\n<pre><code class=\"language-bash\">sherlock --verify someusername</code></pre>\n<p>Re-checks every hit against a canary username; flags the ones that look like false positives.</p>\n<h3>Recover from a slow or rate-limited run</h3>\n<pre><code class=\"language-bash\">sherlock --retry 2 someusername</code></pre>\n<p>Re-checks only the sites that came back <code>Unknown</code>, up to 2 more times.</p>\n<h3>Export a structured report</h3>\n<pre><code class=\"language-bash\">sherlock --verify --export-json results.json someusername\nsherlock --verify --markdown -o results.md someusername</code></pre>\n<h3>Check one or two specific sites</h3>\n<pre><code class=\"language-bash\">sherlock --site GitHub --site Reddit --verify someusername</code></pre>\n<p>For the full site list and the rest of the base tool's flags, see upstream's own README (<code>docs/pyproject/README.md</code>) or the <a href=\"https://sherlock-project.github.io/\" target=\"_blank\" rel=\"noopener noreferrer\">project site</a>.</p>"
     },
     {
      "id": "options",
@@ -791,7 +857,7 @@
      "id": "example-output",
      "label": "Example output",
      "known": true,
-     "html": "<p>Checking a real username against two sites, with <code>--verify</code>:</p>\n<pre><code>$ sherlock --site GitHub --site Reddit --verify torvalds\n\n[+] GitHub: https://www.github.com/torvalds\n[+] Reddit: https://www.reddit.com/user/torvalds\n[*] Verifying 2 claimed result(s) against a canary username...\n[!] Reddit: likely false positive (a random, unregistered username also came back &quot;claimed&quot; here)\n\n[*] Search completed with 2 results</code></pre>\n<p>GitHub's detection held up. Reddit's didn't: a random, near-certainly-unregistered username also came back <code>CLAIMED</code> there, so the real result is flagged instead of presented as confident.</p>\n<p>A <code>--retry</code> run recovering from a dead proxy:</p>\n<pre><code>$ sherlock --site GitHub --proxy http://dead-proxy:1 --retry 2 torvalds\n\n[*] Checking username torvalds on:\n\n[*] Retrying 1 site(s) that returned Unknown (attempt 1/2)...\n[*] Checking username torvalds on:\n\n[*] Retrying 1 site(s) that returned Unknown (attempt 2/2)...</code></pre>\n<p>A <code>--markdown</code> report, low confidence flagged inline:</p>\n<pre><code>| Site | Status | URL |\n| --- | --- | --- |\n| GitHub | Claimed | [https://www.github.com/torvalds](https://www.github.com/torvalds) |\n| Reddit | Claimed ⚠️ low confidence | [https://www.reddit.com/user/torvalds](https://www.reddit.com/user/torvalds) |</code></pre>"
+     "html": "<p>Checking a real username against two sites, with <code>--verify</code>:</p>\n<pre><code class=\"language-text\">$ sherlock --site GitHub --site Reddit --verify torvalds\n\n[+] GitHub: https://www.github.com/torvalds\n[+] Reddit: https://www.reddit.com/user/torvalds\n[*] Verifying 2 claimed result(s) against a canary username...\n[!] Reddit: likely false positive (a random, unregistered username also came back &quot;claimed&quot; here)\n\n[*] Search completed with 2 results</code></pre>\n<p>GitHub's detection held up. Reddit's didn't: a random, near-certainly-unregistered username also came back <code>CLAIMED</code> there, so the real result is flagged instead of presented as confident.</p>\n<p>A <code>--retry</code> run recovering from a dead proxy:</p>\n<pre><code class=\"language-text\">$ sherlock --site GitHub --proxy http://dead-proxy:1 --retry 2 torvalds\n\n[*] Checking username torvalds on:\n\n[*] Retrying 1 site(s) that returned Unknown (attempt 1/2)...\n[*] Checking username torvalds on:\n\n[*] Retrying 1 site(s) that returned Unknown (attempt 2/2)...</code></pre>\n<p>A <code>--markdown</code> report, low confidence flagged inline:</p>\n<pre><code class=\"language-text\">| Site | Status | URL |\n| --- | --- | --- |\n| GitHub | Claimed | [https://www.github.com/torvalds](https://www.github.com/torvalds) |\n| Reddit | Claimed ⚠️ low confidence | [https://www.reddit.com/user/torvalds](https://www.reddit.com/user/torvalds) |</code></pre>"
     },
     {
      "id": "how-it-works",
@@ -859,6 +925,12 @@
    "stars": 0,
    "pushedAt": "2026-11-15",
    "href": "https://github.com/thecyberfarhan/lab-reports",
+   "stats": {
+    "fixes": 0,
+    "additions": 0,
+    "tests": null
+   },
+   "ci": null,
    "sections": [
     {
      "id": "why",

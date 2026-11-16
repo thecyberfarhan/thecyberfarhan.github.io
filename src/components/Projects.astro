@@ -30,7 +30,7 @@ const repo = (p: (typeof PROJECTS)[number]) => (p.href ? p.href.replace('https:/
               <span class="sheet" aria-hidden="true"><b>Case {String(i + 1).padStart(2, '0')}</b><span>{repo(p)}</span></span>
               <span class="front">
                 <span class="top"><span class="status">{p.status}</span>{href && <span class="go" aria-hidden="true">↗</span>}</span>
-                <h3>{p.name}</h3>
+                <h3 style={p.slug ? `view-transition-name: p-${p.slug}` : undefined}>{p.name}</h3>
                 <p>{p.tagline}</p>
                 <ul class="tags">{[p.language, p.skillArea].filter(Boolean).map((t) => <li>{t}</li>)}</ul>
               </span>

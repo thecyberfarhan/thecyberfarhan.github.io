@@ -36,7 +36,7 @@ const description = `All ${writeups.length} of Farhan Hussain's TryHackMe and Ha
         <li data-enter={i < 10 ? '' : undefined} data-platform={w.platform} data-level={w.difficulty ?? ''} data-search={`${w.title} ${w.summary} ${w.takeaway} ${w.tools.join(' ')}`.toLowerCase()}>
           <a href={`/writeups/${w.slug}.html`} style={`--tone:${toneOf(w.difficulty)}`}>
             <span class="plat">{w.platform}</span>
-            <span class="t">{w.title}<small>{w.summary}</small></span>
+            <span class="t"><span class="nm" style={`view-transition-name: w-${w.slug}`}>{w.title}</span><small>{w.summary}</small></span>
             <span class="meta"><span class="lvl">{w.difficulty ?? 'Lab'}</span><time datetime={w.date ?? undefined}>{fmtDate(w.date)}</time></span>
           </a>
         </li>
@@ -68,6 +68,7 @@ const description = `All ${writeups.length} of Farhan Hussain's TryHackMe and Ha
   .list a:hover .t { color: var(--tone-ink); }
   .plat { font: 500 11.5px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
   .t { font: 400 1.5rem/1.2 var(--serif); letter-spacing: -0.01em; transition: color 0.25s; }
+  .nm { display: inline-block; }
   .t small { display: block; font: 400 15px/1.55 var(--sans); color: var(--muted); margin-top: 6px; max-width: 66ch; }
   .meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
   .lvl { font: 500 12px var(--mono); color: var(--tone-ink); border: 1px solid color-mix(in srgb, var(--tone) 45%, transparent); padding: 3px 9px; border-radius: 999px; white-space: nowrap; }

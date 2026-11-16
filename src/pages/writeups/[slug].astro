@@ -1,5 +1,6 @@
 ---
 import { keepCodeTogether } from '../../lib/inline-code';
+import { highlightBlocks } from '../../lib/highlight';
 import Base from '../../layouts/Base.astro';
 import { writeups, toneOf, fmtDate, SITE, toolName, type Writeup } from '../../data/site';
 
@@ -16,6 +17,8 @@ const tone = toneOf(w.difficulty);
 const words = [w.tldrHtml, ...w.sections.map((s) => s.html), w.takeawayHtml, w.againHtml].join(' ').replace(/<[^>]+>/g, ' ').split(/\s+/).length;
 const minutes = Math.max(2, Math.round(words / 220));
 const path = `/writeups/${w.slug}.html`;
+const sections = await Promise.all(w.sections.map(async (s) => ({ ...s, html: await highlightBlocks(keepCodeTogether(s.html)) })));
+const againHtml = w.againHtml ? await highlightBlocks(keepCodeTogether(w.againHtml)) : '';
 const description = w.summary;
 const jsonld = {
   '@context': 'https://schema.org',
@@ -41,7 +44,7 @@ const toc = [
     <header class="head" data-enter="kids">
       <a class="back label" href="/writeups/">← All writeups</a>
       <p class="label kicker">{w.platform} writeup</p>
-      <h1>{w.title}</h1>
+      <h1 style={`view-transition-name: w-${w.slug}`}>{w.title}</h1>
       <ul class="meta">
         {w.difficulty && <li class="lvl">{w.difficulty}</li>}
         {w.date && <li><time datetime={w.date}>{fmtDate(w.date)}</time></li>}
@@ -74,16 +77,16 @@ const toc = [
             <a class="link-arrow" href={w.github} target="_blank" rel="noopener">Read it on GitHub ↗</a>
           </section>
         )}
-        {w.sections.map((s) => (
+        {sections.map((s) => (
           <section id={s.id}>
             <h2>{s.label}</h2>
-            <Fragment set:html={keepCodeTogether(s.html)} />
+            <Fragment set:html={s.html} />
           </section>
         ))}
         {w.takeawayHtml
           ? <section id="takeaway" class="takeaway" data-scout="takeaway"><p class="label">Key takeaway</p><p set:html={keepCodeTogether(w.takeawayHtml)} /></section>
           : <section class="missing"><p class="label">Key takeaway · not written yet</p><p>The takeaway so far is that Farhan owes this page a takeaway. It is on the list.</p></section>}
-        {w.againHtml && <section id="again"><h2>If I did it again</h2><Fragment set:html={keepCodeTogether(w.againHtml)} /></section>}
+        {w.againHtml && <section id="again"><h2>If I did it again</h2><Fragment set:html={againHtml} /></section>}
 
         <div class="end">
           <a class="btn solid" href={w.github} target="_blank" rel="noopener">Full writeup on GitHub ↗</a>
@@ -196,7 +199,10 @@ const toc = [
   animate(bar, { scaleX: [0, 1], ease: 'linear', autoplay: onScroll({ target: prose, enter: 'start start', leave: 'end end', sync: true }) });
 
   if (!reduced) {
-    animate('.head > *', { opacity: [0, 1], y: [18, 0], duration: 800, delay: stagger(80), ease: 'outQuart' });
+    // arriving from another page of the site, the title morphs in through the view transition
+    const morphed = 'onpagereveal' in window && document.referrer.startsWith(location.origin);
+  if (morphed) document.querySelector<HTMLElement>('.head h1')!.style.opacity = '1';
+    animate(morphed ? '.head > :not(h1)' : '.head > *', { opacity: [0, 1], y: [18, 0], duration: 800, delay: stagger(80), ease: 'outQuart' });
   }
 
   // copy buttons on every code block

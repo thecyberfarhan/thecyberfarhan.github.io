@@ -36,7 +36,7 @@ const description = `All ${syncedProjects.length} of Farhan Hussain's public sec
         <li data-enter={i < 10 ? '' : undefined} data-kind={p.kind} data-skill={p.skillArea} data-search={`${p.name} ${p.tagline} ${p.skillArea} ${p.language ?? ''}`.toLowerCase()}>
           <a href={`/projects/${p.slug}.html`} style={`--tone:${TONE[p.kind]}`}>
             <span class="plat">{p.kind}</span>
-            <span class="t">{p.name}<small>{p.tagline}</small></span>
+            <span class="t"><span class="nm" style={`view-transition-name: p-${p.slug}`}>{p.name}</span><small>{p.tagline}</small></span>
             <span class="meta"><span class="lvl">{p.skillArea}</span>{p.stars ? <span class="stars">{p.stars.toLocaleString()}★ upstream</span> : null}</span>
           </a>
         </li>
@@ -68,6 +68,7 @@ const description = `All ${syncedProjects.length} of Farhan Hussain's public sec
   .list a:hover .t { color: var(--tone-ink); }
   .plat { font: 500 11.5px var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
   .t { font: 400 1.5rem/1.2 var(--serif); letter-spacing: -0.01em; transition: color 0.25s; }
+  .nm { display: inline-block; }
   .t small { display: block; font: 400 15px/1.55 var(--sans); color: var(--muted); margin-top: 6px; max-width: 66ch; }
   .meta { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
   .lvl { font: 500 12px var(--mono); color: var(--tone-ink); border: 1px solid color-mix(in srgb, var(--tone) 45%, transparent); padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
