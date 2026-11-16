@@ -1,4 +1,5 @@
 ---
+import { keepCodeTogether } from '../../lib/inline-code';
 import Base from '../../layouts/Base.astro';
 import { writeups, toneOf, fmtDate, SITE, toolName, type Writeup } from '../../data/site';
 
@@ -64,7 +65,7 @@ const toc = [
 
       <div class="prose" id="prose">
         {w.tldrHtml
-          ? <section id="tldr" class="tldr" data-scout="tldr"><p class="label">TL;DR</p><p set:html={w.tldrHtml} /></section>
+          ? <section id="tldr" class="tldr" data-scout="tldr"><p class="label">TL;DR</p><p set:html={keepCodeTogether(w.tldrHtml)} /></section>
           : <section class="missing"><p class="label">TL;DR · not found</p><p>No short version for this one. You will have to read the whole thing, like it is 2009.</p></section>}
         {w.sections.length === 0 && (
           <section class="missing broken">
@@ -76,13 +77,13 @@ const toc = [
         {w.sections.map((s) => (
           <section id={s.id}>
             <h2>{s.label}</h2>
-            <Fragment set:html={s.html} />
+            <Fragment set:html={keepCodeTogether(s.html)} />
           </section>
         ))}
         {w.takeawayHtml
-          ? <section id="takeaway" class="takeaway" data-scout="takeaway"><p class="label">Key takeaway</p><p set:html={w.takeawayHtml} /></section>
+          ? <section id="takeaway" class="takeaway" data-scout="takeaway"><p class="label">Key takeaway</p><p set:html={keepCodeTogether(w.takeawayHtml)} /></section>
           : <section class="missing"><p class="label">Key takeaway · not written yet</p><p>The takeaway so far is that Farhan owes this page a takeaway. It is on the list.</p></section>}
-        {w.againHtml && <section id="again"><h2>If I did it again</h2><Fragment set:html={w.againHtml} /></section>}
+        {w.againHtml && <section id="again"><h2>If I did it again</h2><Fragment set:html={keepCodeTogether(w.againHtml)} /></section>}
 
         <div class="end">
           <a class="btn solid" href={w.github} target="_blank" rel="noopener">Full writeup on GitHub ↗</a>
@@ -109,7 +110,7 @@ const toc = [
   .tools .none { margin-top: 10px; font-size: 13.5px; color: var(--muted); }
   .progress { position: fixed; inset: 0 0 auto; height: 3px; z-index: 60; }
   .progress span { display: block; height: 100%; width: 100%; background: var(--tone); transform: scaleX(0); transform-origin: left; }
-  .doc { padding-top: clamp(110px, 13vw, 150px); }
+  .doc { padding-top: clamp(110px, 13vw, 150px); padding-bottom: clamp(80px, 10vw, 120px); }
   .back { text-decoration: none; display: inline-block; margin-bottom: 34px; }
   .back:hover { color: var(--accent); }
   .kicker { color: var(--tone-ink); }
@@ -141,7 +142,8 @@ const toc = [
   .prose :global(a:not(.btn)) { color: var(--ink); text-underline-offset: 3px; text-decoration-color: var(--rule-strong); }
   .prose :global(a:hover) { text-decoration-color: var(--tone); }
   .prose :global(strong) { color: var(--ink); font-weight: 600; }
-  .prose :global(code) { font: 500 0.86em var(--mono); background: var(--paper-2); color: var(--ink); padding: 2px 6px; border-radius: 5px; }
+  .prose :global(code) { font: 500 0.86em var(--mono); background: var(--paper-2); color: var(--ink); padding: 2px 6px; border-radius: 5px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+  .prose :global(code.nw) { white-space: nowrap; }
   .prose :global(pre) { position: relative; margin: 0 0 22px; padding: 18px 18px; background: var(--code-bg); color: var(--code-fg); border-radius: 12px; overflow-x: auto; font: 13px/1.65 var(--mono); }
   .prose :global(pre code) { background: none; color: inherit; padding: 0; font-size: inherit; }
   .prose :global(.copy) { position: absolute; top: 8px; right: 8px; font: 500 11px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 10px; border-radius: 6px; background: #2c2f36; color: #c9c6bf; opacity: 0; transition: opacity 0.2s, background 0.2s; }

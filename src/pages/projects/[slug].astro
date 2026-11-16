@@ -1,4 +1,5 @@
 ---
+import { keepCodeTogether } from '../../lib/inline-code';
 import Base from '../../layouts/Base.astro';
 import Contact from '../../components/Contact.astro';
 import { syncedProjects, SITE, type SyncedProject } from '../../data/site';
@@ -65,14 +66,14 @@ const repoPath = p.href.replace('https://github.com/', '');
           <p class="label">At a glance</p>
           <dl>{facts.map(([k, v]) => <div><dt>{k}</dt><dd>{v}</dd></div>)}</dl>
         </div>
-        <a class="btn solid sm gh" href={p.href} target="_blank" rel="noopener">View {repoPath} on GitHub ↗</a>
+        <a class="btn solid sm gh" href={p.href} target="_blank" rel="noopener" title={`${repoPath} on GitHub`}>View on GitHub ↗</a>
       </aside>
 
       <div class="prose" id="prose">
         {p.sections.map((s) => (
           <section id={s.id}>
             <h2>{s.label}</h2>
-            <Fragment set:html={s.html} />
+            <Fragment set:html={keepCodeTogether(s.html)} />
           </section>
         ))}
 
@@ -93,7 +94,7 @@ const repoPath = p.href.replace('https://github.com/', '');
 <style>
   .progress { position: fixed; inset: 0 0 auto; height: 3px; z-index: 60; }
   .progress span { display: block; height: 100%; width: 100%; background: var(--tone); transform: scaleX(0); transform-origin: left; }
-  .doc { padding-top: clamp(110px, 13vw, 150px); }
+  .doc { padding-top: clamp(110px, 13vw, 150px); padding-bottom: clamp(80px, 10vw, 120px); }
   .back { text-decoration: none; display: inline-block; margin-bottom: 34px; }
   .back:hover { color: var(--accent); }
   .kicker { color: var(--tone-ink); }
@@ -116,7 +117,7 @@ const repoPath = p.href.replace('https://github.com/', '');
   .facts div { display: flex; flex-direction: column; gap: 2px; }
   .facts dt { font: 500 10.5px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
   .facts dd { font-size: 14px; color: var(--ink); overflow-wrap: anywhere; }
-  .gh { font-size: 13px; text-align: center; }
+  .gh { font-size: 13px; justify-content: center; text-align: center; }
 
   .prose { max-width: 720px; font-size: 17px; line-height: 1.75; color: var(--soft); }
   .prose section { scroll-margin-top: 90px; }
@@ -128,7 +129,8 @@ const repoPath = p.href.replace('https://github.com/', '');
   .prose :global(a:not(.btn)) { color: var(--ink); text-underline-offset: 3px; text-decoration-color: var(--rule-strong); }
   .prose :global(a:hover) { text-decoration-color: var(--tone); }
   .prose :global(strong) { color: var(--ink); font-weight: 600; }
-  .prose :global(code) { font: 500 0.86em var(--mono); background: var(--paper-2); color: var(--ink); padding: 2px 6px; border-radius: 5px; }
+  .prose :global(code) { font: 500 0.86em var(--mono); background: var(--paper-2); color: var(--ink); padding: 2px 6px; border-radius: 5px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+  .prose :global(code.nw) { white-space: nowrap; }
   .prose :global(pre) { position: relative; margin: 0 0 22px; padding: 18px 18px; background: var(--code-bg); color: var(--code-fg); border-radius: 12px; overflow-x: auto; font: 13px/1.65 var(--mono); }
   .prose :global(pre code) { background: none; color: inherit; padding: 0; font-size: inherit; }
   .prose :global(.copy) { position: absolute; top: 8px; right: 8px; font: 500 11px var(--mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 10px; border-radius: 6px; background: #2c2f36; color: #c9c6bf; opacity: 0; transition: opacity 0.2s, background 0.2s; }
