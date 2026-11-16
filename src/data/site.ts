@@ -90,6 +90,7 @@ export const JOURNEY: Stop[] = [
   { kind: 'main', when: '2025', title: 'Penetration testing', body: 'Near the end of intermediate I found penetration testing, and this time it stuck.' },
   { kind: 'main', when: 'Practice', title: 'Labs and public CTFs', body: 'TryHackMe, Hack The Box, PicoCTF, PortSwigger and Hacker101. Every box I finished became a written report, and the repetitive parts became Python and Bash tools.' },
   { kind: 'main', when: '2026', title: 'CPENT certified', body: 'EC-Council Certified Penetration Testing Professional.' },
+  { kind: 'main', when: 'Nov 2026', title: '1st place — SHINGEKI CTF', body: 'Took first place as a team at SHINGEKI CTF 2026 (Faseel Community), scoring 2,950 of 3,550 points.' },
   { kind: 'main', when: 'Now', title: 'Open to work', body: 'One to two years of hands-on offensive security practice, ready to join a team and learn from real engagements.' },
 ];
 
