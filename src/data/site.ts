@@ -10,7 +10,7 @@ export const SITE = {
   role: 'Penetration tester',
   focus: 'Web & API',
   email: 'farhan736hussain@gmail.com',
-  resume: '/assets/Farhan_Hussain_Resume_2026-11-04.pdf',
+  resume: '/assets/Farhan_Hussain_Resume_2026-11-16.pdf',
   report: '/assets/Sample_Pentest_Report.pdf',
   appendix: '/assets/Sample_Technical_Appendix.pdf',
   linkedin: 'https://www.linkedin.com/in/cyber-farhan-hussain/',
