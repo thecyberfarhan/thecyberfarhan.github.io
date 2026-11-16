@@ -102,7 +102,12 @@ const repoPath = p.href.replace('https://github.com/', '');
   .meta { list-style: none; display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; font-size: 14px; color: var(--muted); padding-bottom: 30px; border-bottom: 1px solid var(--ink); }
   .meta .lvl { font: 500 12.5px var(--mono); color: var(--tone-ink); border: 1px solid color-mix(in srgb, var(--tone) 50%, transparent); padding: 4px 11px; border-radius: 999px; }
   .layout { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: clamp(30px, 5vw, 70px); margin-top: 44px; }
-  .side { position: sticky; top: 96px; align-self: start; display: flex; flex-direction: column; gap: 28px; max-height: calc(100vh - 120px); overflow: auto; }
+  .side { position: sticky; top: 96px; align-self: start; display: flex; flex-direction: column; gap: 28px; max-height: calc(100vh - 120px); overflow: hidden auto; overscroll-behavior: contain; scrollbar-width: none; padding-left: 2px; }
+  .side::-webkit-scrollbar { display: none; }
+  /* no visible scrollbar: the edge that still has more to show fades out instead */
+  .side.more-down { mask-image: linear-gradient(#000 calc(100% - 56px), transparent); }
+  .side.more-up { mask-image: linear-gradient(transparent, #000 56px); }
+  .side.more-up.more-down { mask-image: linear-gradient(transparent, #000 56px, #000 calc(100% - 56px), transparent); }
   .toc ol { list-style: none; margin-top: 12px; border-left: 1px solid var(--rule); }
   .toc a { display: block; padding: 6px 0 6px 14px; margin-left: -1px; border-left: 2px solid transparent; font-size: 14px; color: var(--muted); text-decoration: none; transition: color 0.2s, border-color 0.2s; }
   .toc a:hover { color: var(--ink); }
@@ -160,6 +165,7 @@ const repoPath = p.href.replace('https://github.com/', '');
 <script>
   import { animate, onScroll, stagger } from 'animejs';
   import { reduced } from '../../scripts/motion';
+  import { initSidePanel } from '../../scripts/side-panel';
 
   const bar = document.getElementById('bar')!;
   const prose = document.getElementById('prose')!;
@@ -186,12 +192,15 @@ const repoPath = p.href.replace('https://github.com/', '');
     pre.appendChild(b);
   });
 
+  const follow = initSidePanel(document.querySelector<HTMLElement>('.side')!);
   const links = new Map([...document.querySelectorAll<HTMLAnchorElement>('.toc a')].map((a) => [a.hash.slice(1), a]));
   const io = new IntersectionObserver((entries) => {
     entries.forEach((e) => {
       if (!e.isIntersecting) return;
       links.forEach((a) => a.classList.remove('on'));
-      links.get(e.target.id)?.classList.add('on');
+      const on = links.get(e.target.id);
+      on?.classList.add('on');
+      follow(on);
     });
   }, { rootMargin: '-30% 0px -60% 0px' });
   prose.querySelectorAll('section[id]').forEach((s) => io.observe(s));

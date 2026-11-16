@@ -80,6 +80,15 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 ::selection { background: var(--accent); color: var(--on-accent); }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
 
+/* every scroll area on the site (page, code blocks, tables, lab terminal) gets a thin bar in the
+   theme's own colours instead of the browser's grey default */
+html, * { scrollbar-width: thin; scrollbar-color: var(--rule-strong) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--rule-strong); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: var(--muted); }
+::-webkit-scrollbar-corner { background: transparent; }
+
 .wrap { max-width: var(--wrap); margin: 0 auto; padding: 0 var(--gutter); }
 .label {
   font: 500 11.5px/1.4 var(--mono);
