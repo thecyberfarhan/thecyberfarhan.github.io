@@ -62,7 +62,7 @@ const NOTES = [
 
   <div class="wrap">
     <dl class="creds" data-count>
-      <div class="h-cred" data-scout="cpent"><dt>EC-Council certified · <a class="verify" href={SITE.certVerify} target="_blank" rel="noopener">verify ↗</a></dt><dd>CPENT</dd></div>
+      <div class="h-cred" data-scout="cpent"><dt>EC-Council certified · <a class="verify" href={SITE.certVerify} target="_blank" rel="noopener" data-cert={SITE.certId}>verify ↗</a><span class="verify-hint" role="status" aria-live="polite" hidden></span></dt><dd>CPENT</dd></div>
       <div class="h-cred" data-scout="rank"><dt>TryHackMe global ranking</dt><dd>Top <span data-to={STATS.thmRank}>{STATS.thmRank}</span>%</dd></div>
       <div class="h-cred" data-scout="rooms"><dt>Hands-on labs completed</dt><dd><span data-to={STATS.rooms}>{STATS.rooms}</span>+</dd></div>
       <div class="h-cred"><dt>Published writeups</dt><dd><span data-to={STATS.writeups}>{STATS.writeups}</span></dd></div>
@@ -120,6 +120,8 @@ const NOTES = [
 
   .verify { color: var(--accent); text-decoration: none; }
   .verify:hover { text-decoration: underline; }
+  .verify-hint { margin-left: 8px; color: var(--accent); font-size: 11px; font-family: var(--mono); letter-spacing: 0.04em; opacity: 0; transition: opacity 0.2s var(--ease-out); }
+  .verify-hint[data-show] { opacity: 1; }
   .creds { position: relative; z-index: 3; display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--ink); background: linear-gradient(to bottom, var(--paper), color-mix(in srgb, var(--paper) 0%, transparent)); }
   .creds div { position: relative; display: flex; flex-direction: column-reverse; justify-content: flex-end; padding: 18px 18px 28px 0; border-right: 1px solid var(--rule); }
   .creds div::before { content: ''; position: absolute; left: 0; top: -1px; width: 0; height: 2px; background: var(--accent); transition: width 0.5s var(--ease-out); }
@@ -155,6 +157,26 @@ const NOTES = [
   const fig = document.getElementById('fig')!;
   const svg = fig.querySelector<SVGSVGElement>('.marks')!;
   const notes = [...fig.querySelectorAll<HTMLElement>('.note')];
+
+  // verify link: copy the one thing the Aspen form needs (the certificate ID) before it opens, so it's ready to paste
+  const verify = document.querySelector<HTMLAnchorElement>('.verify[data-cert]');
+  const hint = verify?.parentElement?.querySelector<HTMLElement>('.verify-hint');
+  if (verify && hint) {
+    let clear: number | undefined;
+    verify.addEventListener('click', async () => {
+      const id = verify.dataset.cert!;
+      let ok = false;
+      try { await navigator.clipboard.writeText(id); ok = true; } catch { ok = false; }
+      hint.hidden = false;
+      hint.textContent = ok ? `copied ${id} — paste it in the ID field` : `certificate ID: ${id}`;
+      hint.setAttribute('data-show', '');
+      clearTimeout(clear);
+      clear = window.setTimeout(() => {
+        hint.removeAttribute('data-show');
+        clear = window.setTimeout(() => (hint.hidden = true), 250);
+      }, 4000);
+    });
+  }
 
   // leader lines: from each anchor dot to the nearest edge of its card, in the svg's 1000 x 1309 space
   function drawLeaders() {
