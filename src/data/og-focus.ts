@@ -40,6 +40,7 @@ export const WRITEUP_FOCUS: Record<string, string> = {
   silverplatter: 'Silverpeas IDOR, password in logs, root',
   simplectf: 'CMS Made Simple SQLi, sudo vim to root',
   source: 'Webmin RCE (CVE-2019-15107) to root',
+  takeoff: 'SSTI secret leak, forged ticket, n8n to root',
   team: 'vhost recon, LFI log poisoning to root',
   tomghost: 'Ghostcat AJP file read, sudo zip to root',
   ultratech: 'API command injection, Docker group to root',
