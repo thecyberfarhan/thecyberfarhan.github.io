@@ -3,6 +3,7 @@
 // sharing one banner. Rendered from vendored assets through resvg, so the build
 // never fetches anything at runtime. New pages get a card automatically.
 import { Resvg } from '@resvg/resvg-js';
+import sharp from 'sharp';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -50,7 +51,7 @@ export interface OgCardInput {
   badgeColor: string;
 }
 
-export function ogCardPng({ kicker, title, summary, badge, badgeColor }: OgCardInput): Buffer {
+export async function ogCardImage({ kicker, title, summary, badge, badgeColor }: OgCardInput): Promise<Buffer> {
   title = deDash(title);
   summary = deDash(summary);
 
@@ -103,10 +104,13 @@ export function ogCardPng({ kicker, title, summary, badge, badgeColor }: OgCardI
   <text x="166" y="578" font-family="Inter" font-weight="400" font-size="22" fill="#7e8a99">Penetration Tester  ·  thecyberfarhan.github.io</text>
 </svg>`;
 
-  return new Resvg(svg, {
+  const png = new Resvg(svg, {
     fitTo: { mode: 'width', value: 1200 },
     font: { fontFiles: FONT_FILES, loadSystemFonts: false, defaultFontFamily: 'Inter' },
   })
     .render()
     .asPng();
+  // Flatten to JPEG (no alpha channel): some platforms, LinkedIn included,
+  // reject RGBA PNGs with "no image found".
+  return sharp(png).flatten({ background: '#0d1117' }).jpeg({ quality: 86, chromaSubsampling: '4:4:4' }).toBuffer();
 }

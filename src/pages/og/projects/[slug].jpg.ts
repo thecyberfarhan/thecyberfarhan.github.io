@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { syncedProjects } from '../../../data/site';
-import { ogCardPng } from '../../../lib/og-card';
+import { ogCardImage } from '../../../lib/og-card';
 
 const KIND: Record<string, string> = { Original: 'TOOL', Fork: 'FORK', 'Field note': 'NOTE' };
 
@@ -17,7 +17,7 @@ export function getStaticPaths() {
   }));
 }
 
-export const GET: APIRoute = ({ props }) =>
-  new Response(new Uint8Array(ogCardPng(props as any)), {
-    headers: { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=31536000, immutable' },
+export const GET: APIRoute = async ({ props }) =>
+  new Response(new Uint8Array(await ogCardImage(props as any)), {
+    headers: { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=31536000, immutable' },
   });
