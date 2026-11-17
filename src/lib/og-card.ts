@@ -88,11 +88,17 @@ export async function ogCardImage({ platform, title, tag, tagColor, focus }: OgC
   <text x="600" y="586" text-anchor="middle" font-family="Inter" font-weight="400" font-size="24" fill="#5f6b7a">thecyberfarhan.github.io</text>
 </svg>`;
 
+  // Supersample: render at 2x and downscale with lanczos3 for crisp text
+  // edges, then flatten to high-quality mozjpeg (no alpha).
   const png = new Resvg(svg, {
-    fitTo: { mode: 'width', value: 1200 },
+    fitTo: { mode: 'width', value: 2400 },
     font: { fontFiles: FONT_FILES, loadSystemFonts: false, defaultFontFamily: 'Inter' },
   })
     .render()
     .asPng();
-  return sharp(png).flatten({ background: '#0d1117' }).jpeg({ quality: 88, chromaSubsampling: '4:4:4' }).toBuffer();
+  return sharp(png)
+    .resize(1200, 630, { kernel: 'lanczos3' })
+    .flatten({ background: '#0d1117' })
+    .jpeg({ quality: 92, chromaSubsampling: '4:4:4', mozjpeg: true })
+    .toBuffer();
 }
