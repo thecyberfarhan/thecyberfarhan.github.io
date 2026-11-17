@@ -1,9 +1,12 @@
 // Build-time Open Graph card generator. Each writeup/project page gets its own
-// 1200x630 card so link previews are distinct and, crucially, READABLE at the
-// small size LinkedIn shows for organic link posts. The card is a centered
-// mini-poster: a platform/difficulty kicker, the name, and a one-line focus
-// (what you'll learn). Rendered with resvg from vendored Inter, flattened to
-// JPEG (no alpha — LinkedIn rejects RGBA PNGs). Automatic for every page.
+// 1200x630 card so link previews are distinct and READABLE at the small size
+// LinkedIn shows for organic link posts. Writeups render as an attack chain: a
+// kicker (name / platform / difficulty) and a vertical timeline of 3-4 big
+// steps, foothold to root, the final node in the difficulty colour. Pages with
+// no chain (projects, anything new) fall back to one big editorial line. No
+// website URL or brand text: it reads at a glance, nothing small. Rendered with
+// resvg from vendored Inter, supersampled 2x and flattened to JPEG (no alpha,
+// which LinkedIn rejects). Automatic for every page.
 import { Resvg } from '@resvg/resvg-js';
 import sharp from 'sharp';
 import { join } from 'node:path';
@@ -40,56 +43,79 @@ function wrap(text: string, max: number, maxLines: number): string[] {
 }
 
 export interface OgCardInput {
-  platform: string;    // "TryHackMe" or "Open source · Fork"
-  title: string;       // box / tool name
+  platform: string;    // "TryHackMe", "Hack The Box", "Open source · Fork"
+  title: string;       // box / tool name, shown in the kicker
   tag: string;         // difficulty or language, shown in the kicker
-  tagColor: string;    // kicker accent for the tag
-  focus: string;       // one line: what you'll learn (may be empty)
+  tagColor: string;    // kicker accent for the tag and the final chain node
+  chain?: string[];    // attack-chain steps; when 2+ present, chain layout
+  focus?: string;      // one editorial line, used when there is no chain
 }
 
-export async function ogCardImage({ platform, title, tag, tagColor, focus }: OgCardInput): Promise<Buffer> {
-  title = deDash(title);
-  focus = deDash(focus);
+// The kicker: NAME · PLATFORM · TAG, the tag in the accent colour.
+function kickerSvg(name: string, platform: string, tag: string, tagColor: string): string {
+  const sep = `<tspan fill="#5a6472"> &#183; </tspan>`;
+  return `<text x="110" y="112" font-family="Inter" font-weight="700" font-size="33" letter-spacing="3" fill="#9aa4b2">${esc(name.toUpperCase())}${sep}${esc(platform.toUpperCase())}${sep}<tspan fill="${tagColor}">${esc(tag.toUpperCase())}</tspan></text>`;
+}
 
-  let tfs = 128;
-  if (title.length > 8) tfs = 104;
-  if (title.length > 14) tfs = 84;
-  if (title.length > 22) tfs = 64;
-  if (title.length > 32) tfs = 52;
-  const tl = wrap(title, Math.floor(1040 / (tfs * 0.56)), 2);
-  const tLH = tfs * 1.04;
-  const hasFocus = Boolean(focus && focus.trim());
-  // nudge the title block up a little when a focus line follows, else center it
-  const tTop = (hasFocus ? 258 : 330) - ((tl.length - 1) * tLH) / 2;
-  const titleSvg = tl
-    .map((l, i) => `<text x="600" y="${Math.round(tTop + i * tLH)}" text-anchor="middle" font-family="Inter" font-weight="700" font-size="${tfs}" fill="#f4f7fb">${esc(l)}</text>`)
+// Vertical attack-chain timeline. Font scales with step count, then shrinks
+// further if any step would overflow the width, so every line stays on one row.
+function chainSvg(steps: string[], accent: string): string {
+  const n = steps.length;
+  const byCount = n <= 3 ? 62 : n === 4 ? 54 : 48;
+  const longest = Math.max(...steps.map((s) => s.length));
+  const byWidth = Math.floor(1000 / (longest * 0.56));
+  const fs = Math.max(34, Math.min(byCount, byWidth));
+  const areaTop = 192, areaBottom = 558;
+  const gap = (areaBottom - areaTop) / (n - 1);
+  const xDot = 118, xText = 170;
+  const ys = steps.map((_, i) => Math.round(areaTop + i * gap));
+  const line = `<rect x="${xDot - 3}" y="${ys[0]}" width="6" height="${ys[n - 1] - ys[0]}" fill="#2b3340"/>`;
+  const nodes = steps
+    .map((s, i) => {
+      const last = i === n - 1;
+      const col = last ? accent : '#6b7482';
+      const dot = `<circle cx="${xDot}" cy="${ys[i]}" r="${last ? 13 : 10}" fill="${col}"/>`;
+      const txt = `<text x="${xText}" y="${ys[i] + fs * 0.34}" font-family="Inter" font-weight="700" font-size="${fs}" fill="${last ? '#ffffff' : '#eef2f7'}">${esc(s)}</text>`;
+      return dot + txt;
+    })
     .join('');
+  return line + nodes;
+}
 
-  let focusSvg = '';
-  if (hasFocus) {
-    const ff = 44;
-    const fTop = Math.round(tTop + (tl.length - 1) * tLH + 92);
-    const fLH = ff * 1.12;
-    focusSvg = wrap(focus, Math.floor(1000 / (ff * 0.54)), 2)
-      .map((l, i) => `<text x="600" y="${fTop + i * fLH}" text-anchor="middle" font-family="Inter" font-weight="700" font-size="${ff}" fill="#cdd6e0">${esc(l)}</text>`)
-      .join('');
-  }
+// One big editorial line, left-aligned and vertically centred, with a short
+// accent rule above it. Used for projects and any page without a chain.
+function editorialSvg(focus: string, accent: string): string {
+  focus = deDash(focus);
+  const ff = 76;
+  const lines = wrap(focus, Math.floor(990 / (ff * 0.55)), 3);
+  const lh = ff * 1.14;
+  const mid = (192 + 558) / 2;
+  const top = Math.round(mid - ((lines.length - 1) * lh) / 2 + ff * 0.32);
+  const rule = `<rect x="112" y="${Math.round(top - ff * 0.92 - 34)}" width="72" height="8" rx="4" fill="${accent}"/>`;
+  const body = lines
+    .map((l, i) => `<text x="110" y="${top + i * lh}" font-family="Inter" font-weight="700" font-size="${ff}" fill="#eef2f7">${esc(l)}</text>`)
+    .join('');
+  return rule + body;
+}
+
+export async function ogCardImage({ platform, title, tag, tagColor, chain, focus }: OgCardInput): Promise<Buffer> {
+  const name = deDash(title);
+  const steps = (chain ?? []).filter((s) => s && s.trim());
+  const body = steps.length >= 2 ? chainSvg(steps, tagColor) : editorialSvg(focus || name, tagColor);
 
   const svg = `<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#141b29"/><stop offset="55%" stop-color="#0f1420"/><stop offset="100%" stop-color="#0a0e16"/></linearGradient>
-    <radialGradient id="warm" cx="50%" cy="22%" r="72%"><stop offset="0%" stop-color="#e5534b" stop-opacity="0.15"/><stop offset="100%" stop-color="#e5534b" stop-opacity="0"/></radialGradient>
+    <radialGradient id="warm" cx="28%" cy="16%" r="82%"><stop offset="0%" stop-color="#e5534b" stop-opacity="0.16"/><stop offset="100%" stop-color="#e5534b" stop-opacity="0"/></radialGradient>
   </defs>
   <rect width="1200" height="630" fill="url(#bg)"/>
   <rect width="1200" height="630" fill="url(#warm)"/>
-  <text x="600" y="120" text-anchor="middle" font-family="Inter" font-weight="700" font-size="30" letter-spacing="5" fill="#8b94a3">${esc(platform.toUpperCase())}<tspan fill="#5a6472">   /   </tspan><tspan fill="${tagColor}">${esc(tag.toUpperCase())}</tspan></text>
-  ${titleSvg}
-  ${focusSvg}
-  <text x="600" y="586" text-anchor="middle" font-family="Inter" font-weight="400" font-size="24" fill="#5f6b7a">thecyberfarhan.github.io</text>
+  ${kickerSvg(name, platform, tag, tagColor)}
+  ${body}
 </svg>`;
 
-  // Supersample: render at 2x and downscale with lanczos3 for crisp text
-  // edges, then flatten to high-quality mozjpeg (no alpha).
+  // Supersample: render at 2x, downscale with lanczos3 for crisp edges, then
+  // flatten to high-quality mozjpeg (no alpha).
   const png = new Resvg(svg, {
     fitTo: { mode: 'width', value: 2400 },
     font: { fontFiles: FONT_FILES, loadSystemFonts: false, defaultFontFamily: 'Inter' },

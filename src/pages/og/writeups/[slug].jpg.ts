@@ -1,6 +1,6 @@
 import type { APIRoute } from 'astro';
 import { writeups } from '../../../data/site';
-import { WRITEUP_FOCUS } from '../../../data/og-focus';
+import { WRITEUP_FOCUS, WRITEUP_CHAIN } from '../../../data/og-focus';
 import { ogCardImage } from '../../../lib/og-card';
 
 // brighter difficulty accents, legible on the dark card
@@ -17,6 +17,7 @@ export function getStaticPaths() {
       title: w.title,
       tag: w.difficulty ?? '',
       tagColor: TONE[w.difficulty ?? ''] ?? '#8b94a3',
+      chain: WRITEUP_CHAIN[w.slug] ?? [],
       focus: WRITEUP_FOCUS[w.slug] ?? '',
     },
   }));
