@@ -15,10 +15,12 @@ interface Props {
   jsonld?: Record<string, unknown>;
   tone?: string;
   noindex?: boolean;
+  ogImage?: string;
 }
-const { title, description, path = '/', type = 'website', jsonld, tone, noindex } = Astro.props;
+const { title, description, path = '/', type = 'website', jsonld, tone, noindex, ogImage } = Astro.props;
 const canonical = new URL(path, SITE.url).href;
-const og = `${SITE.url}/assets/og-card.jpg`;
+const og = ogImage ? new URL(ogImage, SITE.url).href : `${SITE.url}/assets/og-card.jpg`;
+const ogAlt = ogImage ? title : 'Farhan Hussain, penetration tester, in a red jacket with arms crossed';
 ---
 <!doctype html>
 <html lang="en" style={tone ? `--tone:${tone}` : undefined}>
@@ -40,7 +42,7 @@ const og = `${SITE.url}/assets/og-card.jpg`;
   <meta property="og:image" content={og} />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content="Farhan Hussain, penetration tester, in a red jacket with arms crossed" />
+  <meta property="og:image:alt" content={ogAlt} />
   <meta property="og:site_name" content={SITE.name} />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:image" content={og} />

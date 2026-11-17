@@ -38,7 +38,7 @@ const toc = [
   ...(w.againHtml ? [{ id: 'again', label: 'If I did it again' }] : []),
 ];
 ---
-<Base title={`${w.title}: ${w.platform} writeup | Farhan Hussain`} description={description} path={path} type="article" jsonld={jsonld} tone={tone}>
+<Base title={`${w.title}: ${w.platform} writeup | Farhan Hussain`} description={description} path={path} type="article" jsonld={jsonld} tone={tone} ogImage={`/og/writeups/${w.slug}.png`}>
   <div class="progress" aria-hidden="true"><span id="bar"></span></div>
   <article class="wrap doc">
     <header class="head" data-enter="kids">
