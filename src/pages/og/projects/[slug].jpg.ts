@@ -1,18 +1,26 @@
 import type { APIRoute } from 'astro';
 import { syncedProjects } from '../../../data/site';
+import { PROJECT_FOCUS } from '../../../data/og-focus';
 import { ogCardImage } from '../../../lib/og-card';
 
-const KIND: Record<string, string> = { Original: 'TOOL', Fork: 'FORK', 'Field note': 'NOTE' };
+const KIND: Record<string, string> = { Original: 'Tool', Fork: 'Fork', 'Field note': 'Note' };
+
+// fall back to a trimmed tagline when a project has no hand-written focus
+const shortTagline = (t?: string) => {
+  if (!t) return '';
+  const head = String(t).split(':')[0].split(/(?<=[.!?])\s/)[0];
+  return head.length > 52 ? head.slice(0, 52).replace(/\s+\S*$/, '') + '…' : head;
+};
 
 export function getStaticPaths() {
   return syncedProjects.map((p) => ({
     params: { slug: p.slug },
     props: {
-      kicker: `OPEN SOURCE  ·  ${KIND[p.kind] ?? 'PROJECT'}`,
+      platform: `Open source · ${KIND[p.kind] ?? 'Project'}`,
       title: p.name,
-      summary: p.tagline || '',
-      badge: (p.language ? String(p.language) : 'OSS').toUpperCase(),
-      badgeColor: '#b4232c',
+      tag: p.language ? String(p.language) : 'OSS',
+      tagColor: '#e05b52',
+      focus: PROJECT_FOCUS[p.slug] ?? shortTagline(p.tagline),
     },
   }));
 }

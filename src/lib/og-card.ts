@@ -1,24 +1,21 @@
 // Build-time Open Graph card generator. Each writeup/project page gets its own
-// 1200x630 PNG so link previews look distinct and professional instead of all
-// sharing one banner. Rendered from vendored assets through resvg, so the build
-// never fetches anything at runtime. New pages get a card automatically.
+// 1200x630 card so link previews are distinct and, crucially, READABLE at the
+// small size LinkedIn shows for organic link posts. The card is a centered
+// mini-poster: a platform/difficulty kicker, the name, and a one-line focus
+// (what you'll learn). Rendered with resvg from vendored Inter, flattened to
+// JPEG (no alpha — LinkedIn rejects RGBA PNGs). Automatic for every page.
 import { Resvg } from '@resvg/resvg-js';
 import sharp from 'sharp';
-import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-// Resolve from the project root (build cwd) so paths survive Vite bundling of
-// this module into a chunk, both locally and on CI. resvg-js loads fonts by path.
-const ASSETS = join(process.cwd(), 'src/assets');
-const FONT_FILES = [join(ASSETS, 'og-fonts/Inter-Regular.ttf'), join(ASSETS, 'og-fonts/Inter-Bold.ttf')];
-const AVATAR = 'data:image/png;base64,' + readFileSync(join(ASSETS, 'og-avatar.png')).toString('base64');
+const FONT_FILES = [
+  join(process.cwd(), 'src/assets/og-fonts/Inter-Regular.ttf'),
+  join(process.cwd(), 'src/assets/og-fonts/Inter-Bold.ttf'),
+];
 
 const esc = (s: string) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-// house rule: no em dashes — turn them into a comma pause
 const deDash = (s: string) => String(s).replace(/\s*—\s*/g, ', ').replace(/\s+,/g, ',');
 
-// greedy word-wrap into at most maxLines; the final line is filled and gets an
-// ellipsis only when text is left over.
 function wrap(text: string, max: number, maxLines: number): string[] {
   const words = String(text).trim().split(/\s+/);
   const lines: string[] = [];
@@ -30,8 +27,7 @@ function wrap(text: string, max: number, maxLines: number): string[] {
     lines.push(cur);
     if (lines.length === maxLines - 1) {
       const rest = words.slice(k);
-      let last = '';
-      let j = 0;
+      let last = ''; let j = 0;
       for (; j < rest.length; j++) { const tt = last ? last + ' ' + rest[j] : rest[j]; if (tt.length <= max) last = tt; else break; }
       if (j < rest.length) last = last.replace(/[,.;:\s]+$/, '') + '…';
       lines.push(last);
@@ -44,64 +40,52 @@ function wrap(text: string, max: number, maxLines: number): string[] {
 }
 
 export interface OgCardInput {
-  kicker: string;   // e.g. "TRYHACKME  ·  WRITEUP"
-  title: string;    // box / tool name
-  summary: string;  // the page's own takeaway / tagline
-  badge: string;    // difficulty or language
-  badgeColor: string;
+  platform: string;    // "TryHackMe" or "Open source · Fork"
+  title: string;       // box / tool name
+  tag: string;         // difficulty or language, shown in the kicker
+  tagColor: string;    // kicker accent for the tag
+  focus: string;       // one line: what you'll learn (may be empty)
 }
 
-export async function ogCardImage({ kicker, title, summary, badge, badgeColor }: OgCardInput): Promise<Buffer> {
+export async function ogCardImage({ platform, title, tag, tagColor, focus }: OgCardInput): Promise<Buffer> {
   title = deDash(title);
-  summary = deDash(summary);
+  focus = deDash(focus);
 
-  let tfs = 104;
-  if (title.length > 12) tfs = 84;
-  if (title.length > 20) tfs = 66;
-  if (title.length > 30) tfs = 54;
-  const tlines = wrap(title, Math.floor(980 / (tfs * 0.56)), 2);
-  const tLH = tfs * 1.06;
-  const titleTop = 250 - ((tlines.length - 1) * tLH) / 2;
-  const titleSvg = tlines
-    .map((l, i) => `<text x="80" y="${Math.round(titleTop + i * tLH)}" font-family="Inter" font-weight="700" font-size="${tfs}" fill="#f3f6fa">${esc(l)}</text>`)
+  let tfs = 128;
+  if (title.length > 8) tfs = 104;
+  if (title.length > 14) tfs = 84;
+  if (title.length > 22) tfs = 64;
+  if (title.length > 32) tfs = 52;
+  const tl = wrap(title, Math.floor(1040 / (tfs * 0.56)), 2);
+  const tLH = tfs * 1.04;
+  const hasFocus = Boolean(focus && focus.trim());
+  // nudge the title block up a little when a focus line follows, else center it
+  const tTop = (hasFocus ? 258 : 330) - ((tl.length - 1) * tLH) / 2;
+  const titleSvg = tl
+    .map((l, i) => `<text x="600" y="${Math.round(tTop + i * tLH)}" text-anchor="middle" font-family="Inter" font-weight="700" font-size="${tfs}" fill="#f4f7fb">${esc(l)}</text>`)
     .join('');
 
-  const sumTop = Math.round(titleTop + (tlines.length - 1) * tLH + 66);
-  const sumSvg = wrap(summary, 62, 3)
-    .map((l, i) => `<text x="80" y="${sumTop + i * 46}" font-family="Inter" font-weight="400" font-size="32" fill="#9aa6b5">${esc(l)}</text>`)
-    .join('');
-
-  const badgeText = badge.trim();
-  const bw = Math.round(badgeText.length * 15 + 46);
-  const bx = 1200 - 80 - bw;
+  let focusSvg = '';
+  if (hasFocus) {
+    const ff = 44;
+    const fTop = Math.round(tTop + (tl.length - 1) * tLH + 92);
+    const fLH = ff * 1.12;
+    focusSvg = wrap(focus, Math.floor(1000 / (ff * 0.54)), 2)
+      .map((l, i) => `<text x="600" y="${fTop + i * fLH}" text-anchor="middle" font-family="Inter" font-weight="700" font-size="${ff}" fill="#cdd6e0">${esc(l)}</text>`)
+      .join('');
+  }
 
   const svg = `<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#141b29"/><stop offset="55%" stop-color="#0f1420"/><stop offset="100%" stop-color="#0a0e16"/>
-    </linearGradient>
-    <radialGradient id="warm" cx="88%" cy="8%" r="55%">
-      <stop offset="0%" stop-color="#e5534b" stop-opacity="0.18"/>
-      <stop offset="100%" stop-color="#e5534b" stop-opacity="0"/>
-    </radialGradient>
-    <clipPath id="avclip"><circle cx="112" cy="556" r="34"/></clipPath>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#141b29"/><stop offset="55%" stop-color="#0f1420"/><stop offset="100%" stop-color="#0a0e16"/></linearGradient>
+    <radialGradient id="warm" cx="50%" cy="22%" r="72%"><stop offset="0%" stop-color="#e5534b" stop-opacity="0.15"/><stop offset="100%" stop-color="#e5534b" stop-opacity="0"/></radialGradient>
   </defs>
   <rect width="1200" height="630" fill="url(#bg)"/>
   <rect width="1200" height="630" fill="url(#warm)"/>
-
-  <rect x="80" y="86" width="26" height="26" rx="5" fill="#e5534b"/>
-  <text x="120" y="107" font-family="Inter" font-weight="700" font-size="24" fill="#c2ccd8" letter-spacing="3">${esc(kicker)}</text>
-
-  ${badgeText ? `<rect x="${bx}" y="80" width="${bw}" height="40" rx="20" fill="${badgeColor}"/>
-  <text x="${bx + bw / 2}" y="107" font-family="Inter" font-weight="700" font-size="22" fill="#ffffff" text-anchor="middle" letter-spacing="1.5">${esc(badgeText)}</text>` : ''}
-
+  <text x="600" y="120" text-anchor="middle" font-family="Inter" font-weight="700" font-size="30" letter-spacing="5" fill="#8b94a3">${esc(platform.toUpperCase())}<tspan fill="#5a6472">   /   </tspan><tspan fill="${tagColor}">${esc(tag.toUpperCase())}</tspan></text>
   ${titleSvg}
-  ${sumSvg}
-
-  <circle cx="112" cy="556" r="36" fill="none" stroke="#e5534b" stroke-width="2"/>
-  <image href="${AVATAR}" x="78" y="522" width="68" height="68" clip-path="url(#avclip)"/>
-  <text x="166" y="548" font-family="Inter" font-weight="700" font-size="28" fill="#eaeef3">Farhan Hussain</text>
-  <text x="166" y="578" font-family="Inter" font-weight="400" font-size="22" fill="#7e8a99">Penetration Tester  ·  thecyberfarhan.github.io</text>
+  ${focusSvg}
+  <text x="600" y="586" text-anchor="middle" font-family="Inter" font-weight="400" font-size="24" fill="#5f6b7a">thecyberfarhan.github.io</text>
 </svg>`;
 
   const png = new Resvg(svg, {
@@ -110,7 +94,5 @@ export async function ogCardImage({ kicker, title, summary, badge, badgeColor }:
   })
     .render()
     .asPng();
-  // Flatten to JPEG (no alpha channel): some platforms, LinkedIn included,
-  // reject RGBA PNGs with "no image found".
-  return sharp(png).flatten({ background: '#0d1117' }).jpeg({ quality: 86, chromaSubsampling: '4:4:4' }).toBuffer();
+  return sharp(png).flatten({ background: '#0d1117' }).jpeg({ quality: 88, chromaSubsampling: '4:4:4' }).toBuffer();
 }

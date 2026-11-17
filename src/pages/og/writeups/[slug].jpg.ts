@@ -1,16 +1,23 @@
 import type { APIRoute } from 'astro';
-import { writeups, toneOf } from '../../../data/site';
+import { writeups } from '../../../data/site';
+import { WRITEUP_FOCUS } from '../../../data/og-focus';
 import { ogCardImage } from '../../../lib/og-card';
+
+// brighter difficulty accents, legible on the dark card
+const TONE: Record<string, string> = {
+  'Very Easy': '#7aa0b5', Easy: '#5b8fb8', Medium: '#d08a3a',
+  Hard: '#e05b52', Insane: '#d64b63', Challenge: '#c2a84e',
+};
 
 export function getStaticPaths() {
   return writeups.map((w) => ({
     params: { slug: w.slug },
     props: {
-      kicker: `${(w.platform ?? '').toUpperCase()}  ·  WRITEUP`,
+      platform: w.platform ?? 'TryHackMe',
       title: w.title,
-      summary: w.takeaway || w.summary || '',
-      badge: (w.difficulty ?? '').toUpperCase(),
-      badgeColor: toneOf(w.difficulty),
+      tag: w.difficulty ?? '',
+      tagColor: TONE[w.difficulty ?? ''] ?? '#8b94a3',
+      focus: WRITEUP_FOCUS[w.slug] ?? '',
     },
   }));
 }
