@@ -67,6 +67,21 @@ export const PROJECTS: Project[] = [
   ...manualProjects.map((p): Project => ({ ...p })),
 ];
 
+// Personal / niche projects: things built outside security, kept deliberately
+// separate from the work above so they don't crowd the security story. Curated by
+// hand, shown in their own secondary section, each card links to its GitHub repo.
+export type PersonalProject = { name: string; tagline: string; href: string; status: string; language?: string; tags: string[] };
+export const PERSONAL_PROJECTS: PersonalProject[] = [
+  {
+    name: 'mlbb-linux',
+    tagline: 'Play Mobile Legends on Linux with a keyboard and mouse, the BlueStacks way, through Waydroid and scrcpy-mask with full KDE Plasma integration.',
+    href: 'https://github.com/thecyberfarhan/mlbb-linux',
+    status: 'Public',
+    language: 'Bash, Python',
+    tags: ['Linux', 'KDE', 'Waydroid', 'Gaming'],
+  },
+];
+
 export const STACK = ['Kali', 'Linux', 'Windows', 'Python', 'Bash', 'PowerShell', 'JavaScript', 'SQL', 'Docker', 'GitHub'];
 
 export const TOOL_PHASES = [

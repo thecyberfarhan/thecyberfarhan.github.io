@@ -1,8 +1,9 @@
-import { SITE, STATS, writeups, PROJECTS } from '../data/site';
+import { SITE, STATS, writeups, PROJECTS, PERSONAL_PROJECTS } from '../data/site';
 
 export function GET() {
   const recent = writeups.slice(0, 10).map((w) => `- [${w.title} (${w.platform}, ${w.difficulty ?? 'lab'})](${SITE.url}/writeups/${w.slug}.html): ${w.summary}`);
   const projects = PROJECTS.filter((p) => p.href).map((p) => `- [${p.name}](${SITE.url}${p.slug ? `/projects/${p.slug}.html` : ''}): ${p.tagline}`);
+  const personal = PERSONAL_PROJECTS.map((p) => `- [${p.name}](${p.href}): ${p.tagline}`);
   const body = `# ${SITE.name}
 
 > CPENT-certified web and API penetration tester from Bahawalnagar, Punjab, Pakistan. TryHackMe top ${STATS.thmRank}% with ${STATS.rooms}+ rooms completed and ${STATS.writeups} public writeups. Open to roles in offensive security (penetration testing, web and API security, red team support, bug bounty) and the wider security field. Full-time, available immediately, remote preferred, open to relocation. Languages: English (advanced), Urdu (fluent).
@@ -19,6 +20,9 @@ ${recent.join('\n')}
 
 ## Projects
 ${projects.join('\n')}
+
+## Personal projects
+${personal.join('\n')}
 
 ## Facts
 - Certification: CPENT (Certified Penetration Testing Professional), EC-Council, 2026. Certificate ${SITE.certId}.
