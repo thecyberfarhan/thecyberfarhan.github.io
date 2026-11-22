@@ -2,10 +2,11 @@
 import { PROJECTS, SITE } from '../data/site';
 const count = (f: string) => (f === 'all' ? PROJECTS.length : PROJECTS.filter((p) => p.kind === f).length);
 // only show a filter for a kind that actually has projects (so "Personal" appears once one exists)
-const filters = ([['all', 'All'], ['Original', 'Built'], ['Fork', 'Forked and fixed'], ['Field note', 'Field notes'], ['Personal', 'Personal']] as [string, string][])
+const filters = ([['all', 'All'], ['Original', 'Security tools'], ['Fork', 'Forked & fixed'], ['Field note', 'Field notes'], ['Personal', 'Personal']] as [string, string][])
   .filter(([v]) => v === 'all' || count(v) > 0);
 const TONE: Record<string, string> = { Original: '#3f6e8c', Fork: '#a8642a', 'Field note': '#24704d', Personal: '#6d5296' };
-const TAB: Record<string, string> = { Original: 'Built', Fork: 'Fork', 'Field note': 'Field note', Personal: 'Personal' };
+// short forms for the little folder tab on each card
+const TAB: Record<string, string> = { Original: 'Security', Fork: 'Fork', 'Field note': 'Field note', Personal: 'Personal' };
 // a project's own page, not the GitHub repo directly, so the detail (what changed, how it was
 // tested) shows before anyone leaves the site
 const cardHref = (p: (typeof PROJECTS)[number]) => (p.slug ? `/projects/${p.slug}.html` : undefined);

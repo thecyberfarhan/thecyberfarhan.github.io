@@ -4,7 +4,7 @@ import { highlightBlocks } from '../../lib/highlight';
 import { changeCards, terminalFrames } from '../../lib/project-html';
 import Base from '../../layouts/Base.astro';
 import Contact from '../../components/Contact.astro';
-import { syncedProjects, SITE, type SyncedProject } from '../../data/site';
+import { syncedProjects, SITE, KIND_LABEL, type SyncedProject } from '../../data/site';
 
 export function getStaticPaths() {
   return syncedProjects.map((p, i) => ({
@@ -39,7 +39,7 @@ const stats: { n: string; count?: number; label: string; href?: string; tone?: s
 const jsonld = {
   '@context': 'https://schema.org',
   '@type': 'TechArticle',
-  headline: `${p.name}: ${p.kind.toLowerCase()}`,
+  headline: `${p.name}: ${(KIND_LABEL[p.kind] ?? p.kind).toLowerCase()}`,
   description,
   author: { '@type': 'Person', '@id': `${SITE.url}/#me`, name: SITE.name, url: `${SITE.url}/` },
   url: `${SITE.url}${path}`,
@@ -63,7 +63,7 @@ const repoPath = p.href.replace('https://github.com/', '');
   <article class="wrap doc">
     <header class="head" data-enter="kids">
       <a class="back label" href="/projects/">← All projects</a>
-      <p class="label kicker">{p.kind}{p.stars ? ` · ${p.stars.toLocaleString()}★` : ''}</p>
+      <p class="label kicker">{KIND_LABEL[p.kind] ?? p.kind}{p.stars ? ` · ${p.stars.toLocaleString()}★` : ''}</p>
       <h1 style={`view-transition-name: p-${p.slug}`}>{p.name}</h1>
       <p class="tagline">{p.tagline}</p>
       <ul class="meta">

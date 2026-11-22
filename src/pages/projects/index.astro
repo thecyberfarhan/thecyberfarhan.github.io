@@ -1,7 +1,7 @@
 ---
 import Base from '../../layouts/Base.astro';
 import Contact from '../../components/Contact.astro';
-import { syncedProjects, SITE } from '../../data/site';
+import { syncedProjects, SITE, KIND_LABEL } from '../../data/site';
 
 const kinds = ['Original', 'Fork', 'Field note', 'Personal'].filter((k) => syncedProjects.some((p) => p.kind === k));
 const skills = [...new Set(syncedProjects.map((p) => p.skillArea))].sort();
@@ -23,7 +23,7 @@ const description = `All ${syncedProjects.length} of Farhan Hussain's public pro
         <input type="search" id="q" placeholder="Search by name or skill" maxlength="80" autocomplete="off" spellcheck="false" />
       </label>
       <label class="sel"><span class="sr-only">Kind</span>
-        <select id="kind"><option value="">All kinds</option>{kinds.map((k) => <option value={k}>{k}</option>)}</select>
+        <select id="kind"><option value="">All kinds</option>{kinds.map((k) => <option value={k}>{KIND_LABEL[k] ?? k}</option>)}</select>
       </label>
       <label class="sel"><span class="sr-only">Skill area</span>
         <select id="skill"><option value="">All skills</option>{skills.map((s) => <option value={s}>{s}</option>)}</select>
@@ -35,7 +35,7 @@ const description = `All ${syncedProjects.length} of Farhan Hussain's public pro
       {syncedProjects.map((p, i) => (
         <li data-enter={i < 10 ? '' : undefined} data-kind={p.kind} data-skill={p.skillArea} data-search={`${p.name} ${p.tagline} ${p.skillArea} ${p.language ?? ''}`.toLowerCase()}>
           <a href={`/projects/${p.slug}.html`} style={`--tone:${TONE[p.kind]}`}>
-            <span class="plat">{p.kind}</span>
+            <span class="plat">{KIND_LABEL[p.kind] ?? p.kind}</span>
             <span class="t"><span class="nm" style={`view-transition-name: p-${p.slug}`}>{p.name}</span><small>{p.tagline}</small></span>
             <span class="meta"><span class="lvl">{p.skillArea}</span>{p.stars ? <span class="stars">{p.stars.toLocaleString()}★ upstream</span> : null}</span>
           </a>

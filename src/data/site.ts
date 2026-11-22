@@ -62,6 +62,9 @@ export const manualProjects: ManualProject[] = [
 // What the home page's card grid reads: synced projects first (in the sync's own kind/name
 // order), then the manual ones, each normalised to the same shape.
 export type Project = { kind: 'Original' | 'Fork' | 'Field note' | 'Personal'; name: string; tagline: string; status: string; language?: string | null; href?: string; slug?: string; skillArea?: string };
+// Display labels for the project kinds. The stored kind stays the same; these are
+// what the site shows. Each project lives in exactly one of these buckets.
+export const KIND_LABEL: Record<string, string> = { Original: 'Security tools', Fork: 'Forked & fixed', 'Field note': 'Field notes', Personal: 'Personal' };
 export const PROJECTS: Project[] = [
   ...syncedProjects.map((p): Project => ({ kind: p.kind as Project['kind'], name: p.name, tagline: p.tagline, status: p.status, language: p.language, href: p.href, slug: p.slug, skillArea: p.skillArea })),
   ...manualProjects.map((p): Project => ({ ...p })),
