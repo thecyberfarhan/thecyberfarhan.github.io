@@ -115,4 +115,5 @@ export const PROJECT_FOCUS: Record<string, string> = {
   paramspider: 'Mines Wayback URLs for fuzzing parameters',
   sherlock: 'Username OSINT with false-positive filtering',
   'lab-reports': 'Professional pentest reports from my lab',
+  'mlbb-linux': 'Mobile Legends on Linux with keyboard and mouse',
 };

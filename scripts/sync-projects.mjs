@@ -248,7 +248,7 @@ function parseReadme(md, repo, branch, repoMeta) {
 }
 
 // which skill the project shows an employer, for filtering; falls back to a sane default
-const SKILL_FALLBACK = { Fork: 'Tooling and automation', Original: 'Web and API testing', 'Field note': 'Reporting' };
+const SKILL_FALLBACK = { Fork: 'Tooling and automation', Original: 'Web and API testing', 'Field note': 'Reporting', Personal: 'Personal tooling' };
 
 // numbers the page shows in its facts strip, read from the README itself so they can't drift:
 // how many "### Fixed: ..." / "### Added: ..." entries "What changed" has, and the test count the
@@ -289,6 +289,7 @@ function toRecord(repo, md, branch, extra = {}) {
   const glance = parsed.glance;
   const kind = /^original$/i.test(glance['Kind'] || '') ? 'Original'
     : /^field note$/i.test(glance['Kind'] || '') ? 'Field note'
+    : /^personal$/i.test(glance['Kind'] || '') ? 'Personal'
     : 'Fork';
   return {
     slug: slugify(repo.name),

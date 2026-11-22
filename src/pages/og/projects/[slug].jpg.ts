@@ -3,7 +3,7 @@ import { syncedProjects } from '../../../data/site';
 import { PROJECT_FOCUS } from '../../../data/og-focus';
 import { ogCardImage } from '../../../lib/og-card';
 
-const KIND: Record<string, string> = { Original: 'Tool', Fork: 'Fork', 'Field note': 'Note' };
+const KIND: Record<string, string> = { Original: 'Tool', Fork: 'Fork', 'Field note': 'Note', Personal: 'Personal' };
 
 // fall back to a trimmed tagline when a project has no hand-written focus
 const shortTagline = (t?: string) => {

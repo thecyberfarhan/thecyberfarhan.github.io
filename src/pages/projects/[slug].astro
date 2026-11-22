@@ -15,7 +15,7 @@ export function getStaticPaths() {
 interface Props { p: SyncedProject; newer: SyncedProject | null; older: SyncedProject | null }
 const { p, newer, older } = Astro.props;
 
-const TONE: Record<string, string> = { Original: '#3f6e8c', Fork: '#a8642a', 'Field note': '#24704d' };
+const TONE: Record<string, string> = { Original: '#3f6e8c', Fork: '#a8642a', 'Field note': '#24704d', Personal: '#6d5296' };
 const tone = TONE[p.kind] ?? TONE.Original;
 const path = `/projects/${p.slug}.html`;
 const description = p.tagline;

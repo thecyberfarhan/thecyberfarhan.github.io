@@ -804,7 +804,11 @@
    "requires": "Python 3.10+",
    "license": "MIT",
    "upstream": "sherlock-project/sherlock",
+<<<<<<< HEAD
    "upstreamStars": 115660,
+=======
+   "upstreamStars": 115701,
+>>>>>>> 901148b (Projects: add a Personal category, with mlbb-linux its first)
    "scope": "Authorized testing only",
    "skillArea": "OSINT",
    "stars": 0,
@@ -973,6 +977,79 @@
      "label": "License",
      "known": true,
      "html": "<p>MIT. See <a href=\"https://github.com/thecyberfarhan/lab-reports/blob/master/LICENSE\" target=\"_blank\" rel=\"noopener noreferrer\">LICENSE</a>.</p>"
+    }
+   ]
+  },
+  {
+   "slug": "mlbb-linux",
+   "name": "mlbb-linux",
+   "tagline": "Play Mobile Legends: Bang Bang (MLBB) on Linux with a keyboard and mouse, the way an emulator like BlueStacks does it on Windows: the Android game in Waydroid, WASD on the joystick, keys on the skills, the mouse as touch, with full KDE Plasma integration.",
+   "kind": "Personal",
+   "status": "Public",
+   "language": "Bash, Python",
+   "requires": "Arch Linux, KDE Plasma (Wayland), Waydroid",
+   "license": "MIT",
+   "upstream": null,
+   "upstreamStars": null,
+   "scope": null,
+   "skillArea": "Personal tooling",
+   "stars": 0,
+   "pushedAt": "2026-11-22",
+   "href": "https://github.com/thecyberfarhan/mlbb-linux",
+   "stats": {
+    "fixes": 0,
+    "additions": 0,
+    "tests": null
+   },
+   "ci": null,
+   "sections": [
+    {
+     "id": "what-you-get",
+     "label": "What you get",
+     "known": false,
+     "html": "<ul><li><strong>WASD joystick + key-mapped skills + mouse-as-touch</strong> through <a href=\"https://github.com/AkiChase/scrcpy-mask\" target=\"_blank\" rel=\"noopener noreferrer\">scrcpy-mask</a>.</li><li><strong>One launcher.</strong> <code>mlbb start</code> brings up Android, the keymapper, the overlay and the desktop fixes, checks every piece, and repairs what is missing. <code>mlbb stop</code> tears it all down. <code>mlbb status</code> shows what is running.</li><li><strong>Proper KDE integration.</strong> The game and overlay stay above other windows only while focused (so Meta still shows the taskbar), the overlay sits exactly over the game, its stray 1px border is pushed off-screen, and minimizing from the taskbar works.</li><li><strong>On-screen HUD buttons</strong> (minimize, chat, back-to-game) styled like the in-match HUD, invisible until you hover the left edge.</li><li><strong>A stuck-touch watchdog</strong> that releases a joystick touch Android is still holding when no real key is pressed. It ignores virtual input devices so it cannot wedge.</li><li><strong>Supersampling and smoother video</strong> set automatically each boot.</li><li><strong>Everything is dynamic:</strong> the game monitor, resolution and Android serial are detected or read from config. No hardcoded paths, IPs or monitor names.</li></ul>"
+    },
+    {
+     "id": "requirements",
+     "label": "Requirements",
+     "known": true,
+     "html": "<ul><li><strong>Arch Linux</strong> (the installer uses <code>pacman</code>; other distros need the equivalent packages installed by hand).</li><li><strong>KDE Plasma 6 on Wayland.</strong> The focus, taskbar and overlay layer is built on KWin scripts and layer-shell, so GNOME and X11 are not supported.</li><li>Waydroid with a <strong>GAPPS</strong> image (for Google Play), the <strong>libndk</strong> ARM translator, and a Google-certified device.</li><li>An x86_64 CPU with enough single-thread speed (the game's main thread runs under ARM translation, which is the usual bottleneck).</li></ul>"
+    },
+    {
+     "id": "install",
+     "label": "Install",
+     "known": true,
+     "html": "<pre><code class=\"language-bash\">git clone https://github.com/thecyberfarhan/mlbb-linux\ncd mlbb-linux\n./install.sh</code></pre>\n<p>The installer is idempotent and asks before any system change (set <code>MLBB_YES=1</code> to accept all). It installs the scripts, the KWin script and rules, the udev rule and the keymap, and walks you through the parts that need your own input: initializing Waydroid, installing the ARM translator, and Google Play certification. Signing in to Google Play and installing the game inside Android is yours to do.</p>\n<p>Then:</p>\n<pre><code class=\"language-bash\">mlbb start      # or launch &quot;Mobile Legends (Keyboard)&quot; from your app menu</code></pre>"
+    },
+    {
+     "id": "default-controls",
+     "label": "Default controls",
+     "known": false,
+     "html": "<div class=\"table-wrap\"><table><thead><tr><th>Key</th><th>Action</th><th></th><th>Key</th><th>Action</th></tr></thead><tbody><tr><td><code>W</code> <code>A</code> <code>S</code> <code>D</code></td><td>Move (joystick)</td><td></td><td><code>Q</code></td><td>Recall</td></tr><tr><td>Mouse</td><td>Aim / touch</td><td></td><td><code>Alt</code></td><td>Extra spell</td></tr><tr><td><code>Space</code></td><td>Basic attack</td><td></td><td><code>Tab</code></td><td>Scoreboard</td></tr><tr><td><code>Shift</code></td><td>Flicker / skill</td><td></td><td><code>Ctrl</code></td><td>Shop</td></tr><tr><td><code>E</code></td><td>Regen</td><td></td><td><code>Z</code></td><td>Quick buy</td></tr><tr><td><code>Enter</code></td><td>Chat (typing mode)</td><td></td><td></td><td></td></tr></tbody></table></div>\n<p>Edit <code>profiles/mlbb/mapping.json</code> (or in the scrcpy-mask UI) to rebind. Tap coordinates are in the profile's native resolution; see <a href=\"https://github.com/thecyberfarhan/mlbb-linux/blob/main/docs/PROFILES.md\" target=\"_blank\" rel=\"noopener noreferrer\">docs/PROFILES.md</a>.</p>"
+    },
+    {
+     "id": "configure",
+     "label": "Configure",
+     "known": false,
+     "html": "<pre><code class=\"language-bash\">mlbb config show     # resolved settings + what auto-detection currently finds\nmlbb config edit     # open ~/.config/mlbb-linux/config.conf</code></pre>\n<p>You can pin a monitor, pin the Android serial, switch the monitor to 60 Hz for the session (smoother on a 75 Hz panel without VRR), or add input devices for the watchdog to ignore. Blank values mean &quot;auto-detect&quot;.</p>"
+    },
+    {
+     "id": "how-it-works",
+     "label": "How it works",
+     "known": true,
+     "html": "<p><code>mlbb start</code> starts the Waydroid session, waits for Android to boot and get an IP, applies per-boot tuning (supersampling, faster video decode, no Google Assistant), starts scrcpy-mask and connects it, activates your key layout, launches the game, and focuses the overlay. A KWin script manages window stacking, focus and the taskbar; a small PyQt6 layer-shell overlay shows the HUD buttons, tracks typing vs game mode from scrcpy-mask's log, and runs the watchdog. See <a href=\"https://github.com/thecyberfarhan/mlbb-linux/blob/main/docs/TROUBLESHOOTING.md\" target=\"_blank\" rel=\"noopener noreferrer\">docs/TROUBLESHOOTING.md</a> for the problems this solves and why each fix is there.</p>"
+    },
+    {
+     "id": "faq",
+     "label": "FAQ",
+     "known": false,
+     "html": "<p><strong>Can you play Mobile Legends on Linux?</strong> Yes. There is no official Linux client and BlueStacks does not run on Linux, but Waydroid runs the Android game and this project adds the keyboard-and-mouse controls and desktop integration around it.</p>\n<p><strong>How do I use a keyboard and mouse for Mobile Legends on PC without BlueStacks?</strong> On Linux, run it in Waydroid and use this project: WASD is the joystick, keys are the skills, and the mouse acts as touch, via scrcpy-mask.</p>\n<p><strong>Does it work on GNOME or X11?</strong> No. It relies on KDE Plasma (KWin) and Wayland layer-shell. GNOME or X11 support would need a different windowing layer.</p>\n<p><strong>Is this a cheat, macro or bot?</strong> No. It is a one-key-to-one-tap input remapper, the same convenience BlueStacks provides. It does not automate gameplay.</p>\n<p><strong>Will it work for other Waydroid games?</strong> The structure supports per-game profiles. Mobile Legends is the one that is tested; see <a href=\"https://github.com/thecyberfarhan/mlbb-linux/blob/main/docs/PROFILES.md\" target=\"_blank\" rel=\"noopener noreferrer\">docs/PROFILES.md</a> to add another.</p>"
+    },
+    {
+     "id": "credits-and-license",
+     "label": "Credits and license",
+     "known": false,
+     "html": "<p>Stands on <a href=\"https://waydro.id/\" target=\"_blank\" rel=\"noopener noreferrer\">Waydroid</a>, <a href=\"https://github.com/AkiChase/scrcpy-mask\" target=\"_blank\" rel=\"noopener noreferrer\">scrcpy-mask</a>, <a href=\"https://github.com/casualsnek/waydroid_script\" target=\"_blank\" rel=\"noopener noreferrer\">waydroid_script</a> and <a href=\"https://github.com/FeralInteractive/gamemode\" target=\"_blank\" rel=\"noopener noreferrer\">gamemode</a>. Mobile Legends: Bang Bang is a trademark of Moonton; this project is not affiliated with or endorsed by Moonton.</p>\n<p>Licensed under the <a href=\"https://github.com/thecyberfarhan/mlbb-linux/blob/main/LICENSE\" target=\"_blank\" rel=\"noopener noreferrer\">MIT License</a>.</p>"
     }
    ]
   }

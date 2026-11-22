@@ -61,28 +61,13 @@ export const manualProjects: ManualProject[] = [
 
 // What the home page's card grid reads: synced projects first (in the sync's own kind/name
 // order), then the manual ones, each normalised to the same shape.
-export type Project = { kind: 'Original' | 'Fork' | 'Field note'; name: string; tagline: string; status: string; language?: string | null; href?: string; slug?: string; skillArea?: string };
+export type Project = { kind: 'Original' | 'Fork' | 'Field note' | 'Personal'; name: string; tagline: string; status: string; language?: string | null; href?: string; slug?: string; skillArea?: string };
 export const PROJECTS: Project[] = [
   ...syncedProjects.map((p): Project => ({ kind: p.kind as Project['kind'], name: p.name, tagline: p.tagline, status: p.status, language: p.language, href: p.href, slug: p.slug, skillArea: p.skillArea })),
   ...manualProjects.map((p): Project => ({ ...p })),
 ];
 
-// Personal / niche projects: things built outside security, kept deliberately
-// separate from the work above so they don't crowd the security story. Curated by
-// hand, shown in their own secondary section, each card links to its GitHub repo.
-export type PersonalProject = { name: string; tagline: string; href: string; status: string; language?: string; tags: string[] };
-export const PERSONAL_PROJECTS: PersonalProject[] = [
-  {
-    name: 'mlbb-linux',
-    tagline: 'Play Mobile Legends on Linux with a keyboard and mouse, the BlueStacks way, through Waydroid and scrcpy-mask with full KDE Plasma integration.',
-    href: 'https://github.com/thecyberfarhan/mlbb-linux',
-    status: 'Public',
-    language: 'Bash, Python',
-    tags: ['Linux', 'KDE', 'Waydroid', 'Gaming'],
-  },
-];
-
-export const STACK = ['Kali', 'Linux', 'Windows', 'Python', 'Bash', 'PowerShell', 'JavaScript', 'SQL', 'Docker', 'GitHub'];
+export const STACK =['Kali', 'Linux', 'Windows', 'Python', 'Bash', 'PowerShell', 'JavaScript', 'SQL', 'Docker', 'GitHub'];
 
 export const TOOL_PHASES = [
   { phase: 'Recon and scanning', tools: [['Nmap', 'Port and service scans'], ['Nessus', 'Vulnerability scanning'], ['Nikto', 'Web server scanning'], ['RustScan', 'Fast port discovery'], ['Masscan', 'Large-scale scanning'], ['Subfinder', 'Subdomain discovery'], ['Shodan', 'Internet-wide search'], ['Maltego', 'OSINT link analysis']] },

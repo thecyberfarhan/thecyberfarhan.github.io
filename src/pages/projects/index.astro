@@ -3,10 +3,10 @@ import Base from '../../layouts/Base.astro';
 import Contact from '../../components/Contact.astro';
 import { syncedProjects, SITE } from '../../data/site';
 
-const kinds = ['Original', 'Fork', 'Field note'].filter((k) => syncedProjects.some((p) => p.kind === k));
+const kinds = ['Original', 'Fork', 'Field note', 'Personal'].filter((k) => syncedProjects.some((p) => p.kind === k));
 const skills = [...new Set(syncedProjects.map((p) => p.skillArea))].sort();
-const TONE: Record<string, string> = { Original: '#3f6e8c', Fork: '#a8642a', 'Field note': '#24704d' };
-const description = `All ${syncedProjects.length} of Farhan Hussain's public security-tooling projects: original tools, forks with real fixes, and written reports. Search or filter by kind and skill.`;
+const TONE: Record<string, string> = { Original: '#3f6e8c', Fork: '#a8642a', 'Field note': '#24704d', Personal: '#6d5296' };
+const description = `All ${syncedProjects.length} of Farhan Hussain's public projects: security tools, forks with real fixes, written reports, and personal tools. Search or filter by kind and skill.`;
 ---
 <Base title="Projects | Farhan Hussain" description={description} path="/projects/">
   <section class="hub wrap">
