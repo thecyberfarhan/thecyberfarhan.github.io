@@ -102,6 +102,82 @@
    ]
   },
   {
+   "slug": "idorproof",
+   "name": "idorproof",
+   "tagline": "Prove broken object-level authorization (BOLA / IDOR) by replaying one user's requests with another user's object ids, and confirm every finding with the exact data that leaked.",
+   "kind": "Original",
+   "status": "Active",
+   "language": "Python",
+   "requires": "Python 3.9+, no dependencies",
+   "license": "MIT",
+   "upstream": null,
+   "upstreamStars": null,
+   "scope": null,
+   "skillArea": "Web and API testing",
+   "stars": 0,
+   "pushedAt": "2026-11-22",
+   "href": "https://github.com/thecyberfarhan/idorproof",
+   "stats": {
+    "fixes": 0,
+    "additions": 0,
+    "tests": null
+   },
+   "ci": {
+    "conclusion": "success",
+    "url": "https://github.com/thecyberfarhan/idorproof/actions/runs/45055157369"
+   },
+   "sections": [
+    {
+     "id": "why",
+     "label": "Why",
+     "known": true,
+     "html": "<p>Authorization bugs do not show up in a single request. A <code>GET /api/users/5/profile</code> looks completely normal on its own. It is only a vulnerability if user 5 is not you and the server hands you their data anyway. That is a two-session, two-identity problem, and a scanner that only ever sees one session cannot find it. idorproof is built around that fact: you give it two accounts, it does the swapping, and it decides each case by comparing what came back against what each account legitimately owns.</p>"
+    },
+    {
+     "id": "what-this-shows",
+     "label": "What this shows",
+     "known": true,
+     "html": "<p>The thing that makes idorproof different from a basic IDOR script, and the part worth understanding:</p>\n<ul><li><strong>Evidence, not guessing.</strong> A finding is marked CONFIRMED only when the response actually contains the victim's data. It prints the leaked field, for example <code>email = bob@corp.test</code>, so there is nothing to eyeball and nothing to second-guess.</li><li><strong>A three-rung confidence ladder.</strong> CONFIRMED (the victim's data leaked), SUSPECTED (access got through with a 2xx but no victim data could be proven to leak, worth a manual look), and BLOCKED (the server denied it, so authorization worked). Most tools only give you &quot;interesting / not interesting&quot;.</li><li><strong>Two independent ways to confirm</strong>, so numeric-only leaks are not missed: a per-user data fingerprint (the victim's email, name, record text that the other user does not have), and a direct comparison against the victim's own captured object (which catches a leaked card number or amount that a fingerprint would skip). Echoed ids are excluded from both, so the object id coming back in the response never causes a false positive.</li><li><strong>Scriptable and CI-friendly.</strong> It is a command-line tool with a JSON report and a configurable exit code, so it can run in a pipeline, not only in a GUI.</li></ul>"
+    },
+    {
+     "id": "install",
+     "label": "Install",
+     "known": true,
+     "html": "<pre><code class=\"language-bash\">pipx install git+https://github.com/thecyberfarhan/idorproof\n# or, from a clone:\npip install .</code></pre>\n<p>No third-party dependencies; the Python standard library is all it needs.</p>"
+    },
+    {
+     "id": "usage",
+     "label": "Usage",
+     "known": true,
+     "html": "<ol><li>Log in as user A and browse the app with your browser's DevTools (or Burp) recording, then <strong>Save as HAR</strong>. Do the same as user B. Each capture should include each user reading their own data.</li><li>Run idorproof with both captures:</li></ol>\n<pre><code class=\"language-bash\">idorproof --a alice.har --b bob.har --label-a alice --label-b bob</code></pre>\n<p>It replays the requests live, so point it at the same environment the captures came from (or use <code>--target http://localhost:8099</code> to send them somewhere else). <code>--json findings.json</code> writes the full report; <code>--fail-on confirmed</code> (the default) makes it exit non-zero when a real bug is found, for CI.</p>"
+    },
+    {
+     "id": "how-it-works",
+     "label": "How it works",
+     "known": true,
+     "html": "<ol><li>Parse both HAR captures into requests.</li><li>Group requests into endpoint templates by blanking id-like path segments and query values, so <code>GET /api/users/1/profile</code> and <code>GET /api/users/2/profile</code> become one template.</li><li>Build each user's data fingerprint and the set of object ids they legitimately used.</li><li>For every template, replay one user's request with the other user's id, using the first user's session, in both directions.</li><li>Classify each response: CONFIRMED if the victim's data leaked (with the field as evidence), SUSPECTED if access was granted without a provable leak, BLOCKED if denied.</li></ol>"
+    },
+    {
+     "id": "testing",
+     "label": "Testing",
+     "known": true,
+     "html": "<p>A deliberately vulnerable API ships in <code>testbed/</code> with three broken endpoints and two correctly-scoped ones. The test suite stands it up, records two users, runs a full audit, and asserts that the broken endpoints are CONFIRMED, the scoped endpoints are never flagged, and every confirmation carries evidence. In other words it is tested for its false-positive rate, not just that it runs.</p>\n<pre><code class=\"language-bash\">pip install pytest &amp;&amp; python3 -m pytest</code></pre>\n<p>Try it by hand:</p>\n<pre><code class=\"language-bash\">python3 testbed/vulnerable_api.py 8099 &amp;\npython3 testbed/capture.py http://127.0.0.1:8099 tok-alice alice.har /api/account /api/users/1/profile /api/notes/11 /api/invoices/101 /api/users/1/orders /api/settings/1\npython3 testbed/capture.py http://127.0.0.1:8099 tok-bob   bob.har   /api/account /api/users/2/profile /api/notes/22 /api/invoices/202 /api/users/2/orders /api/settings/2\nidorproof --a alice.har --b bob.har --label-a alice --label-b bob</code></pre>"
+    },
+    {
+     "id": "scope-and-responsible-use",
+     "label": "Scope and responsible use",
+     "known": false,
+     "html": "<p>idorproof only replays requests you supply, from accounts you control, against a target you choose. Run it only against systems you own or are explicitly authorized to test. It is a testing tool for finding your own authorization bugs before someone else does.</p>"
+    },
+    {
+     "id": "license",
+     "label": "License",
+     "known": true,
+     "html": "<p>MIT. See <a href=\"https://github.com/thecyberfarhan/idorproof/blob/main/LICENSE\" target=\"_blank\" rel=\"noopener noreferrer\">LICENSE</a>.</p>"
+    }
+   ]
+  },
+  {
    "slug": "reconkit",
    "name": "reconkit",
    "tagline": "Threaded port scan, HTTP/security-header probing and optional subdomain brute force, in one Markdown or JSON report. Standard library only.",
@@ -804,7 +880,7 @@
    "requires": "Python 3.10+",
    "license": "MIT",
    "upstream": "sherlock-project/sherlock",
-   "upstreamStars": 115705,
+   "upstreamStars": 115789,
    "scope": "Authorized testing only",
    "skillArea": "OSINT",
    "stars": 0,
