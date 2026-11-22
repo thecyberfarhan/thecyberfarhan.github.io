@@ -804,7 +804,7 @@
    "requires": "Python 3.10+",
    "license": "MIT",
    "upstream": "sherlock-project/sherlock",
-   "upstreamStars": 115702,
+   "upstreamStars": 115705,
    "scope": "Authorized testing only",
    "skillArea": "OSINT",
    "stars": 0,
@@ -1018,10 +1018,10 @@
      "html": "<pre><code class=\"language-bash\">git clone https://github.com/thecyberfarhan/mlbb-linux\ncd mlbb-linux\n./install.sh</code></pre>\n<p>The installer is idempotent and asks before any system change (set <code>MLBB_YES=1</code> to accept all). It installs the scripts, the KWin script and rules, the udev rule and the keymap, and walks you through the parts that need your own input: initializing Waydroid, installing the ARM translator, and Google Play certification. Signing in to Google Play and installing the game inside Android is yours to do.</p>\n<p>Then:</p>\n<pre><code class=\"language-bash\">mlbb start      # or launch &quot;Mobile Legends (Keyboard)&quot; from your app menu</code></pre>"
     },
     {
-     "id": "default-controls",
-     "label": "Default controls",
+     "id": "controls",
+     "label": "Controls",
      "known": false,
-     "html": "<div class=\"table-wrap\"><table><thead><tr><th>Key</th><th>Action</th><th></th><th>Key</th><th>Action</th></tr></thead><tbody><tr><td><code>W</code> <code>A</code> <code>S</code> <code>D</code></td><td>Move (joystick)</td><td></td><td><code>Q</code></td><td>Recall</td></tr><tr><td>Mouse</td><td>Aim / touch</td><td></td><td><code>Alt</code></td><td>Extra spell</td></tr><tr><td><code>Space</code></td><td>Basic attack</td><td></td><td><code>Tab</code></td><td>Scoreboard</td></tr><tr><td><code>Shift</code></td><td>Flicker / skill</td><td></td><td><code>Ctrl</code></td><td>Shop</td></tr><tr><td><code>E</code></td><td>Regen</td><td></td><td><code>Z</code></td><td>Quick buy</td></tr><tr><td><code>Enter</code></td><td>Chat (typing mode)</td><td></td><td></td><td></td></tr></tbody></table></div>\n<p>Edit <code>profiles/mlbb/mapping.json</code> (or in the scrcpy-mask UI) to rebind. Tap coordinates are in the profile's native resolution; see <a href=\"https://github.com/thecyberfarhan/mlbb-linux/blob/main/docs/PROFILES.md\" target=\"_blank\" rel=\"noopener noreferrer\">docs/PROFILES.md</a>.</p>"
+     "html": "<p>The keys in the bundled layout:</p>\n<div class=\"table-wrap\"><table><thead><tr><th>Key</th><th>Action</th><th></th><th>Key</th><th>Action</th></tr></thead><tbody><tr><td><code>W</code> <code>A</code> <code>S</code> <code>D</code></td><td>Move (joystick)</td><td></td><td><code>Q</code></td><td>Recall</td></tr><tr><td>Mouse</td><td>Aim / touch</td><td></td><td><code>Alt</code></td><td>Extra spell</td></tr><tr><td><code>Space</code></td><td>Basic attack</td><td></td><td><code>Tab</code></td><td>Scoreboard</td></tr><tr><td><code>Shift</code></td><td>Flicker / skill</td><td></td><td><code>Ctrl</code></td><td>Shop</td></tr><tr><td><code>E</code></td><td>Regen</td><td></td><td><code>Z</code></td><td>Quick buy</td></tr><tr><td><code>Enter</code></td><td>Chat (typing mode)</td><td></td><td></td><td></td></tr></tbody></table></div>\n<p>Two things to know before you rely on these:</p>\n<ul><li>You can rebind any key.</li><li>The on-screen <strong>tap positions are placed for one specific Mobile Legends HUD</strong> (a custom PC-friendly layout). Mobile Legends lets every player move their buttons around, so if yours sit in different spots the taps will miss. That is expected, not a bug: remap them to your own HUD once, as below.</li></ul>\n<h3>Remap to your own layout</h3>\n<ol><li>Launch with <code>mlbb start</code> so the game and the scrcpy-mask overlay are up.</li><li>Run <code>mlbb remap</code>. Each binding's label appears on its tap so you can see what you are moving.</li><li>In the scrcpy-mask window, open its key-mapping editor and drag each binding onto the matching button in <strong>your</strong> HUD. Add, remove or rebind keys as you like.</li><li>Save in scrcpy-mask, then run <code>mlbb start</code> again to play (the labels hide automatically).</li></ol>\n<p>Tip: arrange your in-game HUD first (Mobile Legends &gt; Settings &gt; Controls &gt; Customize), then map the taps onto it. The raw coordinates live in <code>profiles/mlbb/mapping.json</code>, in the profile's native resolution, if you prefer to edit them by hand; see <a href=\"https://github.com/thecyberfarhan/mlbb-linux/blob/main/docs/PROFILES.md\" target=\"_blank\" rel=\"noopener noreferrer\">docs/PROFILES.md</a>.</p>"
     },
     {
      "id": "configure",
