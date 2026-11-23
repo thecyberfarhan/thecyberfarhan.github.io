@@ -880,7 +880,7 @@
    "requires": "Python 3.10+",
    "license": "MIT",
    "upstream": "sherlock-project/sherlock",
-   "upstreamStars": 115882,
+   "upstreamStars": 115884,
    "scope": "Authorized testing only",
    "skillArea": "OSINT",
    "stars": 0,
