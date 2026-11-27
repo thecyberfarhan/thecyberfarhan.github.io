@@ -1,5 +1,5 @@
 {
- "generated": "2026-11-26",
+ "generated": "2026-11-27",
  "projects": [
   {
    "slug": "apicheck",
@@ -529,7 +529,7 @@
    "requires": "Python 3.11+",
    "license": "GPL-3.0 (upstream's own licence file; see License)",
    "upstream": "ticarpi/jwt_tool",
-   "upstreamStars": 6829,
+   "upstreamStars": 6830,
    "scope": "Authorized testing only",
    "skillArea": "Web and API testing",
    "stars": 0,
@@ -647,7 +647,7 @@
    "requires": "Python 3.12+ (server side)",
    "license": "BSD-3-Clause",
    "upstream": "CrimsonForge-io/king-phisher",
-   "upstreamStars": 2619,
+   "upstreamStars": 2620,
    "scope": "Authorized testing only",
    "skillArea": "Social engineering",
    "stars": 0,
@@ -880,7 +880,7 @@
    "requires": "Python 3.10+",
    "license": "MIT",
    "upstream": "sherlock-project/sherlock",
-   "upstreamStars": 117966,
+   "upstreamStars": 118138,
    "scope": "Authorized testing only",
    "skillArea": "OSINT",
    "stars": 0,
